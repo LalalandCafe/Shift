@@ -22,9 +22,6 @@ function mapEntry(entry, storeGuid) {
   };
 }
 
-// GET /api/toast/cron
-// Lo dispara Vercel Cron (ver vercel.json). Sincroniza el dia anterior.
-// Vercel manda Authorization: Bearer <CRON_SECRET> si defines esa env var.
 export async function GET(request) {
   try {
     const auth = request.headers.get("authorization");
@@ -32,12 +29,11 @@ export async function GET(request) {
       return Response.json({ ok: false, error: "No autorizado" }, { status: 401 });
     }
 
-    // Rango: ayer 00:00 a ayer 23:59 (ajusta el offset a tu zona horaria).
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setDate(now.getDate() - 1);
-    const y = yesterday.toISOString().slice(0, 10); // YYYY-MM-DD
-    const startDate = `${y}T00:00:00.000-0500`; // CT, ajusta si hace falta
+    const y = yesterday.toISOString().slice(0, 10);
+    const startDate = `${y}T00:00:00.000-0500`;
     const endDate = `${y}T23:59:59.000-0500`;
 
     const guid = process.env.TOAST_RESTAURANT_GUID;

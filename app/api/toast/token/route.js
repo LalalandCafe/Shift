@@ -1,8 +1,5 @@
 import { getToastToken } from "@/lib/toast";
 
-// GET /api/toast/token
-// Solo para debug: confirma que las credenciales de Toast funcionan.
-// No devuelve el token completo, solo confirma que se obtuvo.
 export async function GET() {
   try {
     const token = await getToastToken();
