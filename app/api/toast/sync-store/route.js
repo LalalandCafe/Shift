@@ -2,7 +2,6 @@ import { getToastToken, getTimeEntries } from "@/lib/toast";
 import { translateTimeEntries } from "@/lib/toast-labels";
 import { supabaseAdmin } from "@/lib/supabase";
 
-// Suma el gross sales real de Toast (misma logica validada en sales-debug)
 async function computeGrossSales(businessDate, restaurantGuid) {
   const token = await getToastToken();
   const headers = {
@@ -42,10 +41,12 @@ async function computeGrossSales(businessDate, restaurantGuid) {
   return Math.round(grossSales * 100) / 100;
 }
 
-// POST /api/toast/sync-store
-// Body: { storeCode: 10002, restaurantGuid: "...", businessDate: "20260719", isoDate: "2026-07-19" }
 export async function POST(request) {
   try {
+    const secret = request.headers.get("x-sync-secret");
+    if (secret !== process.env.SYNC_SECRET) {
+      return Response.json({ ok: false, error: "No autorizado" }, { status: 401 });
+    }
     const body = await request.json();
     const { storeCode, restaurantGuid, businessDate, isoDate } = body;
     if (!storeCode || !restaurantGuid || !businessDate || !isoDate) {
@@ -55,7 +56,6 @@ export async function POST(request) {
       );
     }
 
-    // ── 1. LABOR: jalar time entries, traducir nombres/puestos, guardar ──
     const startDate = isoDate + "T00:00:00.000-0500";
     const endDate = isoDate + "T23:59:59.000-0500";
     const rawEntries = await getTimeEntries({ restaurantGuid, startDate, endDate });
@@ -81,7 +81,6 @@ export async function POST(request) {
       if (laborErr) throw new Error("Guardar labor fallo: " + laborErr.message);
     }
 
-    // ── 2. VENTAS: sumar ordenes reales, guardar en daily_sales ──
     const grossSales = await computeGrossSales(businessDate, restaurantGuid);
     const { error: salesErr } = await supabaseAdmin
       .from("daily_sales")

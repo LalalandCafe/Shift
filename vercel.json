@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/toast/cron-all",
+      "path": "/api/toast/cron-trigger",
       "schedule": "30 12 * * *"
     }
   ]
