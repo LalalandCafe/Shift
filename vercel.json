@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/toast/cron-trigger",
-      "schedule": "30 12 * * *"
+      "schedule": "30 13 * * *"
     }
   ]
 }
