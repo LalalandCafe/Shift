@@ -27,12 +27,13 @@ async function computeGrossSales(businessDate, restaurantGuid) {
       })
     );
     results.forEach((order) => {
-      if (!order || order.voided) return;
+      if (!order || order.voided || order.deleted || order.excessFood) return;
       (order.checks || []).forEach((check) => {
-        if (check.voided) return;
+        if (check.voided || check.deleted) return;
         (check.selections || []).forEach((sel) => {
           if (sel.voided) return;
-          grossSales += (sel.preDiscountPrice || sel.price || 0);
+          if (sel.deferred) return;
+          grossSales += (sel.preDiscountPrice || 0);
         });
       });
     });
