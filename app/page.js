@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react";
 import "./globals.css";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
 const DEFAULT_DATE = "2026-07-19";
 
 const GROUP_STRUCTURE = {
@@ -145,6 +143,8 @@ export default function ShiftApp() {
   );
   const totalSplh = totals && totals.hours > 0 ? Math.round(totals.sales / totals.hours) : 0;
 
+  const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
+
   return (
     <div className="app">
       <div className="sidebar">
@@ -186,7 +186,7 @@ export default function ShiftApp() {
               </select>
             )}
             <span className="badge b-info" style={{ marginLeft: 8 }}>
-              {report ? `Week ${report.weekNum} · Period ${report.period}` : "34 stores · Toast auto-sync"}
+              {report ? `Week ${report.weekNum} · P${report.period}` : "34 stores"}
             </span>
           </div>
         </div>
@@ -227,7 +227,7 @@ export default function ShiftApp() {
                     </div>
                     <div className="mc">
                       <div className="mc-l">Total Gross Sales</div>
-                      <div className="mc-v">${Math.round(totals.sales).toLocaleString("en-US")}</div>
+                      <div className="mc-v">{money(totals.sales)}</div>
                     </div>
                     <div className="mc">
                       <div className="mc-l">Blended SPLH</div>
@@ -238,11 +238,12 @@ export default function ShiftApp() {
                     </div>
                   </div>
 
-                  <div className="tcard">
+                  {/* ===== TABLA (escritorio) ===== */}
+                  <div className="tcard desktop-table">
                     <div className="thead">
                       <span className="ttl">Labor Dashboard — {report.dayName}, {report.date}</span>
                     </div>
-                    <div className="scx" style={{ overflowX: "auto" }}>
+                    <div className="scx">
                       <table className="grid">
                         <thead>
                           <tr>
@@ -280,14 +281,14 @@ export default function ShiftApp() {
                                     <div className="lc-name">{s.name}</div>
                                   </td>
                                   <td className="num">{s.day.hours}</td>
-                                  <td className="num">${s.day.sales.toLocaleString("en-US")}</td>
+                                  <td className="num">{money(s.day.sales)}</td>
                                   <td className="num">${s.day.target}</td>
                                   <td className={"num " + (s.day.ok ? "cell-ok" : "cell-bad")}>${s.day.splh}</td>
                                   <td className="num">
                                     {s.day.overUnder < 0 ? `(${Math.abs(s.day.overUnder)})` : s.day.overUnder}
                                   </td>
                                   <td className="num" style={{ borderLeft: "2px solid #999" }}>{s.wtd.hours}</td>
-                                  <td className="num">${s.wtd.sales.toLocaleString("en-US")}</td>
+                                  <td className="num">{money(s.wtd.sales)}</td>
                                   <td className={"num " + (s.wtd.ok ? "cell-ok" : "cell-bad")}>${s.wtd.splh}</td>
                                   <td className="num" style={{ borderLeft: "2px solid #999" }}>{s.wtd.trainee || "-"}</td>
                                   <td className="num">{s.wtd.trainer || "-"}</td>
@@ -300,7 +301,7 @@ export default function ShiftApp() {
                                   ) : (
                                     <>
                                       <td className="num" style={{ borderLeft: "2px solid #999" }}>{s.ptd.hours.toLocaleString("en-US")}</td>
-                                      <td className="num">${s.ptd.sales.toLocaleString("en-US")}</td>
+                                      <td className="num">{money(s.ptd.sales)}</td>
                                       <td className={"num " + (s.ptd.ok ? "cell-ok" : "cell-bad")}>${s.ptd.splh}</td>
                                     </>
                                   )}
@@ -311,6 +312,111 @@ export default function ShiftApp() {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+
+                  {/* ===== TARJETAS (movil) ===== */}
+                  <div className="mobile-cards">
+                    {groupedSections(report.rows).map((section) => (
+                      <div key={"m-" + section.label}>
+                        <div className="scard-region-head">{section.label}</div>
+                        {section.stores.map((s) => (
+                          <div className="store-card" key={"mc-" + s.code}>
+                            <div className="store-card-head">
+                              <div>
+                                <div className="store-card-code">
+                                  {s.code}
+                                  {s.day.flags && s.day.flags.length > 0 && (
+                                    <span title={s.day.flags.join(" · ")} style={{ marginLeft: 5 }}>⚠️</span>
+                                  )}
+                                </div>
+                                <div className="store-card-name">{s.name}</div>
+                              </div>
+                              <div
+                                className="store-card-splh"
+                                style={{
+                                  background: s.day.ok ? "var(--cell-green-bg)" : "var(--cell-red-bg)",
+                                  color: s.day.ok ? "var(--cell-green-t)" : "var(--cell-red-t)",
+                                }}
+                              >
+                                ${s.day.splh}
+                              </div>
+                            </div>
+
+                            <div className="scard-block">
+                              <div className="scard-block-label">Day — {report.dayName}</div>
+                              <div className="scard-row">
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">Hours</div>
+                                  <div className="scard-cell-val">{s.day.hours}</div>
+                                </div>
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">Sales</div>
+                                  <div className="scard-cell-val">{money(s.day.sales)}</div>
+                                </div>
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">Target</div>
+                                  <div className="scard-cell-val">${s.day.target}</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="scard-block">
+                              <div className="scard-block-label">Week to Date</div>
+                              <div className="scard-row">
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">Hours</div>
+                                  <div className="scard-cell-val">{s.wtd.hours}</div>
+                                </div>
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">Sales</div>
+                                  <div className="scard-cell-val">{money(s.wtd.sales)}</div>
+                                </div>
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">SPLH</div>
+                                  <div className="scard-cell-val" style={{ color: s.wtd.ok ? "var(--cell-green-t)" : "var(--cell-red-t)" }}>${s.wtd.splh}</div>
+                                </div>
+                              </div>
+                              <div className="scard-row" style={{ marginTop: 8 }}>
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">Trainee</div>
+                                  <div className="scard-cell-val">{s.wtd.trainee || "-"}</div>
+                                </div>
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">Trainer</div>
+                                  <div className="scard-cell-val">{s.wtd.trainer || "-"}</div>
+                                </div>
+                                <div className="scard-cell">
+                                  <div className="scard-cell-lbl">(Over)/Under</div>
+                                  <div className="scard-cell-val">{s.wtd.overUnder < 0 ? `(${Math.abs(s.wtd.overUnder)})` : s.wtd.overUnder}</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="scard-block">
+                              <div className="scard-block-label">Period to Date</div>
+                              {s.ptd.empty ? (
+                                <div style={{ fontSize: 12, color: "var(--text3)", padding: "4px 2px" }}>Sin datos de periodo</div>
+                              ) : (
+                                <div className="scard-row">
+                                  <div className="scard-cell">
+                                    <div className="scard-cell-lbl">Hours</div>
+                                    <div className="scard-cell-val">{s.ptd.hours.toLocaleString("en-US")}</div>
+                                  </div>
+                                  <div className="scard-cell">
+                                    <div className="scard-cell-lbl">Sales</div>
+                                    <div className="scard-cell-val">{money(s.ptd.sales)}</div>
+                                  </div>
+                                  <div className="scard-cell">
+                                    <div className="scard-cell-lbl">SPLH</div>
+                                    <div className="scard-cell-val" style={{ color: s.ptd.ok ? "var(--cell-green-t)" : "var(--cell-red-t)" }}>${s.ptd.splh}</div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 </>
               )}
@@ -354,7 +460,7 @@ export default function ShiftApp() {
               {!storesLoading && stores && (
                 <div className="tcard">
                   <div className="thead"><span className="ttl">Store Targets (SPLH)</span></div>
-                  <div className="scx" style={{ overflowX: "auto" }}>
+                  <div className="scx">
                     <table className="grid">
                       <thead>
                         <tr>
@@ -384,7 +490,7 @@ export default function ShiftApp() {
                                       type="number"
                                       defaultValue={st.weekday_target}
                                       onChange={(ev) => editField(st.code, "weekday_target", ev.target.value)}
-                                      style={{ width: 60, textAlign: "right", fontFamily: "monospace" }}
+                                      className="tinput"
                                     />
                                   </td>
                                   <td className="num">
@@ -392,7 +498,7 @@ export default function ShiftApp() {
                                       type="number"
                                       defaultValue={st.weekend_target}
                                       onChange={(ev) => editField(st.code, "weekend_target", ev.target.value)}
-                                      style={{ width: 60, textAlign: "right", fontFamily: "monospace" }}
+                                      className="tinput"
                                     />
                                   </td>
                                   <td className="num">
@@ -400,7 +506,7 @@ export default function ShiftApp() {
                                       type="number"
                                       defaultValue={st.ptd_target}
                                       onChange={(ev) => editField(st.code, "ptd_target", ev.target.value)}
-                                      style={{ width: 60, textAlign: "right", fontFamily: "monospace" }}
+                                      className="tinput"
                                     />
                                   </td>
                                   <td className="num">
