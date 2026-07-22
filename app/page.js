@@ -182,7 +182,7 @@ export default function ShiftApp() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="🔍 Buscar tienda o código..."
+                placeholder="🔍 Search store or code..."
                 style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 12.5, width: 200 }}
               />
             )}
