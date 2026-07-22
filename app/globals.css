@@ -132,6 +132,7 @@ table.stores .sreg{padding:6px 14px;font-size:10px;font-weight:700;color:#fff;ba
 @media (max-width: 820px) {
   .desktop-table { display: none; }
   .mobile-cards { display: block; }
+
   .sidebar { display: none; }
   .content { padding: 14px 12px; }
   .topbar { padding: 12px 14px; }
@@ -154,7 +155,7 @@ table.stores .sreg{padding:6px 14px;font-size:10px;font-weight:700;color:#fff;ba
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border);
 }
-.store-card-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.store-card-name { font-size: 15px; font-weight: 700; color: var(--text1); }
 .store-card-code { font-size: 11px; color: var(--text3); font-family: monospace; }
 .store-card-splh {
   font-size: 22px; font-weight: 800; padding: 4px 12px; border-radius: 8px;
@@ -172,8 +173,42 @@ table.stores .sreg{padding:6px 14px;font-size:10px;font-weight:700;color:#fff;ba
   background: var(--bg2); border-radius: 8px; padding: 7px 9px; text-align: center;
 }
 .scard-cell-lbl { font-size: 9.5px; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
-.scard-cell-val { font-size: 14px; font-weight: 700; color: var(--text); }
+.scard-cell-val { font-size: 14px; font-weight: 700; color: var(--text1); }
 .scard-region-head {
   font-size: 12px; font-weight: 800; color: #fff; background: var(--navy);
   padding: 7px 12px; border-radius: 8px; margin: 16px 0 10px 0;
 }
+
+/* ===== Pulido de tarjetas moviles ===== */
+.store-card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  padding: 16px;
+}
+.store-card.ok { border-left: 5px solid var(--cell-green-t); }
+.store-card.bad { border-left: 5px solid var(--cell-red-t); }
+
+/* Celda SPLH pintada dentro de tarjeta */
+.scard-cell.splh-ok {
+  background: var(--cell-green-bg);
+  border: 1px solid var(--cell-green-t);
+}
+.scard-cell.splh-ok .scard-cell-val { color: var(--cell-green-t); }
+.scard-cell.splh-ok .scard-cell-lbl { color: var(--cell-green-t); opacity: .8; }
+.scard-cell.splh-bad {
+  background: var(--cell-red-bg);
+  border: 1px solid var(--cell-red-t);
+}
+.scard-cell.splh-bad .scard-cell-val { color: var(--cell-red-t); }
+.scard-cell.splh-bad .scard-cell-lbl { color: var(--cell-red-t); opacity: .8; }
+
+/* Numero grande del target */
+.store-card-splh {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 74px; line-height: 1;
+}
+
+.scard-block-label { margin-bottom: 7px; }
+.scard-cell { padding: 9px 9px; transition: transform .08s; }
+.scard-cell-val { font-size: 15px; }

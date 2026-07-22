@@ -1,4 +1,4 @@
-  "use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import "./globals.css";
@@ -182,7 +182,7 @@ export default function ShiftApp() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="🔍 Search store or code..."
+                placeholder="🔍 Buscar tienda o código..."
                 style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 12.5, width: 200 }}
               />
             )}
@@ -332,7 +332,7 @@ export default function ShiftApp() {
                       <div key={"m-" + section.label}>
                         <div className="scard-region-head">{section.label}</div>
                         {section.stores.map((s) => (
-                          <div className="store-card" key={"mc-" + s.code}>
+                          <div className={"store-card " + (s.day.ok ? "ok" : "bad")} key={"mc-" + s.code}>
                             <div className="store-card-head">
                               <div>
                                 <div className="store-card-code">
@@ -363,9 +363,9 @@ export default function ShiftApp() {
                                   <div className="scard-cell-lbl">Sales</div>
                                   <div className="scard-cell-val">{money(s.day.sales)}</div>
                                 </div>
-                                <div className="scard-cell">
+                                <div className={"scard-cell " + (s.day.ok ? "splh-ok" : "splh-bad")}>
                                   <div className="scard-cell-lbl">SPLH</div>
-                                  <div className="scard-cell-val" style={{ color: s.day.ok ? "var(--cell-green-t)" : "var(--cell-red-t)" }}>${s.day.splh}</div>
+                                  <div className="scard-cell-val">${s.day.splh}</div>
                                 </div>
                               </div>
                             </div>
@@ -381,9 +381,9 @@ export default function ShiftApp() {
                                   <div className="scard-cell-lbl">Sales</div>
                                   <div className="scard-cell-val">{money(s.wtd.sales)}</div>
                                 </div>
-                                <div className="scard-cell">
+                                <div className={"scard-cell " + (s.wtd.ok ? "splh-ok" : "splh-bad")}>
                                   <div className="scard-cell-lbl">SPLH</div>
-                                  <div className="scard-cell-val" style={{ color: s.wtd.ok ? "var(--cell-green-t)" : "var(--cell-red-t)" }}>${s.wtd.splh}</div>
+                                  <div className="scard-cell-val">${s.wtd.splh}</div>
                                 </div>
                               </div>
                               <div className="scard-row" style={{ marginTop: 8 }}>
@@ -416,9 +416,9 @@ export default function ShiftApp() {
                                     <div className="scard-cell-lbl">Sales</div>
                                     <div className="scard-cell-val">{money(s.ptd.sales)}</div>
                                   </div>
-                                  <div className="scard-cell">
+                                  <div className={"scard-cell " + (s.ptd.ok ? "splh-ok" : "splh-bad")}>
                                     <div className="scard-cell-lbl">SPLH</div>
-                                    <div className="scard-cell-val" style={{ color: s.ptd.ok ? "var(--cell-green-t)" : "var(--cell-red-t)" }}>${s.ptd.splh}</div>
+                                    <div className="scard-cell-val">${s.ptd.splh}</div>
                                   </div>
                                 </div>
                               )}
