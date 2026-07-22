@@ -1,4 +1,4 @@
-"use client";
+  "use client";
 
 import { useState, useEffect } from "react";
 import "./globals.css";
@@ -21,6 +21,7 @@ export default function ShiftApp() {
   const [view, setView] = useState("week");
   const [isoDate, setIsoDate] = useState(DEFAULT_DATE);
   const [groupFilter, setGroupFilter] = useState("All");
+  const [search, setSearch] = useState("");
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -89,11 +90,13 @@ export default function ShiftApp() {
   }, [view]);
 
   function groupedSections(rows) {
+    const q = search.trim().toLowerCase();
     const sections = [];
     for (const grp of Object.keys(GROUP_STRUCTURE)) {
       if (groupFilter !== "All" && groupFilter !== grp) continue;
       GROUP_STRUCTURE[grp].forEach((rDef) => {
-        const list = rows.filter((r) => r.grp === grp && rDef.regions.includes(r.region));
+        let list = rows.filter((r) => r.grp === grp && rDef.regions.includes(r.region));
+        if (q) list = list.filter((r) => r.name.toLowerCase().includes(q) || String(r.code).includes(q));
         if (list.length) sections.push({ label: rDef.label, stores: list });
       });
     }
@@ -174,6 +177,15 @@ export default function ShiftApp() {
             {view === "week" ? "Week view" : view === "email" ? "HTML email" : "Store Targets"}
           </div>
           <div className="tbr">
+            {view === "week" && (
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="🔍 Search store or code..."
+                style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 12.5, width: 200 }}
+              />
+            )}
             {(view === "week" || view === "email") && (
               <select
                 value={groupFilter}
@@ -333,12 +345,10 @@ export default function ShiftApp() {
                               </div>
                               <div
                                 className="store-card-splh"
-                                style={{
-                                  background: s.day.ok ? "var(--cell-green-bg)" : "var(--cell-red-bg)",
-                                  color: s.day.ok ? "var(--cell-green-t)" : "var(--cell-red-t)",
-                                }}
+                                style={{ background: "var(--bg3)", color: "var(--text)" }}
                               >
-                                ${s.day.splh}
+                                ${s.day.target}
+                                <div style={{ fontSize: 9, fontWeight: 700, opacity: 0.6, textAlign: "center", marginTop: -2 }}>TARGET</div>
                               </div>
                             </div>
 
@@ -354,8 +364,8 @@ export default function ShiftApp() {
                                   <div className="scard-cell-val">{money(s.day.sales)}</div>
                                 </div>
                                 <div className="scard-cell">
-                                  <div className="scard-cell-lbl">Target</div>
-                                  <div className="scard-cell-val">${s.day.target}</div>
+                                  <div className="scard-cell-lbl">SPLH</div>
+                                  <div className="scard-cell-val" style={{ color: s.day.ok ? "var(--cell-green-t)" : "var(--cell-red-t)" }}>${s.day.splh}</div>
                                 </div>
                               </div>
                             </div>
