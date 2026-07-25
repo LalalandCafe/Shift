@@ -87,10 +87,18 @@ export async function GET(request) {
       return Response.json({ ok: false, error: "No autorizado" }, { status: 401 });
     }
 
-    const now = new Date();
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const isoDate = yesterday.toISOString().slice(0, 10);
+    const { searchParams } = new URL(request.url);
+    const dateParam = searchParams.get("date");
+
+    let isoDate;
+    if (dateParam) {
+      isoDate = dateParam;
+    } else {
+      const now = new Date();
+      const yesterday = new Date(now);
+      yesterday.setDate(now.getDate() - 1);
+      isoDate = yesterday.toISOString().slice(0, 10);
+    }
     const businessDate = isoDate.replace(/-/g, "");
 
     const { data: stores, error } = await supabaseAdmin
