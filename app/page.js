@@ -319,6 +319,14 @@ export default function ShiftApp() {
                 style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 12.5, width: 200 }}
               />
             )}
+            {(view === "week" || view === "leaderboard") && (
+              <input
+                type="date"
+                value={isoDate}
+                onChange={(e) => setIsoDate(e.target.value)}
+                style={{ padding: "5px 10px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 12.5 }}
+              />
+            )}
             {(view === "week" || view === "email") && (
               <select
                 value={groupFilter}
@@ -344,26 +352,15 @@ export default function ShiftApp() {
         <div className="content">
           {view === "week" && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 17, flexWrap: "wrap" }}>
-                <div>
-                  <label style={{ fontSize: 10.5, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 4 }}>
-                    Report Date
-                  </label>
-                  <input
-                    type="date"
-                    value={isoDate}
-                    onChange={(e) => setIsoDate(e.target.value)}
-                    style={{ padding: "6px 10px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 13 }}
-                  />
-                </div>
-                {report && (
-                  <div style={{ background: "var(--navy)", color: "#fff", padding: "8px 16px", borderRadius: 10, fontSize: 13 }}>
+              {report && (
+                <div style={{ marginBottom: 17 }}>
+                  <div style={{ background: "var(--navy)", color: "#fff", padding: "8px 16px", borderRadius: 10, fontSize: 13, display: "inline-block" }}>
                     <span style={{ fontWeight: 700 }}>Week {report.weekNum}</span>
                     <span style={{ opacity: 0.85 }}> &middot; {report.dayName} &middot; Period {report.period}</span>
                     <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>Week starts {report.weekStart}</div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               {loading && <div className="empty">Cargando...</div>}
               {error && <div className="empty">Error: {error}</div>}
@@ -702,4 +699,4 @@ export default function ShiftApp() {
       </div>
     </div>
   );
-}
+}}
