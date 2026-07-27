@@ -34,6 +34,49 @@ export default function ShiftApp() {
   const [savedFlash, setSavedFlash] = useState(null);
   const [copyStatus, setCopyStatus] = useState("idle");
 
+  const [reporterMode, setReporterMode] = useState(false);
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [unlockErr, setUnlockErr] = useState("");
+  const [saveErr, setSaveErr] = useState(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 900);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  useEffect(() => {
+    if (sessionStorage.getItem("shift_reporter_code")) setReporterMode(true);
+  }, []);
+
+  async function unlockReporter() {
+    setUnlockErr("");
+    try {
+      const res = await fetch("/api/auth/reporter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: codeInput }),
+      });
+      const j = await res.json();
+      if (!j.ok) { setUnlockErr("Código incorrecto"); return; }
+      sessionStorage.setItem("shift_reporter_code", codeInput);
+      setReporterMode(true);
+      setShowUnlock(false);
+      setCodeInput("");
+    } catch (e) {
+      setUnlockErr("Error de conexión");
+    }
+  }
+
+  function lockReporter() {
+    sessionStorage.removeItem("shift_reporter_code");
+    setReporterMode(false);
+    if (view === "targets") setView("week");
+  }
+
   async function copyEmailHtml() {
     if (!emailHtml) return;
     try {
@@ -123,10 +166,15 @@ export default function ShiftApp() {
     const weekdayTarget = e.weekday_target !== undefined ? Number(e.weekday_target) : st.weekday_target;
     const weekendTarget = e.weekend_target !== undefined ? Number(e.weekend_target) : st.weekend_target;
     const ptdTarget = e.ptd_target !== undefined ? Number(e.ptd_target) : st.ptd_target;
+
+    const rcode = sessionStorage.getItem("shift_reporter_code");
+    if (!rcode) { setSaveErr("Reporter mode requerido"); return; }
+
+    setSaveErr(null);
     setSavingCode(st.code);
     const res = await fetch("/api/stores", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-reporter-code": rcode },
       body: JSON.stringify({ code: st.code, weekdayTarget, weekendTarget, ptdTarget }),
     });
     const d = await res.json();
@@ -137,6 +185,15 @@ export default function ShiftApp() {
       );
       setSavedFlash(st.code);
       setTimeout(() => setSavedFlash(null), 1500);
+    } else {
+      if (res.status === 401) {
+        sessionStorage.removeItem("shift_reporter_code");
+        setReporterMode(false);
+        setSaveErr("Sesión expirada. Desbloquea reporter mode de nuevo.");
+        setView("week");
+      } else {
+        setSaveErr(d.error || "Error al guardar");
+      }
     }
   }
 
@@ -165,11 +222,68 @@ export default function ShiftApp() {
         <button className={"nbtn" + (view === "email" ? " active" : "")} onClick={() => setView("email")}>
           <span className="nbtn-ic">✉️</span>HTML email
         </button>
-        <div className="nsec">Admin</div>
-        <button className={"nbtn" + (view === "targets" ? " active" : "")} onClick={() => setView("targets")}>
-          <span className="nbtn-ic">🎯</span>Store Targets
-        </button>
+
+        {isDesktop && (
+          <>
+            <div className="nsec">Admin</div>
+            {reporterMode ? (
+              <>
+                <button className={"nbtn" + (view === "targets" ? " active" : "")} onClick={() => setView("targets")}>
+                  <span className="nbtn-ic">🎯</span>Store Targets
+                </button>
+                <button className="nbtn" onClick={lockReporter}>
+                  <span className="nbtn-ic">🔒</span>Lock reporter mode
+                </button>
+              </>
+            ) : (
+              <button className="nbtn" onClick={() => setShowUnlock(true)}>
+                <span className="nbtn-ic">🔓</span>Unlock reporter mode
+              </button>
+            )}
+          </>
+        )}
       </div>
+
+      {showUnlock && (
+        <div
+          onClick={() => { setShowUnlock(false); setUnlockErr(""); setCodeInput(""); }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <div
+            onClick={(ev) => ev.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 12, padding: 24, width: 320, boxShadow: "0 10px 40px rgba(0,0,0,.3)" }}
+          >
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Reporter mode</div>
+            <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 14 }}>
+              Enter the code to edit stores and targets.
+            </div>
+            <input
+              type="password"
+              value={codeInput}
+              autoFocus
+              onChange={(ev) => setCodeInput(ev.target.value)}
+              onKeyDown={(ev) => { if (ev.key === "Enter") unlockReporter(); }}
+              placeholder="Code"
+              style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 13, marginBottom: 10, boxSizing: "border-box" }}
+            />
+            {unlockErr && <div style={{ color: "#9c0006", fontSize: 12, marginBottom: 10 }}>{unlockErr}</div>}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => { setShowUnlock(false); setUnlockErr(""); setCodeInput(""); }}
+                style={{ padding: "7px 14px", borderRadius: 8, border: "1.5px solid var(--border2)", background: "#fff", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={unlockReporter}
+                style={{ padding: "7px 14px", borderRadius: 8, border: "none", background: "var(--navy)", color: "#fff", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700 }}
+              >
+                Unlock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="main">
         <div className="topbar">
@@ -196,6 +310,11 @@ export default function ShiftApp() {
                 <option value="TX-TN">TX-TN</option>
                 <option value="CA-AZ">CA-AZ</option>
               </select>
+            )}
+            {reporterMode && (
+              <span className="badge" style={{ marginLeft: 8, background: "#1a6630", color: "#fff" }}>
+                🔓 Reporter
+              </span>
             )}
             <span className="badge b-info" style={{ marginLeft: 8 }}>
               {report ? `Week ${report.weekNum} · P${report.period}` : "34 stores"}
@@ -268,7 +387,9 @@ export default function ShiftApp() {
                             <th className="r" style={{ borderLeft: "2px solid #999" }}>WTD Hours</th>
                             <th className="r">WTD Sales</th>
                             <th className="r">WTD SPLH</th>
-                            <th className="r" style={{ borderLeft: "2px solid #999" }}>Trainee</th>
+                            <th className="r">WTD (Over)/Under</th>
+                            <th className="r" style={{ borderLeft: "2px solid #999" }}>Total Training</th>
+                            <th className="r">Trainee</th>
                             <th className="r">Trainer</th>
                             <th className="r" style={{ borderLeft: "2px solid #999" }}>PTD Hours</th>
                             <th className="r">PTD Sales</th>
@@ -279,7 +400,7 @@ export default function ShiftApp() {
                           {groupedSections(report.rows).map((section) => (
                             <>
                               <tr className="rrow" key={"h-" + section.label}>
-                                <td colSpan={14}>{section.label}</td>
+                                <td colSpan={16}>{section.label}</td>
                               </tr>
                               {section.stores.map((s) => (
                                 <tr key={s.code}>
@@ -302,7 +423,11 @@ export default function ShiftApp() {
                                   <td className="num" style={{ borderLeft: "2px solid #999" }}>{s.wtd.hours}</td>
                                   <td className="num">{money(s.wtd.sales)}</td>
                                   <td className={"num " + (s.wtd.ok ? "cell-ok" : "cell-bad")}>${s.wtd.splh}</td>
-                                  <td className="num" style={{ borderLeft: "2px solid #999" }}>{s.wtd.trainee || "-"}</td>
+                                  <td className="num">
+                                    {s.wtd.overUnder < 0 ? `(${Math.abs(s.wtd.overUnder)})` : s.wtd.overUnder}
+                                  </td>
+                                  <td className="num" style={{ borderLeft: "2px solid #999" }}>{s.wtd.trainTotal || "-"}</td>
+                                  <td className="num">{s.wtd.trainee || "-"}</td>
                                   <td className="num">{s.wtd.trainer || "-"}</td>
                                   {s.ptd.empty ? (
                                     <>
@@ -464,8 +589,17 @@ export default function ShiftApp() {
             </div>
           )}
 
-          {view === "targets" && (
+          {view === "targets" && !reporterMode && (
+            <div className="empty">🔒 Reporter mode requerido para editar targets.</div>
+          )}
+
+          {view === "targets" && reporterMode && (
             <>
+              {saveErr && (
+                <div style={{ background: "#fde8e8", color: "#9c0006", padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+                  {saveErr}
+                </div>
+              )}
               {storesLoading && <div className="empty">Cargando tiendas...</div>}
               {!storesLoading && stores && (
                 <div className="tcard">

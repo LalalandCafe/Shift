@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { getAllStores, updateStoreTargets } from "@/lib/data";
+import { reporterGuard } from "@/lib/reporter-auth";
 
 export async function GET() {
   try {
@@ -12,6 +13,9 @@ export async function GET() {
 }
 
 export async function PATCH(request) {
+  const denied = reporterGuard(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const { code, weekdayTarget, weekendTarget, ptdTarget } = body;
