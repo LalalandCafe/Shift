@@ -699,4 +699,4 @@ export default function ShiftApp() {
       </div>
     </div>
   );
-}}
+}
