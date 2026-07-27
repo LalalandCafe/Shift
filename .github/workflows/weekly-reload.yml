@@ -1,0 +1,79 @@
+name: Weekly SHIFT Reload
+
+on:
+  schedule:
+    - cron: "0 15 * * 1"
+  workflow_dispatch:
+    inputs:
+      week_start:
+        description: "Lunes de la semana a recargar YYYY-MM-DD (vacio = semana pasada)"
+        required: false
+        default: ""
+
+jobs:
+  reload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Resolver semana
+        id: semana
+        run: |
+          if [ -n "${{ github.event.inputs.week_start }}" ]; then
+            START="${{ github.event.inputs.week_start }}"
+          else
+            START=$(TZ=America/Chicago date -d "last monday - 7 days" +%Y-%m-%d)
+          fi
+          echo "start=$START" >> $GITHUB_OUTPUT
+          echo "Recargando semana del $START"
+
+      - name: Traer tiendas
+        run: |
+          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/stores?active=eq.true&toast_guid=not.is.null&select=code,toast_guid" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -o stores.json
+          echo "Tiendas: $(jq 'length' stores.json)"
+
+      - name: Recargar 7 dias
+        run: |
+          START="${{ steps.semana.outputs.start }}"
+          TOTAL_OK=0; TOTAL_FAIL=0; STALE=0
+
+          for OFFSET in 0 1 2 3 4 5 6; do
+            ISO=$(date -d "$START + $OFFSET days" +%Y-%m-%d)
+            BUSINESS=$(echo $ISO | tr -d '-')
+            echo "::group::$ISO"
+
+            for row in $(jq -r '.[] | @base64' stores.json); do
+              CODE=$(echo $row | base64 -d | jq -r '.code')
+              GUID=$(echo $row | base64 -d | jq -r '.toast_guid')
+
+              SUCCESS=0
+              for attempt in 1 2 3; do
+                RESP=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.APP_URL }}/api/toast/sync-store" \
+                  -H "Content-Type: application/json" \
+                  -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
+                  -d "{\"storeCode\":$CODE,\"restaurantGuid\":\"$GUID\",\"businessDate\":\"$BUSINESS\",\"isoDate\":\"$ISO\"}")
+                HTTP=$(echo "$RESP" | tail -n1)
+                BODY=$(echo "$RESP" | sed '$d')
+                if [ "$HTTP" = "200" ]; then
+                  RM=$(echo "$BODY" | jq -r '.staleRemoved // 0')
+                  STALE=$((STALE+RM))
+                  [ "$RM" -gt 0 ] && echo "  $CODE limpio $RM turnos viejos"
+                  SUCCESS=1
+                  break
+                fi
+                sleep 5
+              done
+
+              if [ "$SUCCESS" = "1" ]; then TOTAL_OK=$((TOTAL_OK+1)); else TOTAL_FAIL=$((TOTAL_FAIL+1)); fi
+              sleep 1
+            done
+            echo "::endgroup::"
+          done
+
+          echo "### Recarga semanal desde $START" >> $GITHUB_STEP_SUMMARY
+          echo "Syncs exitosos: $TOTAL_OK" >> $GITHUB_STEP_SUMMARY
+          echo "Syncs fallidos: $TOTAL_FAIL" >> $GITHUB_STEP_SUMMARY
+          echo "Turnos viejos eliminados: $STALE" >> $GITHUB_STEP_SUMMARY
+          if [ "$TOTAL_FAIL" -gt 0 ]; then exit 1; fi

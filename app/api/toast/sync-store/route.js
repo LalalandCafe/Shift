@@ -80,7 +80,34 @@ export async function POST(request) {
       synced_at: new Date().toISOString(),
     }));
 
+    // Borra los turnos existentes de esta tienda/dia antes de insertar.
+    // Sin esto, los auto clock-out que Toast corrige despues dejan filas
+    // huerfanas que siguen sumando horas para siempre.
+    // Solo borra si Toast devolvio datos, para no vaciar el dia si la API falla.
+    let deletedStale = 0;
     if (laborRows.length) {
+      const keepIds = laborRows.map((r) => r.toast_entry_id);
+      const { data: existing, error: exErr } = await supabaseAdmin
+        .from("toast_labor_shifts")
+        .select("toast_entry_id")
+        .eq("store_id", String(storeCode))
+        .gte("clock_in", isoDate + "T00:00:00")
+        .lte("clock_in", isoDate + "T23:59:59");
+      if (exErr) throw new Error("Leer existentes fallo: " + exErr.message);
+
+      const stale = (existing || [])
+        .map((r) => r.toast_entry_id)
+        .filter((id) => !keepIds.includes(id));
+
+      if (stale.length) {
+        const { error: delErr } = await supabaseAdmin
+          .from("toast_labor_shifts")
+          .delete()
+          .in("toast_entry_id", stale);
+        if (delErr) throw new Error("Borrar huerfanos fallo: " + delErr.message);
+        deletedStale = stale.length;
+      }
+
       const { error: laborErr } = await supabaseAdmin
         .from("toast_labor_shifts")
         .upsert(laborRows, { onConflict: "toast_entry_id" });
@@ -102,6 +129,7 @@ export async function POST(request) {
       date: isoDate,
       elapsedSeconds: Math.round((Date.now() - started) / 1000),
       laborEntriesSynced: laborRows.length,
+      staleRemoved: deletedStale,
       grossSales,
     });
   } catch (err) {
