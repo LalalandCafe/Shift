@@ -2,31 +2,32 @@ import { getToastToken, getTimeEntries } from "@/lib/toast";
 import { translateTimeEntries } from "@/lib/toast-labels";
 import { supabaseAdmin } from "@/lib/supabase";
 
+export const maxDuration = 60;
+
 async function computeGrossSales(businessDate, restaurantGuid) {
   const token = await getToastToken();
   const headers = {
     Authorization: "Bearer " + token,
     "Toast-Restaurant-External-ID": restaurantGuid,
   };
-  const listUrl = process.env.TOAST_API_HOST + "/orders/v2/orders?businessDate=" + businessDate;
-  const listRes = await fetch(listUrl, { headers });
-  if (!listRes.ok) throw new Error("Orders list fallo: " + (await listRes.text()));
-  const orderGuids = await listRes.json();
 
   let grossSales = 0;
-  const BATCH = 3;
-  for (let i = 0; i < orderGuids.length; i += BATCH) {
-    const batch = orderGuids.slice(i, i + BATCH);
-    const results = await Promise.all(
-      batch.map(async (og) => {
-        try {
-          const r = await fetch(process.env.TOAST_API_HOST + "/orders/v2/orders/" + og, { headers });
-          if (!r.ok) return null;
-          return await r.json();
-        } catch (e) { return null; }
-      })
-    );
-    results.forEach((order) => {
+  const PAGE_SIZE = 100;
+  let page = 1;
+
+  while (page <= 200) {
+    const url =
+      process.env.TOAST_API_HOST +
+      "/orders/v2/ordersBulk?businessDate=" + businessDate +
+      "&pageSize=" + PAGE_SIZE +
+      "&page=" + page;
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error("ordersBulk fallo: " + (await res.text()));
+    const orders = await res.json();
+    if (!Array.isArray(orders) || orders.length === 0) break;
+
+    orders.forEach((order) => {
       if (!order || order.voided || order.deleted || order.excessFood) return;
       (order.checks || []).forEach((check) => {
         if (check.voided || check.deleted) return;
@@ -37,8 +38,11 @@ async function computeGrossSales(businessDate, restaurantGuid) {
         });
       });
     });
-    await new Promise((r) => setTimeout(r, 150));
+
+    if (orders.length < PAGE_SIZE) break;
+    page++;
   }
+
   return Math.round(grossSales * 100) / 100;
 }
 
@@ -57,6 +61,7 @@ export async function POST(request) {
       );
     }
 
+    const started = Date.now();
     const startDate = isoDate + "T00:00:00.000-0500";
     const endDate = isoDate + "T23:59:59.000-0500";
     const rawEntries = await getTimeEntries({ restaurantGuid, startDate, endDate });
@@ -95,6 +100,7 @@ export async function POST(request) {
       ok: true,
       storeCode,
       date: isoDate,
+      elapsedSeconds: Math.round((Date.now() - started) / 1000),
       laborEntriesSynced: laborRows.length,
       grossSales,
     });

@@ -1,0 +1,82 @@
+name: Daily SHIFT Sync
+
+on:
+  schedule:
+    - cron: "30 13 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Fecha YYYY-MM-DD (vacio = ayer)"
+        required: false
+        default: ""
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Resolver fecha
+        id: fecha
+        run: |
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            ISO="${{ github.event.inputs.date }}"
+          else
+            ISO=$(TZ=America/Chicago date -d "yesterday" +%Y-%m-%d)
+          fi
+          echo "iso=$ISO" >> $GITHUB_OUTPUT
+          echo "business=$(echo $ISO | tr -d '-')" >> $GITHUB_OUTPUT
+          echo "Sincronizando $ISO"
+
+      - name: Traer lista de tiendas
+        run: |
+          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/stores?active=eq.true&toast_guid=not.is.null&select=code,toast_guid" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -o stores.json
+          COUNT=$(jq 'length' stores.json)
+          echo "Tiendas activas: $COUNT"
+          if [ "$COUNT" -lt 1 ]; then echo "Sin tiendas, abortando"; exit 1; fi
+
+      - name: Sincronizar cada tienda
+        run: |
+          ISO="${{ steps.fecha.outputs.iso }}"
+          BUSINESS="${{ steps.fecha.outputs.business }}"
+          OK=0; FAIL=0; FAILED_LIST=""
+
+          for row in $(jq -r '.[] | @base64' stores.json); do
+            CODE=$(echo $row | base64 -d | jq -r '.code')
+            GUID=$(echo $row | base64 -d | jq -r '.toast_guid')
+
+            SUCCESS=0
+            for attempt in 1 2 3; do
+              RESP=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.APP_URL }}/api/toast/sync-store" \
+                -H "Content-Type: application/json" \
+                -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
+                -d "{\"storeCode\":$CODE,\"restaurantGuid\":\"$GUID\",\"businessDate\":\"$BUSINESS\",\"isoDate\":\"$ISO\"}")
+              HTTP=$(echo "$RESP" | tail -n1)
+              BODY=$(echo "$RESP" | sed '$d')
+              if [ "$HTTP" = "200" ]; then
+                SALES=$(echo "$BODY" | jq -r '.grossSales')
+                echo "OK $CODE -> \$$SALES"
+                SUCCESS=1
+                break
+              fi
+              echo "Intento $attempt fallo para $CODE (HTTP $HTTP)"
+              sleep 5
+            done
+
+            if [ "$SUCCESS" = "1" ]; then
+              OK=$((OK+1))
+            else
+              FAIL=$((FAIL+1)); FAILED_LIST="$FAILED_LIST $CODE"
+            fi
+            sleep 1
+          done
+
+          echo "### Sync $ISO" >> $GITHUB_STEP_SUMMARY
+          echo "Exitosas: $OK" >> $GITHUB_STEP_SUMMARY
+          echo "Fallidas: $FAIL" >> $GITHUB_STEP_SUMMARY
+          if [ "$FAIL" -gt 0 ]; then
+            echo "Fallidas:$FAILED_LIST" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

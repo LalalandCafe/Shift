@@ -8,25 +8,24 @@ async function computeGrossSales(businessDate, restaurantGuid) {
     Authorization: "Bearer " + token,
     "Toast-Restaurant-External-ID": restaurantGuid,
   };
-  const listUrl = process.env.TOAST_API_HOST + "/orders/v2/orders?businessDate=" + businessDate;
-  const listRes = await fetch(listUrl, { headers });
-  if (!listRes.ok) throw new Error("Orders list fallo: " + (await listRes.text()));
-  const orderGuids = await listRes.json();
 
   let grossSales = 0;
-  const BATCH = 3;
-  for (let i = 0; i < orderGuids.length; i += BATCH) {
-    const batch = orderGuids.slice(i, i + BATCH);
-    const results = await Promise.all(
-      batch.map(async (og) => {
-        try {
-          const r = await fetch(process.env.TOAST_API_HOST + "/orders/v2/orders/" + og, { headers });
-          if (!r.ok) return null;
-          return await r.json();
-        } catch (e) { return null; }
-      })
-    );
-    results.forEach((order) => {
+  const PAGE_SIZE = 100;
+  let page = 1;
+
+  while (page <= 200) {
+    const url =
+      process.env.TOAST_API_HOST +
+      "/orders/v2/ordersBulk?businessDate=" + businessDate +
+      "&pageSize=" + PAGE_SIZE +
+      "&page=" + page;
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) throw new Error("ordersBulk fallo: " + (await res.text()));
+    const orders = await res.json();
+    if (!Array.isArray(orders) || orders.length === 0) break;
+
+    orders.forEach((order) => {
       if (!order || order.voided || order.deleted || order.excessFood) return;
       (order.checks || []).forEach((check) => {
         if (check.voided || check.deleted) return;
@@ -37,8 +36,11 @@ async function computeGrossSales(businessDate, restaurantGuid) {
         });
       });
     });
-    await new Promise((r) => setTimeout(r, 150));
+
+    if (orders.length < PAGE_SIZE) break;
+    page++;
   }
+
   return Math.round(grossSales * 100) / 100;
 }
 
@@ -89,6 +91,7 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get("date");
+    const onlyStore = searchParams.get("store");
 
     let isoDate;
     if (dateParam) {
@@ -101,13 +104,17 @@ export async function GET(request) {
     }
     const businessDate = isoDate.replace(/-/g, "");
 
-    const { data: stores, error } = await supabaseAdmin
+    let q = supabaseAdmin
       .from("stores")
       .select("code, toast_guid")
       .not("toast_guid", "is", null)
       .eq("active", true);
+    if (onlyStore) q = q.eq("code", onlyStore);
+
+    const { data: stores, error } = await q;
     if (error) throw new Error(error.message);
 
+    const started = Date.now();
     const results = [];
     const errors = [];
 
@@ -123,6 +130,7 @@ export async function GET(request) {
     return Response.json({
       ok: true,
       date: isoDate,
+      elapsedSeconds: Math.round((Date.now() - started) / 1000),
       storesSynced: results.length,
       storesFailed: errors.length,
       results,
