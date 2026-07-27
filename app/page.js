@@ -2,8 +2,15 @@
 
 import { useState, useEffect } from "react";
 import "./globals.css";
+import Leaderboard from "../components/Leaderboard";
 
-const DEFAULT_DATE = "2026-07-19";
+function yesterdayISO() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+const DEFAULT_DATE = yesterdayISO();
 
 const GROUP_STRUCTURE = {
   "TX-TN": [
@@ -205,6 +212,12 @@ export default function ShiftApp() {
 
   const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
 
+  const pageTitle =
+    view === "week" ? "Week view"
+      : view === "email" ? "HTML email"
+      : view === "leaderboard" ? "Leaderboard"
+      : "Store Targets";
+
   return (
     <div className="app">
       <div className="sidebar">
@@ -221,6 +234,9 @@ export default function ShiftApp() {
         </button>
         <button className={"nbtn" + (view === "email" ? " active" : "")} onClick={() => setView("email")}>
           <span className="nbtn-ic">✉️</span>HTML email
+        </button>
+        <button className={"nbtn" + (view === "leaderboard" ? " active" : "")} onClick={() => setView("leaderboard")}>
+          <span className="nbtn-ic">🏆</span>Leaderboard
         </button>
 
         {isDesktop && (
@@ -287,9 +303,7 @@ export default function ShiftApp() {
 
       <div className="main">
         <div className="topbar">
-          <div className="ptitle">
-            {view === "week" ? "Week view" : view === "email" ? "HTML email" : "Store Targets"}
-          </div>
+          <div className="ptitle">{pageTitle}</div>
           <div className="tbr">
             {view === "week" && (
               <input
@@ -557,6 +571,8 @@ export default function ShiftApp() {
               )}
             </>
           )}
+
+          {view === "leaderboard" && <Leaderboard report={report} />}
 
           {view === "email" && (
             <div className="tcard">
