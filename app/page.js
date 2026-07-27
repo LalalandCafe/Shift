@@ -81,7 +81,7 @@ export default function ShiftApp() {
   function lockReporter() {
     sessionStorage.removeItem("shift_reporter_code");
     setReporterMode(false);
-    if (view === "targets") setView("week");
+    if (view === "targets" || view === "email" || view === "leaderboard") setView("week");
   }
 
   async function copyEmailHtml() {
@@ -228,19 +228,24 @@ export default function ShiftApp() {
             <div className="logo-sub">Lalaland Cafe</div>
           </div>
         </div>
+
         <div className="nsec">Reports</div>
         <button className={"nbtn" + (view === "week" ? " active" : "")} onClick={() => setView("week")}>
           <span className="nbtn-ic">📊</span>Week view
         </button>
-        <button className={"nbtn" + (view === "email" ? " active" : "")} onClick={() => setView("email")}>
-          <span className="nbtn-ic">✉️</span>HTML email
-        </button>
-        <button className={"nbtn" + (view === "leaderboard" ? " active" : "")} onClick={() => setView("leaderboard")}>
-          <span className="nbtn-ic">🏆</span>Leaderboard
-        </button>
 
         {isDesktop && (
           <>
+            {reporterMode && (
+              <>
+                <button className={"nbtn" + (view === "email" ? " active" : "")} onClick={() => setView("email")}>
+                  <span className="nbtn-ic">✉️</span>HTML email
+                </button>
+                <button className={"nbtn" + (view === "leaderboard" ? " active" : "")} onClick={() => setView("leaderboard")}>
+                  <span className="nbtn-ic">🏆</span>Leaderboard
+                </button>
+              </>
+            )}
             <div className="nsec">Admin</div>
             {reporterMode ? (
               <>
@@ -271,7 +276,7 @@ export default function ShiftApp() {
           >
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Reporter mode</div>
             <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 14 }}>
-              Enter the code to edit stores and targets.
+              Enter the code to unlock email, leaderboard, and targets.
             </div>
             <input
               type="password"
@@ -383,7 +388,6 @@ export default function ShiftApp() {
                     </div>
                   </div>
 
-                  {/* ===== TABLA (escritorio) ===== */}
                   <div className="tcard desktop-table">
                     <div className="thead">
                       <span className="ttl">Labor Dashboard — {report.dayName}, {report.date}</span>
@@ -465,7 +469,6 @@ export default function ShiftApp() {
                     </div>
                   </div>
 
-                  {/* ===== TARJETAS (movil) ===== */}
                   <div className="mobile-cards">
                     {groupedSections(report.rows).map((section) => (
                       <div key={"m-" + section.label}>
@@ -482,10 +485,7 @@ export default function ShiftApp() {
                                 </div>
                                 <div className="store-card-name">{s.name}</div>
                               </div>
-                              <div
-                                className="store-card-splh"
-                                style={{ background: "var(--bg3)", color: "var(--text)" }}
-                              >
+                              <div className="store-card-splh" style={{ background: "var(--bg3)", color: "var(--text)" }}>
                                 ${s.day.target}
                                 <div style={{ fontSize: 9, fontWeight: 700, opacity: 0.6, textAlign: "center", marginTop: -2 }}>TARGET</div>
                               </div>
@@ -572,9 +572,9 @@ export default function ShiftApp() {
             </>
           )}
 
-          {view === "leaderboard" && <Leaderboard report={report} />}
+          {view === "leaderboard" && reporterMode && <Leaderboard report={report} />}
 
-          {view === "email" && (
+          {view === "email" && reporterMode && (
             <div className="tcard">
               <div className="thead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="ttl">Email preview</span>
