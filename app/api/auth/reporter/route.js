@@ -13,4 +13,4 @@ export async function POST(request) {
   } catch (err) {
     return Response.json({ ok: false, error: err.message }, { status: 500 });
   }
-}grep -n "reporterGuard" app/api/stores/route.js
+}
