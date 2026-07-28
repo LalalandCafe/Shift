@@ -4,6 +4,31 @@ import { supabaseAdmin } from "@/lib/supabase";
 
 export const maxDuration = 60;
 
+// Offset real de una zona IANA en un instante dado, en minutos.
+function tzOffsetMinutes(date, tz) {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+  const parts = {};
+  dtf.formatToParts(date).forEach((p) => { parts[p.type] = p.value; });
+  const asUTC = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour) % 24, Number(parts.minute), Number(parts.second)
+  );
+  return (asUTC - date.getTime()) / 60000;
+}
+
+function offsetToIso(offMinutes) {
+  const sign = offMinutes <= 0 ? "-" : "+";
+  const abs = Math.abs(offMinutes);
+  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
+  const mm = String(abs % 60).padStart(2, "0");
+  return sign + hh + mm;
+}
+
 async function computeGrossSales(businessDate, restaurantGuid) {
   const token = await getToastToken();
   const headers = {
@@ -63,12 +88,24 @@ export async function POST(request) {
 
     const started = Date.now();
 
-    // Esta ventana se usa para DOS cosas: pedirle los turnos a Toast y
-    // decidir que filas viejas borrar. Tienen que ser identicas. Si la
-    // ventana de borrado es mas ancha que la de Toast, se borran turnos
+    // Zona horaria real de la tienda. Sin esto, las tiendas del Pacifico
+    // usaban Central y sus turnos de cierre caian en el dia equivocado.
+    const { data: storeRow } = await supabaseAdmin
+      .from("stores")
+      .select("timezone")
+      .eq("code", storeCode)
+      .single();
+    const tz = (storeRow && storeRow.timezone) || "America/Chicago";
+
+    const probe = new Date(isoDate + "T12:00:00Z");
+    const offMin = tzOffsetMinutes(probe, tz);
+    const offIso = offsetToIso(offMin);
+
+    // Esta ventana se usa para DOS cosas: pedirle turnos a Toast y decidir
+    // que filas borrar. Tienen que ser identicas, si no se borran turnos
     // legitimos de la jornada anterior.
-    const startDate = isoDate + "T00:00:00.000-0500";
-    const endDate = isoDate + "T23:59:59.000-0500";
+    const startDate = isoDate + "T00:00:00.000" + offIso;
+    const endDate = isoDate + "T23:59:59.000" + offIso;
 
     const rawEntries = await getTimeEntries({ restaurantGuid, startDate, endDate });
     const translated = await translateTimeEntries(rawEntries, restaurantGuid);
@@ -130,6 +167,8 @@ export async function POST(request) {
       ok: true,
       storeCode,
       date: isoDate,
+      timezone: tz,
+      utcOffset: offIso,
       elapsedSeconds: Math.round((Date.now() - started) / 1000),
       laborEntriesSynced: laborRows.length,
       staleRemoved: deletedStale,
