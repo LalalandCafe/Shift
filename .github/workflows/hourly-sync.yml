@@ -1,0 +1,65 @@
+name: Hourly SHIFT Sync
+
+on:
+  schedule:
+    - cron: "0 0-4,11-23 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: shift-hourly
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Resolver fecha de hoy (Central)
+        id: fecha
+        run: |
+          ISO=$(TZ=America/Chicago date +%Y-%m-%d)
+          echo "iso=$ISO" >> $GITHUB_OUTPUT
+          echo "business=$(echo $ISO | tr -d '-')" >> $GITHUB_OUTPUT
+          echo "Sync en vivo de $ISO ($(TZ=America/Chicago date +%H:%M) CT)"
+
+      - name: Traer tiendas
+        run: |
+          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/stores?active=eq.true&toast_guid=not.is.null&select=code,toast_guid" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -o stores.json
+          COUNT=$(jq 'length' stores.json)
+          echo "Tiendas activas: $COUNT"
+          if [ "$COUNT" -lt 1 ]; then echo "Sin tiendas, abortando"; exit 1; fi
+
+      - name: Sincronizar cada tienda
+        run: |
+          ISO="${{ steps.fecha.outputs.iso }}"
+          BUSINESS="${{ steps.fecha.outputs.business }}"
+          OK=0; FAIL=0; FAILED_LIST=""
+
+          for row in $(jq -r '.[] | @base64' stores.json); do
+            CODE=$(echo $row | base64 -d | jq -r '.code')
+            GUID=$(echo $row | base64 -d | jq -r '.toast_guid')
+
+            SUCCESS=0
+            for attempt in 1 2; do
+              RESP=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.APP_URL }}/api/toast/sync-store" \
+                -H "Content-Type: application/json" \
+                -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
+                -d "{\"storeCode\":$CODE,\"restaurantGuid\":\"$GUID\",\"businessDate\":\"$BUSINESS\",\"isoDate\":\"$ISO\"}")
+              HTTP=$(echo "$RESP" | tail -n1)
+              if [ "$HTTP" = "200" ]; then SUCCESS=1; break; fi
+              sleep 4
+            done
+
+            if [ "$SUCCESS" = "1" ]; then OK=$((OK+1)); else FAIL=$((FAIL+1)); FAILED_LIST="$FAILED_LIST $CODE"; fi
+            sleep 1
+          done
+
+          echo "### Sync en vivo $ISO" >> $GITHUB_STEP_SUMMARY
+          echo "Exitosas: $OK · Fallidas: $FAIL" >> $GITHUB_STEP_SUMMARY
+          if [ "$FAIL" -gt 0 ]; then
+            echo "Fallidas:$FAILED_LIST" >> $GITHUB_STEP_SUMMARY
+            echo "::warning::$FAIL tiendas fallaron en el sync en vivo"
+          fi
