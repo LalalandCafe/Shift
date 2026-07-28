@@ -118,6 +118,18 @@ export default function ShiftApp() {
       .catch((e) => { setError(String(e)); setLoading(false); });
   }, [isoDate]);
 
+  // Auto-refresh cada 5 min cuando se ve el dia de hoy
+  useEffect(() => {
+    if (!report || !report.isLive) return;
+    const id = setInterval(() => {
+      fetch(`/api/report?date=${isoDate}`)
+        .then((r) => r.json())
+        .then((d) => { if (d.ok) setReport(d); })
+        .catch(() => {});
+    }, 300000);
+    return () => clearInterval(id);
+  }, [report?.isLive, isoDate]);
+
   useEffect(() => {
     if (view === "email" && isoDate) {
       const groupParam = groupFilter !== "All" ? `&group=${encodeURIComponent(groupFilter)}` : "";
@@ -354,11 +366,24 @@ export default function ShiftApp() {
             <>
               {report && (
                 <div style={{ marginBottom: 17 }}>
-                  <div style={{ background: "var(--navy)", color: "#fff", padding: "8px 16px", borderRadius: 10, fontSize: 13, display: "inline-block" }}>
+                  <div style={{ background: "var(--navy)", color: "#fff", padding: "8px 16px", borderRadius: 10, fontSize: 13, display: "inline-block", verticalAlign: "top" }}>
                     <span style={{ fontWeight: 700 }}>Week {report.weekNum}</span>
                     <span style={{ opacity: 0.85 }}> &middot; {report.dayName} &middot; Period {report.period}</span>
                     <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>Week starts {report.weekStart}</div>
                   </div>
+                  {report.isLive ? (
+                    <div style={{ display: "inline-block", marginLeft: 10, background: "#1a6630", color: "#fff", padding: "8px 14px", borderRadius: 10, fontSize: 12, verticalAlign: "top" }}>
+                      <span style={{ fontWeight: 700 }}>● LIVE</span>
+                      <div style={{ fontSize: 10.5, opacity: 0.85, marginTop: 2 }}>
+                        Updated {new Date(report.generatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "inline-block", marginLeft: 10, background: "var(--bg3)", color: "var(--text2)", padding: "8px 14px", borderRadius: 10, fontSize: 12, verticalAlign: "top" }}>
+                      <span style={{ fontWeight: 700 }}>Final</span>
+                      <div style={{ fontSize: 10.5, opacity: 0.75, marginTop: 2 }}>Day closed</div>
+                    </div>
+                  )}
                 </div>
               )}
 
