@@ -81,7 +81,7 @@ export default function ShiftApp() {
   function lockReporter() {
     sessionStorage.removeItem("shift_reporter_code");
     setReporterMode(false);
-    if (view === "targets" || view === "email" || view === "leaderboard") setView("week");
+    if (view === "targets" || view === "email") setView("week");
   }
 
   async function copyEmailHtml() {
@@ -245,18 +245,16 @@ export default function ShiftApp() {
         <button className={"nbtn" + (view === "week" ? " active" : "")} onClick={() => setView("week")}>
           <span className="nbtn-ic">📊</span>Week view
         </button>
+        <button className={"nbtn" + (view === "leaderboard" ? " active" : "")} onClick={() => setView("leaderboard")}>
+          <span className="nbtn-ic">🏆</span>Leaderboard
+        </button>
 
         {isDesktop && (
           <>
             {reporterMode && (
-              <>
-                <button className={"nbtn" + (view === "email" ? " active" : "")} onClick={() => setView("email")}>
-                  <span className="nbtn-ic">✉️</span>HTML email
-                </button>
-                <button className={"nbtn" + (view === "leaderboard" ? " active" : "")} onClick={() => setView("leaderboard")}>
-                  <span className="nbtn-ic">🏆</span>Leaderboard
-                </button>
-              </>
+              <button className={"nbtn" + (view === "email" ? " active" : "")} onClick={() => setView("email")}>
+                <span className="nbtn-ic">✉️</span>HTML email
+              </button>
             )}
             <div className="nsec">Admin</div>
             {reporterMode ? (
@@ -288,7 +286,7 @@ export default function ShiftApp() {
           >
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Reporter mode</div>
             <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 14 }}>
-              Enter the code to unlock email, leaderboard, and targets.
+              Enter the code to unlock email and targets.
             </div>
             <input
               type="password"
@@ -594,7 +592,7 @@ export default function ShiftApp() {
             </>
           )}
 
-          {view === "leaderboard" && reporterMode && <Leaderboard report={report} />}
+          {view === "leaderboard" && <Leaderboard report={report} />}
 
           {view === "email" && reporterMode && (
             <div className="tcard">

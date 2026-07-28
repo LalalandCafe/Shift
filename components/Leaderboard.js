@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 const GROUP_STRUCTURE = {
   "TX-TN": [
     { label: "DFW", regions: ["DFW"] },
@@ -20,28 +22,14 @@ function efficiency(row) {
   return ((h + row.wtd.overUnder) / h) * 100;
 }
 
-function Row({ s, rank, compact }) {
-  const medal = rank <= 3 ? MEDALS[rank - 1] : null;
+function PodiumRow({ s, rank }) {
   const color = s.eff >= 100 ? "#1a6630" : "#9c0006";
-
-  if (compact) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "5px 12px", fontSize: 12 }}>
-        <div style={{ width: 28, textAlign: "center", color: "var(--text3)", fontWeight: 700, fontSize: 11 }}>
-          {rank}
-        </div>
-        <div style={{ flex: 1, minWidth: 0, color: "var(--text2)" }}>{s.name}</div>
-        <div style={{ fontWeight: 700, color }}>{Math.round(s.eff)}%</div>
-      </div>
-    );
-  }
-
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 12,
+        gap: 10,
         padding: "10px 12px",
         borderRadius: 10,
         marginBottom: 8,
@@ -49,18 +37,89 @@ function Row({ s, rank, compact }) {
         border: rank === 1 ? "1.5px solid #1a6630" : "1.5px solid transparent",
       }}
     >
-      <div style={{ fontSize: 22, width: 28, textAlign: "center" }}>{medal}</div>
+      <div style={{ fontSize: 20, width: 26, textAlign: "center", flexShrink: 0 }}>
+        {MEDALS[rank - 1]}
+      </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700 }}>{s.name}</div>
-        <div style={{ fontSize: 10.5, color: "var(--text3)" }}>
-          {s.code} &middot; ${s.wtd.splh} SPLH &middot; target ${s.day.target}
+        <div style={{ fontSize: 13, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {s.name}
+        </div>
+        <div style={{ fontSize: 10, color: "var(--text3)" }}>
+          ${s.wtd.splh} SPLH &middot; target ${s.day.target}
         </div>
       </div>
-      <div style={{ textAlign: "right" }}>
-        <div style={{ fontSize: 17, fontWeight: 800, color }}>{Math.round(s.eff)}%</div>
-        <div style={{ fontSize: 9.5, color: "var(--text3)", fontWeight: 700, letterSpacing: ".04em" }}>
+      <div style={{ textAlign: "right", flexShrink: 0 }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color }}>{Math.round(s.eff)}%</div>
+        <div style={{ fontSize: 9, color: "var(--text3)", fontWeight: 700, letterSpacing: ".03em" }}>
           VS TARGET
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CompactRow({ s, rank }) {
+  const color = s.eff >= 100 ? "#1a6630" : "#9c0006";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px", fontSize: 12 }}>
+      <div style={{ width: 26, textAlign: "center", color: "var(--text3)", fontWeight: 700, fontSize: 11, flexShrink: 0 }}>
+        {rank}
+      </div>
+      <div style={{ flex: 1, minWidth: 0, color: "var(--text2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {s.name}
+      </div>
+      <div style={{ fontWeight: 700, color, flexShrink: 0 }}>{Math.round(s.eff)}%</div>
+    </div>
+  );
+}
+
+function Board({ title, stores }) {
+  const [expanded, setExpanded] = useState(false);
+  const top = stores.slice(0, 3);
+  const rest = stores.slice(3);
+
+  return (
+    <div className="tcard">
+      <div className="thead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span className="ttl">{title}</span>
+        <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>
+          {stores.length} stores
+        </span>
+      </div>
+      <div style={{ padding: "12px 12px" }}>
+        {top.map((s, i) => (
+          <PodiumRow key={s.code} s={s} rank={i + 1} />
+        ))}
+
+        {rest.length > 0 && (
+          <>
+            {expanded && (
+              <div style={{ marginTop: 10, borderTop: "1px solid var(--border2)", paddingTop: 8 }}>
+                {rest.map((s, i) => (
+                  <CompactRow key={s.code} s={s} rank={i + 4} />
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setExpanded(!expanded)}
+              style={{
+                width: "100%",
+                marginTop: 10,
+                padding: "8px 0",
+                borderRadius: 8,
+                border: "1.5px solid var(--border2)",
+                background: "#fff",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--text2)",
+              }}
+            >
+              {expanded ? "Show top 3 only" : `Show all ${stores.length}`}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -76,6 +135,10 @@ export default function Leaderboard({ report }) {
     .filter((r) => r.eff !== null)
     .sort((a, b) => b.eff - a.eff);
 
+  if (!all.length) {
+    return <div className="empty">Sin datos para esta fecha.</div>;
+  }
+
   const sections = [];
   for (const grp of Object.keys(GROUP_STRUCTURE)) {
     GROUP_STRUCTURE[grp].forEach((rDef) => {
@@ -86,61 +149,34 @@ export default function Leaderboard({ report }) {
 
   return (
     <>
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ background: "var(--navy)", color: "#fff", padding: "10px 16px", borderRadius: 10, display: "inline-block", fontSize: 13 }}>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ background: "var(--navy)", color: "#fff", padding: "10px 14px", borderRadius: 10, fontSize: 13 }}>
           <span style={{ fontWeight: 700 }}>Week {report.weekNum} Leaderboard</span>
-          <span style={{ opacity: 0.85 }}> &middot; through {report.dayName}, {report.date}</span>
-        </div>
-        <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 8, maxWidth: 620 }}>
-          Ranked by labor efficiency: hours the target called for, divided by hours actually used.
-          Over 100% means the store hit its sales with fewer hours than budgeted. Each store is
-          measured against its own target, so stores with different targets compete fairly.
-        </div>
-      </div>
-
-      <div className="tcard" style={{ marginBottom: 22 }}>
-        <div className="thead">
-          <span className="ttl">All Stores</span>
-          <span style={{ float: "right", fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>
-            {all.length} stores
-          </span>
-        </div>
-        <div style={{ padding: "12px 14px" }}>
-          {all.slice(0, 3).map((s, i) => (
-            <Row key={s.code} s={s} rank={i + 1} />
-          ))}
-          {all.length > 3 && (
-            <div style={{ marginTop: 12, borderTop: "1px solid var(--border2)", paddingTop: 10 }}>
-              {all.slice(3).map((s, i) => (
-                <Row key={s.code} s={s} rank={i + 4} compact />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gap: 18, gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))" }}>
-        {sections.map((sec) => (
-          <div className="tcard" key={sec.label}>
-            <div className="thead">
-              <span className="ttl">{sec.label}</span>
-              <span style={{ float: "right", fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>
-                {sec.stores.length} stores
-              </span>
-            </div>
-            <div style={{ padding: "12px 14px" }}>
-              {sec.stores.slice(0, 3).map((s, i) => (
-                <Row key={s.code} s={s} rank={i + 1} />
-              ))}
-              {sec.stores.length > 3 && (
-                <div style={{ marginTop: 12, borderTop: "1px solid var(--border2)", paddingTop: 10 }}>
-                  {sec.stores.slice(3).map((s, i) => (
-                    <Row key={s.code} s={s} rank={i + 4} compact />
-                  ))}
-                </div>
-              )}
-            </div>
+          <div style={{ fontSize: 10.5, opacity: 0.8, marginTop: 2 }}>
+            Through {report.dayName}, {report.date}
+            {report.isLive ? " · LIVE" : ""}
           </div>
+        </div>
+        <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 8, lineHeight: 1.5 }}>
+          Ranked by labor efficiency: the hours your target allowed, divided by the hours you
+          actually used. Over 100% means you hit your sales with fewer hours than budgeted.
+          Every store is measured against its own target, so different targets compete fairly.
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 20 }}>
+        <Board title="All Stores" stores={all} />
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gap: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(300px, 100%), 1fr))",
+        }}
+      >
+        {sections.map((sec) => (
+          <Board key={sec.label} title={sec.label} stores={sec.stores} />
         ))}
       </div>
     </>
