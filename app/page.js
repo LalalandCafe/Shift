@@ -359,6 +359,21 @@ export default function ShiftApp() {
           </div>
         </div>
 
+        <div className="mobile-nav">
+          <button
+            className={"mnav-btn" + (view === "week" ? " active" : "")}
+            onClick={() => setView("week")}
+          >
+            📊 Week
+          </button>
+          <button
+            className={"mnav-btn" + (view === "leaderboard" ? " active" : "")}
+            onClick={() => setView("leaderboard")}
+          >
+            🏆 Leaderboard
+          </button>
+        </div>
+
         <div className="content">
           {view === "week" && (
             <>
