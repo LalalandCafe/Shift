@@ -62,16 +62,22 @@ export async function POST(request) {
     }
 
     const started = Date.now();
+
+    // Esta ventana se usa para DOS cosas: pedirle los turnos a Toast y
+    // decidir que filas viejas borrar. Tienen que ser identicas. Si la
+    // ventana de borrado es mas ancha que la de Toast, se borran turnos
+    // legitimos de la jornada anterior.
     const startDate = isoDate + "T00:00:00.000-0500";
     const endDate = isoDate + "T23:59:59.000-0500";
+
     const rawEntries = await getTimeEntries({ restaurantGuid, startDate, endDate });
     const translated = await translateTimeEntries(rawEntries, restaurantGuid);
 
     const laborRows = translated.map((t) => ({
       toast_entry_id: t.guid,
       store_id: String(storeCode),
-      employee_id: null,
       employee_name: t.employee,
+      employee_id: null,
       job_title: t.jobTitle,
       clock_in: t.inDate,
       clock_out: t.outDate,
@@ -80,24 +86,21 @@ export async function POST(request) {
       synced_at: new Date().toISOString(),
     }));
 
-    // Borra los turnos existentes de esta tienda/dia antes de insertar.
-    // Sin esto, los auto clock-out que Toast corrige despues dejan filas
-    // huerfanas que siguen sumando horas para siempre.
-    // Solo borra si Toast devolvio datos, para no vaciar el dia si la API falla.
     let deletedStale = 0;
     if (laborRows.length) {
-      const keepIds = laborRows.map((r) => r.toast_entry_id);
+      const keepIds = new Set(laborRows.map((r) => r.toast_entry_id));
+
       const { data: existing, error: exErr } = await supabaseAdmin
         .from("toast_labor_shifts")
         .select("toast_entry_id")
         .eq("store_id", String(storeCode))
-        .gte("clock_in", isoDate + "T00:00:00")
-        .lte("clock_in", isoDate + "T23:59:59");
+        .gte("clock_in", startDate)
+        .lte("clock_in", endDate);
       if (exErr) throw new Error("Leer existentes fallo: " + exErr.message);
 
       const stale = (existing || [])
         .map((r) => r.toast_entry_id)
-        .filter((id) => !keepIds.includes(id));
+        .filter((id) => !keepIds.has(id));
 
       if (stale.length) {
         const { error: delErr } = await supabaseAdmin
