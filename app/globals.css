@@ -19,7 +19,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .sidebar{width:214px;flex-shrink:0;background:var(--bg);border-right:1px solid var(--border);padding:14px 11px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
 .topbar{background:var(--bg);border-bottom:1px solid var(--border);padding:11px 22px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;gap:8px}
-.content{padding:22px;flex:1;max-width:1200px}
+.content{padding:22px;flex:1;max-width:none}
 
 /* Sidebar */
 .logo{display:flex;align-items:center;gap:9px;padding:5px 8px;margin-bottom:14px}
@@ -58,7 +58,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .btn-green{background:var(--green-bg);color:var(--green);border-color:var(--green-b)}
 
 /* Metric cards */
-.mc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:18px}
+.mc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:18px;max-width:1200px}
 .mc{background:var(--bg);border:1px solid var(--border);border-radius:var(--rl);padding:13px 15px}
 .mc-l{font-size:9.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
 .mc-v{font-size:24px;font-weight:700;line-height:1;letter-spacing:-.025em}
@@ -83,9 +83,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 
 /* Excel-style grid table */
 table.grid{width:100%;border-collapse:collapse;font-size:12.5px}
-table.grid th{padding:7px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border:1px solid var(--border);background:var(--bg2);white-space:nowrap}
+table.grid th{padding:7px 7px;text-align:left;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;border:1px solid var(--border);background:var(--bg2);white-space:nowrap}
 table.grid th.r{text-align:right}
-table.grid td{padding:7px 10px;border:1px solid var(--border);font-size:12px}
+table.grid td{padding:7px 7px;border:1px solid var(--border);font-size:12px}
 table.grid .num{font-family:monospace;text-align:right;font-size:11.5px}
 table.grid tr:hover td{background:#fafaf8}
 .cell-ok{background:var(--cell-green-bg)!important;color:var(--cell-green-t);font-weight:700}
@@ -212,6 +212,7 @@ table.stores .sreg{padding:6px 14px;font-size:10px;font-weight:700;color:#fff;ba
 .scard-block-label { margin-bottom: 7px; }
 .scard-cell { padding: 9px 9px; transition: transform .08s; }
 .scard-cell-val { font-size: 15px; }
+
 /* Navegacion movil (el sidebar se esconde abajo de 820px) */
 .mobile-nav { display: none; }
 
