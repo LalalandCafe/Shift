@@ -224,6 +224,9 @@ export default function ShiftApp() {
 
   const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
 
+  const clockTime = (iso) =>
+    new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+
   const pageTitle =
     view === "week" ? "Week view"
       : view === "email" ? "HTML email"
@@ -388,13 +391,17 @@ export default function ShiftApp() {
                     <div style={{ display: "inline-block", marginLeft: 10, background: "#1a6630", color: "#fff", padding: "8px 14px", borderRadius: 10, fontSize: 12, verticalAlign: "top" }}>
                       <span style={{ fontWeight: 700 }}>● LIVE</span>
                       <div style={{ fontSize: 10.5, opacity: 0.85, marginTop: 2 }}>
-                        Updated {new Date(report.generatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                        {report.lastSyncAt
+                          ? "Data as of " + clockTime(report.lastSyncAt)
+                          : "Waiting for first sync today"}
                       </div>
                     </div>
                   ) : (
                     <div style={{ display: "inline-block", marginLeft: 10, background: "var(--bg3)", color: "var(--text2)", padding: "8px 14px", borderRadius: 10, fontSize: 12, verticalAlign: "top" }}>
                       <span style={{ fontWeight: 700 }}>Final</span>
-                      <div style={{ fontSize: 10.5, opacity: 0.75, marginTop: 2 }}>Day closed</div>
+                      <div style={{ fontSize: 10.5, opacity: 0.75, marginTop: 2 }}>
+                        {report.lastSyncAt ? "Synced " + clockTime(report.lastSyncAt) : "Day closed"}
+                      </div>
                     </div>
                   )}
                 </div>
