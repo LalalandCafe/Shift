@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import "./globals.css";
 import Leaderboard from "../components/Leaderboard";
+import Dashboard from "../components/Dashboard";
 
 function yesterdayISO() {
   const d = new Date();
@@ -55,8 +56,12 @@ export default function ShiftApp() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  // Si ya hay sesion de reporter guardada, abre en el dashboard
   useEffect(() => {
-    if (sessionStorage.getItem("shift_reporter_code")) setReporterMode(true);
+    if (sessionStorage.getItem("shift_reporter_code")) {
+      setReporterMode(true);
+      setView("dashboard");
+    }
   }, []);
 
   async function unlockReporter() {
@@ -73,6 +78,7 @@ export default function ShiftApp() {
       setReporterMode(true);
       setShowUnlock(false);
       setCodeInput("");
+      setView("dashboard");
     } catch (e) {
       setUnlockErr("Error de conexión");
     }
@@ -81,7 +87,7 @@ export default function ShiftApp() {
   function lockReporter() {
     sessionStorage.removeItem("shift_reporter_code");
     setReporterMode(false);
-    if (view === "targets" || view === "email") setView("week");
+    if (view === "targets" || view === "email" || view === "dashboard") setView("week");
   }
 
   async function copyEmailHtml() {
@@ -228,7 +234,8 @@ export default function ShiftApp() {
     new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
   const pageTitle =
-    view === "week" ? "Week view"
+    view === "dashboard" ? "Dashboard"
+      : view === "week" ? "Week view"
       : view === "email" ? "HTML email"
       : view === "leaderboard" ? "Leaderboard"
       : "Store Targets";
@@ -245,6 +252,11 @@ export default function ShiftApp() {
         </div>
 
         <div className="nsec">Reports</div>
+        {reporterMode && (
+          <button className={"nbtn" + (view === "dashboard" ? " active" : "")} onClick={() => setView("dashboard")}>
+            <span className="nbtn-ic">🏠</span>Dashboard
+          </button>
+        )}
         <button className={"nbtn" + (view === "week" ? " active" : "")} onClick={() => setView("week")}>
           <span className="nbtn-ic">📊</span>Week view
         </button>
@@ -289,7 +301,7 @@ export default function ShiftApp() {
           >
             <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>Reporter mode</div>
             <div style={{ fontSize: 12, color: "var(--text2)", marginBottom: 14 }}>
-              Enter the code to unlock email and targets.
+              Enter the code to unlock the dashboard, email, and targets.
             </div>
             <input
               type="password"
@@ -332,7 +344,7 @@ export default function ShiftApp() {
                 style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 12.5, width: 200 }}
               />
             )}
-            {(view === "week" || view === "leaderboard") && (
+            {(view === "week" || view === "leaderboard" || view === "dashboard") && (
               <input
                 type="date"
                 value={isoDate}
@@ -363,6 +375,14 @@ export default function ShiftApp() {
         </div>
 
         <div className="mobile-nav">
+          {reporterMode && (
+            <button
+              className={"mnav-btn" + (view === "dashboard" ? " active" : "")}
+              onClick={() => setView("dashboard")}
+            >
+              🏠 Dashboard
+            </button>
+          )}
           <button
             className={"mnav-btn" + (view === "week" ? " active" : "")}
             onClick={() => setView("week")}
@@ -378,6 +398,8 @@ export default function ShiftApp() {
         </div>
 
         <div className="content">
+          {view === "dashboard" && reporterMode && <Dashboard isoDate={isoDate} />}
+
           {view === "week" && (
             <>
               {report && (
