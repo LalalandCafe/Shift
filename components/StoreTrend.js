@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer, Dot } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
+import Forecast from "./Forecast";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-// Escala divergente de 6 pasos. El color solo significa rendimiento
-// contra target, nada decorativo.
 function cellStyle(ratio) {
   if (ratio === null || ratio === undefined) return null;
   if (ratio >= 1.15) return { background: "#1a6630", color: "#fff" };
@@ -15,6 +14,12 @@ function cellStyle(ratio) {
   if (ratio >= 0.95) return { background: "#f0f0ec", color: "#5f5f5c" };
   if (ratio >= 0.85) return { background: "#ffc7ce", color: "#9c0006" };
   return { background: "#c9302c", color: "#fff" };
+}
+
+function prettyFull(iso) {
+  return new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", timeZone: "UTC",
+  });
 }
 
 function ChartTip({ active, payload }) {
@@ -29,6 +34,50 @@ function ChartTip({ active, payload }) {
   );
 }
 
+function DayPanel({ day, onClose }) {
+  const over = day.overUnder < 0;
+  return (
+    <div className="day-panel">
+      <button className="day-panel-close" onClick={onClose} title="Close">×</button>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.6 }}>
+        Day detail
+      </div>
+      <div style={{ fontSize: 19, fontWeight: 800, marginTop: 4 }}>{prettyFull(day.date)}</div>
+      <div className="day-panel-grid">
+        <div>
+          <div className="day-panel-k">Hours</div>
+          <div className="day-panel-v">{day.hours}</div>
+        </div>
+        <div>
+          <div className="day-panel-k">Sales</div>
+          <div className="day-panel-v">${Math.round(day.sales).toLocaleString("en-US")}</div>
+        </div>
+        <div>
+          <div className="day-panel-k">SPLH</div>
+          <div className="day-panel-v" style={{ color: day.ok ? "#8ce0ac" : "#ff9a91" }}>
+            ${day.splh}
+          </div>
+        </div>
+        <div>
+          <div className="day-panel-k">Target</div>
+          <div className="day-panel-v" style={{ opacity: 0.75 }}>${day.target}</div>
+        </div>
+        <div>
+          <div className="day-panel-k">{over ? "Hours over" : "Hours under"}</div>
+          <div className="day-panel-v" style={{ color: over ? "#ff9a91" : "#8ce0ac" }}>
+            {Math.abs(day.overUnder)}
+          </div>
+        </div>
+      </div>
+      <div style={{ fontSize: 11.5, opacity: 0.75, marginTop: 15, lineHeight: 1.55, maxWidth: 560 }}>
+        {over
+          ? `Sales of $${Math.round(day.sales).toLocaleString("en-US")} at a $${day.target} target supported about ${Math.round(day.sales / day.target)} hours. You used ${day.hours}, so ${Math.abs(day.overUnder)} hours more than budget.`
+          : `Sales of $${Math.round(day.sales).toLocaleString("en-US")} at a $${day.target} target supported about ${Math.round(day.sales / day.target)} hours, and you used ${day.hours}. Good day.`}
+      </div>
+    </div>
+  );
+}
+
 export default function StoreTrend({ isoDate }) {
   const [stores, setStores] = useState([]);
   const [code, setCode] = useState(null);
@@ -36,6 +85,8 @@ export default function StoreTrend({ isoDate }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
+  const [selDay, setSelDay] = useState(null);
+  const [tab, setTab] = useState("history");
 
   useEffect(() => {
     fetch("/api/store-trend")
@@ -53,6 +104,7 @@ export default function StoreTrend({ isoDate }) {
     if (!code || !isoDate) return;
     setLoading(true);
     setErr(null);
+    setSelDay(null);
     fetch(`/api/store-trend?store=${code}&date=${isoDate}&weeks=${weeks}`)
       .then((r) => r.json())
       .then((d) => {
@@ -63,43 +115,87 @@ export default function StoreTrend({ isoDate }) {
       .catch((e) => { setErr(String(e)); setLoading(false); });
   }, [code, isoDate, weeks]);
 
-  const selector = (
-    <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 20 }}>
-      <div>
-        <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".07em", display: "block", marginBottom: 5 }}>
-          Store
-        </label>
-        <select
-          value={code || ""}
-          onChange={(e) => setCode(Number(e.target.value))}
-          style={{ padding: "9px 13px", borderRadius: 9, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 14, fontWeight: 600, minWidth: 240, background: "#fff" }}
-        >
-          {stores.map((s) => (
-            <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
-          ))}
-        </select>
+  const currentStore = stores.find((s) => s.code === code);
+
+  const controls = (
+    <>
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 16 }}>
+        <div>
+          <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".07em", display: "block", marginBottom: 5 }}>
+            Store
+          </label>
+          <select
+            value={code || ""}
+            onChange={(e) => setCode(Number(e.target.value))}
+            style={{ padding: "9px 13px", borderRadius: 9, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 14, fontWeight: 600, minWidth: 240, background: "#fff" }}
+          >
+            {stores.map((s) => (
+              <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+            ))}
+          </select>
+        </div>
+        {tab === "history" && (
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".07em", display: "block", marginBottom: 5 }}>
+              Weeks
+            </label>
+            <select
+              value={weeks}
+              onChange={(e) => setWeeks(Number(e.target.value))}
+              style={{ padding: "9px 13px", borderRadius: 9, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: "#fff" }}
+            >
+              <option value={2}>2</option>
+              <option value={4}>4</option>
+              <option value={6}>6</option>
+              <option value={8}>8</option>
+            </select>
+          </div>
+        )}
       </div>
-      <div>
-        <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".07em", display: "block", marginBottom: 5 }}>
-          Weeks
-        </label>
-        <select
-          value={weeks}
-          onChange={(e) => setWeeks(Number(e.target.value))}
-          style={{ padding: "9px 13px", borderRadius: 9, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: "#fff" }}
+
+      <div style={{ display: "flex", gap: 7, marginBottom: 18, flexWrap: "wrap" }}>
+        <button
+          onClick={() => setTab("history")}
+          style={{
+            padding: "9px 17px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+            border: tab === "history" ? "1.5px solid var(--navy)" : "1.5px solid var(--border2)",
+            background: tab === "history" ? "var(--navy)" : "#fff",
+            color: tab === "history" ? "#fff" : "var(--text2)",
+          }}
         >
-          <option value={2}>2</option>
-          <option value={4}>4</option>
-          <option value={6}>6</option>
-          <option value={8}>8</option>
-        </select>
+          What happened
+        </button>
+        <button
+          onClick={() => setTab("plan")}
+          style={{
+            padding: "9px 17px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+            border: tab === "plan" ? "1.5px solid var(--navy)" : "1.5px solid var(--border2)",
+            background: tab === "plan" ? "var(--navy)" : "#fff",
+            color: tab === "plan" ? "#fff" : "var(--text2)",
+          }}
+        >
+          Plan next week
+        </button>
       </div>
-    </div>
+    </>
   );
 
-  if (loading && !data) return <>{selector}<div className="empty">Loading trend...</div></>;
-  if (err) return <>{selector}<div className="empty">Error: {err}</div></>;
-  if (!data) return <>{selector}<div className="empty">Pick a store to see its pattern.</div></>;
+  if (tab === "plan") {
+    return (
+      <>
+        {controls}
+        {code ? (
+          <Forecast storeCode={code} storeName={currentStore ? currentStore.name : ""} />
+        ) : (
+          <div className="empty">Pick a store.</div>
+        )}
+      </>
+    );
+  }
+
+  if (loading && !data) return <>{controls}<div className="empty">Loading trend...</div></>;
+  if (err) return <>{controls}<div className="empty">Error: {err}</div></>;
+  if (!data) return <>{controls}<div className="empty">Pick a store to see its pattern.</div></>;
 
   const v = data.verdict;
   const heroClass = v.type === "clean" ? "good" : v.type === "nodata" ? "none" : "bad";
@@ -110,8 +206,6 @@ export default function StoreTrend({ isoDate }) {
     .filter((d) => d.hasData && d.best)
     .sort((a, b) => b.best.splh - a.best.splh)[0];
 
-  // Solo semanas completas en la linea de tendencia. Una semana de un dia
-  // se veria como un pico enorme que no significa nada.
   const chartData = data.weekList.filter((w) => w.daysWithData >= 4).map((w) => ({
     weekNum: w.weekNum,
     label: "W" + w.weekNum,
@@ -124,7 +218,7 @@ export default function StoreTrend({ isoDate }) {
 
   return (
     <>
-      {selector}
+      {controls}
 
       <div className={"st-verdict " + heroClass}>
         <div className="st-verdict-eyebrow">
@@ -133,6 +227,8 @@ export default function StoreTrend({ isoDate }) {
         <div className="st-verdict-head">{v.headline}</div>
         <div className="st-verdict-detail">{v.detail}</div>
       </div>
+
+      {selDay && <DayPanel day={selDay} onClose={() => setSelDay(null)} />}
 
       <div className="mc-grid">
         <div className="mc">
@@ -167,13 +263,13 @@ export default function StoreTrend({ isoDate }) {
       <div className="tcard">
         <div className="thead">
           <span className="ttl">Every day, every week</span>
-          <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>SPLH per day</span>
+          <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>tap any day for detail</span>
         </div>
         <div style={{ padding: "18px 18px 16px" }}>
           <div className="st-grid">
             <div className="st-corner" />
             {DAYS.map((d) => (
-              <div key={d} className={"st-colhead" + (flagged.size && [...flagged].some((f) => f.startsWith(d)) ? " flagged" : "")}>
+              <div key={d} className={"st-colhead" + ([...flagged].some((f) => f.startsWith(d)) ? " flagged" : "")}>
                 {d}
               </div>
             ))}
@@ -191,17 +287,23 @@ export default function StoreTrend({ isoDate }) {
                   const s = cellStyle(d.ratio);
                   if (!s) {
                     return (
-                      <div key={d.date} className="st-cell empty" title={d.isFuture ? "Not yet" : "No data"}>
+                      <div key={d.date} className="st-cell empty">
                         {d.isFuture ? "" : "–"}
                       </div>
                     );
                   }
+                  const isSel = selDay && selDay.date === d.date;
                   return (
                     <div
                       key={d.date}
                       className="st-cell"
-                      style={s}
-                      title={`${d.dayName} ${d.date}\nSPLH $${d.splh} vs target $${d.target}\n${d.hours} hrs · $${Math.round(d.sales).toLocaleString("en-US")}\n${d.overUnder < 0 ? Math.abs(d.overUnder) + " hrs over budget" : d.overUnder + " hrs under budget"}`}
+                      style={{
+                        ...s,
+                        cursor: "pointer",
+                        boxShadow: isSel ? "0 0 0 3px var(--navy)" : undefined,
+                      }}
+                      onClick={() => setSelDay(isSel ? null : d)}
+                      title={`${d.shortDay} ${d.date} — tap for detail`}
                     >
                       ${d.splh}
                       <small>{d.hours}h</small>
@@ -221,7 +323,7 @@ export default function StoreTrend({ isoDate }) {
                   key={b.dayName}
                   className={s ? "st-cell" : "st-cell empty"}
                   style={s ? { ...s, marginTop: 8, opacity: 0.92 } : { marginTop: 8 }}
-                  title={b.hasData ? `${b.dayName} average across ${b.weeksWithData} week(s)\nSPLH $${b.splh} vs target $${b.target}` : "No data"}
+                  title={b.hasData ? `${b.dayName} average across ${b.weeksWithData} week(s): $${b.splh} vs target $${b.target}` : "No data"}
                 >
                   {b.hasData ? "$" + b.splh : "–"}
                   {b.hasData && <small>{b.weeksWithData}w</small>}
@@ -241,7 +343,7 @@ export default function StoreTrend({ isoDate }) {
               <div className="st-legend-sw" style={{ background: "#1a6630" }} />
             </div>
             <span style={{ fontWeight: 600 }}>Above target</span>
-            <span style={{ marginLeft: "auto" }}>Dashed cell means no data · hover any cell for detail</span>
+            <span style={{ marginLeft: "auto" }}>Dashed cell means no data</span>
           </div>
         </div>
       </div>
@@ -265,14 +367,7 @@ export default function StoreTrend({ isoDate }) {
                   label={{ value: "target $" + target, position: "insideTopRight", fontSize: 10.5, fill: "#9c0006" }}
                 />
                 <Tooltip content={<ChartTip />} />
-                <Line
-                  type="monotone"
-                  dataKey="splh"
-                  stroke="#1a1a2e"
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: "#1a1a2e" }}
-                  activeDot={{ r: 6 }}
-                />
+                <Line type="monotone" dataKey="splh" stroke="#1a1a2e" strokeWidth={2.5} dot={{ r: 4, fill: "#1a1a2e" }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

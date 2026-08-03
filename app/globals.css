@@ -308,3 +308,49 @@ table.stores .sreg{padding:6px 14px;font-size:10px;font-weight:700;color:#fff;ba
   .st-cell small{display:none}
   .st-rowhead{font-size:9.5px;padding-right:6px}
 }
+
+/* ===== Forecast planner ===== */
+.fc-hero{border-radius:16px;padding:22px 26px;margin-bottom:18px}
+.fc-hero.over{background:linear-gradient(135deg,#1a1a2e 0%,#3d1518 100%);color:#fff}
+.fc-hero.ok{background:linear-gradient(135deg,#0f3d24 0%,#1a6630 100%);color:#fff}
+.fc-hero.under{background:linear-gradient(135deg,#1a1a2e 0%,#1e3a5f 100%);color:#fff}
+.fc-hero.empty{background:var(--bg3);color:var(--text)}
+.fc-eyebrow{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.65;margin-bottom:7px}
+.fc-head{font-size:23px;font-weight:800;letter-spacing:-.02em;line-height:1.22}
+.fc-detail{font-size:13px;opacity:.85;margin-top:8px;max-width:620px;line-height:1.6}
+
+.fc-row{display:grid;grid-template-columns:52px 1.5fr 90px 100px 96px;gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border)}
+.fc-row.head{border-bottom:2px solid var(--border2);padding:8px 14px}
+.fc-row.total{border-bottom:none;background:var(--bg2);font-weight:700;border-radius:0 0 10px 10px}
+.fc-lbl{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)}
+.fc-day{font-size:13px;font-weight:700}
+.fc-sales{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.fc-range{font-size:10.5px;color:var(--text3);margin-top:1px;font-variant-numeric:tabular-nums}
+.fc-allowed{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+.fc-input{width:82px;padding:7px 9px;font-size:14px;border:1.5px solid var(--border2);border-radius:7px;font-family:monospace;text-align:right;font-weight:700;background:#fff}
+.fc-input:focus{outline:none;border-color:var(--navy);box-shadow:0 0 0 3px rgba(26,26,46,.09)}
+.fc-var{font-size:12.5px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.fc-conf{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.fc-conf.high{background:#1a6630}
+.fc-conf.medium{background:#9a5e0a}
+.fc-conf.low{background:#ccccc6}
+
+.fc-save{padding:11px 22px;border-radius:10px;border:none;background:var(--navy);color:#fff;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.fc-save:disabled{opacity:.45;cursor:default}
+.fc-save.saved{background:#1a6630}
+
+.day-panel{background:var(--navy);color:#fff;border-radius:13px;padding:18px 20px;margin-bottom:16px}
+.day-panel-close{float:right;background:rgba(255,255,255,.14);border:none;color:#fff;width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:15px;line-height:1}
+.day-panel-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:14px;margin-top:14px}
+.day-panel-k{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;opacity:.6}
+.day-panel-v{font-size:19px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums}
+
+@media (max-width: 820px) {
+  .fc-hero{padding:17px 19px}
+  .fc-head{font-size:18px}
+  .fc-row{grid-template-columns:42px 1fr 62px 74px;gap:7px;padding:10px 10px}
+  .fc-row .fc-var-col{display:none}
+  .fc-input{width:64px;font-size:13px}
+  .fc-allowed{font-size:15px}
+  .st-cell{cursor:pointer}
+}
