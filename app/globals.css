@@ -268,3 +268,43 @@ table.stores .sreg{padding:6px 14px;font-size:10px;font-weight:700;color:#fff;ba
   .dash-hero{padding:16px 18px;gap:14px}
   .dash-hero-num{font-size:22px}
 }
+
+/* ===== Store trend: heatmap y diagnostico ===== */
+.st-verdict{border-radius:16px;padding:24px 28px;margin-bottom:20px}
+.st-verdict.good{background:linear-gradient(135deg,#0f3d24 0%,#1a6630 100%);color:#fff}
+.st-verdict.bad{background:linear-gradient(135deg,#1a1a2e 0%,#3d1518 100%);color:#fff}
+.st-verdict.none{background:var(--bg3);color:var(--text2)}
+.st-verdict-eyebrow{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.65;margin-bottom:8px}
+.st-verdict-head{font-size:25px;font-weight:800;letter-spacing:-.02em;line-height:1.2}
+.st-verdict-detail{font-size:13px;opacity:.85;margin-top:9px;max-width:600px;line-height:1.6}
+
+.st-grid{display:grid;grid-template-columns:auto repeat(7,minmax(0,1fr));gap:5px}
+.st-corner{}
+.st-colhead{font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);text-align:center;padding-bottom:3px}
+.st-colhead.flagged{color:#9c0006}
+.st-rowhead{font-size:10.5px;font-weight:700;color:var(--text3);padding-right:10px;white-space:nowrap;display:flex;flex-direction:column;justify-content:center;line-height:1.25}
+.st-rowhead small{font-weight:500;opacity:.7;font-size:9.5px}
+.st-cell{aspect-ratio:1.35;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12.5px;font-weight:700;cursor:default;transition:transform .1s ease,box-shadow .1s ease;position:relative;min-height:42px}
+.st-cell:hover{transform:scale(1.07);box-shadow:0 4px 14px rgba(0,0,0,.16);z-index:3}
+.st-cell small{font-size:8.5px;font-weight:600;opacity:.7;margin-top:1px}
+.st-cell.empty{background:transparent;border:1.5px dashed var(--border2);color:var(--text3);font-weight:500;font-size:11px}
+
+.st-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:16px;font-size:10.5px;color:var(--text3)}
+.st-legend-scale{display:flex;align-items:center;gap:3px}
+.st-legend-sw{width:19px;height:12px;border-radius:3px}
+
+.st-wk{display:flex;align-items:baseline;gap:9px;padding:11px 14px;border-bottom:1px solid var(--border)}
+.st-wk:last-child{border-bottom:none}
+.st-wk-num{font-size:11px;font-weight:700;color:var(--text3);min-width:62px}
+.st-wk-splh{font-size:19px;font-weight:800;letter-spacing:-.02em}
+.st-wk-meta{font-size:11px;color:var(--text3);margin-left:auto;text-align:right;line-height:1.4}
+.st-partial{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--amber);background:var(--amber-bg);padding:2px 6px;border-radius:4px;margin-left:6px}
+
+@media (max-width: 820px) {
+  .st-verdict{padding:18px 20px}
+  .st-verdict-head{font-size:19px}
+  .st-grid{gap:3px}
+  .st-cell{min-height:36px;font-size:11px}
+  .st-cell small{display:none}
+  .st-rowhead{font-size:9.5px;padding-right:6px}
+}

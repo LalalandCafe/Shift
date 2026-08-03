@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import "./globals.css";
 import Leaderboard from "../components/Leaderboard";
 import Dashboard from "../components/Dashboard";
+import StoreTrend from "../components/StoreTrend";
 
 function yesterdayISO() {
   const d = new Date();
@@ -238,6 +239,7 @@ export default function ShiftApp() {
       : view === "week" ? "Week view"
       : view === "email" ? "HTML email"
       : view === "leaderboard" ? "Leaderboard"
+      : view === "storetrend" ? "Store detail"
       : "Store Targets";
 
   return (
@@ -259,6 +261,9 @@ export default function ShiftApp() {
         )}
         <button className={"nbtn" + (view === "week" ? " active" : "")} onClick={() => setView("week")}>
           <span className="nbtn-ic">📊</span>Week view
+        </button>
+        <button className={"nbtn" + (view === "storetrend" ? " active" : "")} onClick={() => setView("storetrend")}>
+          <span className="nbtn-ic">🔍</span>Store detail
         </button>
         <button className={"nbtn" + (view === "leaderboard" ? " active" : "")} onClick={() => setView("leaderboard")}>
           <span className="nbtn-ic">🏆</span>Leaderboard
@@ -344,7 +349,7 @@ export default function ShiftApp() {
                 style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 12.5, width: 200 }}
               />
             )}
-            {(view === "week" || view === "leaderboard" || view === "dashboard") && (
+            {(view === "week" || view === "leaderboard" || view === "dashboard" || view === "storetrend") && (
               <input
                 type="date"
                 value={isoDate}
@@ -390,15 +395,23 @@ export default function ShiftApp() {
             📊 Week
           </button>
           <button
+            className={"mnav-btn" + (view === "storetrend" ? " active" : "")}
+            onClick={() => setView("storetrend")}
+          >
+            🔍 Store
+          </button>
+          <button
             className={"mnav-btn" + (view === "leaderboard" ? " active" : "")}
             onClick={() => setView("leaderboard")}
           >
-            🏆 Leaderboard
+            🏆 Board
           </button>
         </div>
 
         <div className="content">
           {view === "dashboard" && reporterMode && <Dashboard isoDate={isoDate} />}
+
+          {view === "storetrend" && <StoreTrend isoDate={isoDate} />}
 
           {view === "week" && (
             <>
