@@ -4,30 +4,10 @@ import { supabaseAdmin } from "@/lib/supabase";
 
 export const maxDuration = 60;
 
-// Offset real de una zona IANA en un instante dado, en minutos.
-function tzOffsetMinutes(date, tz) {
-  const dtf = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    hour12: false,
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  });
-  const parts = {};
-  dtf.formatToParts(date).forEach((p) => { parts[p.type] = p.value; });
-  const asUTC = Date.UTC(
-    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
-    Number(parts.hour) % 24, Number(parts.minute), Number(parts.second)
-  );
-  return (asUTC - date.getTime()) / 60000;
-}
-
-function offsetToIso(offMinutes) {
-  const sign = offMinutes <= 0 ? "-" : "+";
-  const abs = Math.abs(offMinutes);
-  const hh = String(Math.floor(abs / 60)).padStart(2, "0");
-  const mm = String(abs % 60).padStart(2, "0");
-  return sign + hh + mm;
-}
+// Un ticket que tarda mas de esto no es lento, es que nunca se marco
+// cumplido en el KDS (se le olvido a alguien, o quedo abierto toda la
+// noche). Se excluye del promedio y se cuenta aparte como "stuck".
+const STUCK_THRESHOLD_MIN = 30;
 
 async function computeGrossSales(businessDate, restaurantGuid) {
   const token = await getToastToken();
@@ -71,6 +51,63 @@ async function computeGrossSales(businessDate, restaurantGuid) {
   return Math.round(grossSales * 100) / 100;
 }
 
+function percentile(sorted, p) {
+  if (!sorted.length) return null;
+  const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * p));
+  return sorted[idx];
+}
+
+async function computeKitchenMetrics(businessDate, restaurantGuid) {
+  const token = await getToastToken();
+  const headers = {
+    Authorization: "Bearer " + token,
+    "Toast-Restaurant-External-ID": restaurantGuid,
+  };
+
+  const url =
+    process.env.TOAST_API_HOST +
+    "/kitchen/v1/export/itemFulfillments?businessDate=" + businessDate;
+
+  const res = await fetch(url, { headers });
+  if (res.status === 204) {
+    return { itemCount: 0, medianMin: null, avgMin: null, p90Min: null, stuckCount: 0 };
+  }
+  if (!res.ok) throw new Error("kitchen fulfillments fallo: " + (await res.text()));
+
+  const items = await res.json();
+  if (!Array.isArray(items) || !items.length) {
+    return { itemCount: 0, medianMin: null, avgMin: null, p90Min: null, stuckCount: 0 };
+  }
+
+  const durationsMin = [];
+  let stuckCount = 0;
+
+  items.forEach((it) => {
+    if (!it.ticketFiredAt || !it.itemFulfilledAt) return;
+    const fired = new Date(it.ticketFiredAt).getTime();
+    const done = new Date(it.itemFulfilledAt).getTime();
+    if (!isFinite(fired) || !isFinite(done) || done < fired) return;
+    const min = (done - fired) / 60000;
+    if (min > STUCK_THRESHOLD_MIN) {
+      stuckCount++;
+      return;
+    }
+    durationsMin.push(min);
+  });
+
+  durationsMin.sort((a, b) => a - b);
+
+  return {
+    itemCount: items.length,
+    medianMin: durationsMin.length ? Math.round(percentile(durationsMin, 0.5) * 10) / 10 : null,
+    avgMin: durationsMin.length
+      ? Math.round((durationsMin.reduce((a, b) => a + b, 0) / durationsMin.length) * 10) / 10
+      : null,
+    p90Min: durationsMin.length ? Math.round(percentile(durationsMin, 0.9) * 10) / 10 : null,
+    stuckCount,
+  };
+}
+
 export async function POST(request) {
   try {
     const secret = request.headers.get("x-sync-secret");
@@ -88,24 +125,11 @@ export async function POST(request) {
 
     const started = Date.now();
 
-    // Zona horaria real de la tienda. Sin esto, las tiendas del Pacifico
-    // usaban Central y sus turnos de cierre caian en el dia equivocado.
-    const { data: storeRow } = await supabaseAdmin
-      .from("stores")
-      .select("timezone")
-      .eq("code", storeCode)
-      .single();
-    const tz = (storeRow && storeRow.timezone) || "America/Chicago";
-
-    const probe = new Date(isoDate + "T12:00:00Z");
-    const offMin = tzOffsetMinutes(probe, tz);
-    const offIso = offsetToIso(offMin);
-
-    // Esta ventana se usa para DOS cosas: pedirle turnos a Toast y decidir
-    // que filas borrar. Tienen que ser identicas, si no se borran turnos
-    // legitimos de la jornada anterior.
-    const startDate = isoDate + "T00:00:00.000" + offIso;
-    const endDate = isoDate + "T23:59:59.000" + offIso;
+    // Esta ventana se usa para DOS cosas: pedirle los turnos a Toast y
+    // decidir que filas borrar. Tienen que ser identicas, si no se borran
+    // turnos legitimos de la jornada anterior.
+    const startDate = isoDate + "T00:00:00.000-0500";
+    const endDate = isoDate + "T23:59:59.000-0500";
 
     const rawEntries = await getTimeEntries({ restaurantGuid, startDate, endDate });
     const translated = await translateTimeEntries(rawEntries, restaurantGuid);
@@ -163,16 +187,42 @@ export async function POST(request) {
       );
     if (salesErr) throw new Error("Guardar ventas fallo: " + salesErr.message);
 
+    // Kitchen metrics: si falla, no tumba el sync completo. Las ventas
+    // y horas son lo critico, el tiempo de ticket es un extra.
+    let kitchen = null;
+    let kitchenError = null;
+    try {
+      kitchen = await computeKitchenMetrics(businessDate, restaurantGuid);
+      const { error: kErr } = await supabaseAdmin
+        .from("kitchen_metrics")
+        .upsert(
+          [{
+            store_code: storeCode,
+            business_date: isoDate,
+            item_count: kitchen.itemCount,
+            median_minutes: kitchen.medianMin,
+            avg_minutes: kitchen.avgMin,
+            p90_minutes: kitchen.p90Min,
+            stuck_count: kitchen.stuckCount,
+            synced_at: new Date().toISOString(),
+          }],
+          { onConflict: "store_code,business_date" }
+        );
+      if (kErr) throw new Error(kErr.message);
+    } catch (e) {
+      kitchenError = e.message;
+    }
+
     return Response.json({
       ok: true,
       storeCode,
       date: isoDate,
-      timezone: tz,
-      utcOffset: offIso,
       elapsedSeconds: Math.round((Date.now() - started) / 1000),
       laborEntriesSynced: laborRows.length,
       staleRemoved: deletedStale,
       grossSales,
+      kitchen,
+      kitchenError,
     });
   } catch (err) {
     return Response.json({ ok: false, error: err.message }, { status: 500 });
