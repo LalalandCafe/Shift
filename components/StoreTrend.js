@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
 import Forecast from "./Forecast";
+import KitchenTrend from "./KitchenTrend";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -134,7 +135,7 @@ export default function StoreTrend({ isoDate }) {
             ))}
           </select>
         </div>
-        {tab === "history" && (
+        {(tab === "history" || tab === "kitchen") && (
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".07em", display: "block", marginBottom: 5 }}>
               Weeks
@@ -166,6 +167,17 @@ export default function StoreTrend({ isoDate }) {
           What happened
         </button>
         <button
+          onClick={() => setTab("kitchen")}
+          style={{
+            padding: "9px 17px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
+            border: tab === "kitchen" ? "1.5px solid var(--navy)" : "1.5px solid var(--border2)",
+            background: tab === "kitchen" ? "var(--navy)" : "#fff",
+            color: tab === "kitchen" ? "#fff" : "var(--text2)",
+          }}
+        >
+          Ticket times
+        </button>
+        <button
           onClick={() => setTab("plan")}
           style={{
             padding: "9px 17px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
@@ -189,6 +201,15 @@ export default function StoreTrend({ isoDate }) {
         ) : (
           <div className="empty">Pick a store.</div>
         )}
+      </>
+    );
+  }
+
+  if (tab === "kitchen") {
+    return (
+      <>
+        {controls}
+        {code ? <KitchenTrend code={code} weeks={weeks} /> : <div className="empty">Pick a store.</div>}
       </>
     );
   }

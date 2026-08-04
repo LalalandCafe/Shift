@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import WeekOverWeekChart from "./WeekOverWeekChart";
+import EfficiencyQuadrant from "./EfficiencyQuadrant";
 
 const SEV_LABEL = { data: "Data issue", critical: "Critical", warning: "Watch" };
 
@@ -99,7 +100,7 @@ export default function Dashboard({ isoDate }) {
           <div className="mc-l">Blended WTD SPLH</div>
           <div className="mc-v" style={{ fontSize: 32 }}>${t.blendedCurrent}</div>
           <div className="mc-s">
-            {t.blendedPrior !== null ? `$${t.blendedPrior} same point last week` : "no prior week yet"}
+            {t.blendedPrior !== null ? `$${t.blendedPrior} same point last week` : "no prior week to compare"}
           </div>
         </div>
         <div className="mc">
@@ -118,6 +119,8 @@ export default function Dashboard({ isoDate }) {
           <div className="mc-s">{t.comparable} comparable to last week</div>
         </div>
       </div>
+
+      <EfficiencyQuadrant isoDate={isoDate} />
 
       <div className="tcard">
         <div className="thead">
