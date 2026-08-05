@@ -5,8 +5,6 @@ import { useState, useEffect } from "react";
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 // Escala inversa a la de SPLH: aqui MENOS tiempo es mejor.
-// Los cortes son arbitrarios y razonables para bebidas de cafe,
-// se pueden ajustar despues con mas data.
 function cellStyle(min) {
   if (min === null || min === undefined) return null;
   if (min <= 1.5) return { background: "#1a6630", color: "#fff" };
@@ -17,15 +15,156 @@ function cellStyle(min) {
   return { background: "#c9302c", color: "#fff" };
 }
 
+function barColor(min) {
+  if (min <= 1.5) return "#6ee7a8";
+  if (min <= 3.5) return "#8ce0ac";
+  if (min <= 5) return "#f5d48a";
+  return "#ff9a91";
+}
+
+function prettyFull(iso) {
+  return new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", {
+    weekday: "long", month: "long", day: "numeric", timeZone: "UTC",
+  });
+}
+
+function DayPanel({ storeCode, date, onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/kitchen-day?store=${storeCode}&date=${date}`)
+      .then((r) => r.json())
+      .then((d) => { setData(d.ok ? d : null); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [storeCode, date]);
+
+  if (loading) {
+    return (
+      <div className="kd-panel">
+        <button className="kd-close" onClick={onClose}>×</button>
+        <div className="kd-eyebrow">Day detail</div>
+        <div className="kd-title">{prettyFull(date)}</div>
+        <div style={{ opacity: 0.6, fontSize: 12.5, marginTop: 12 }}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!data || !data.overall) {
+    return (
+      <div className="kd-panel">
+        <button className="kd-close" onClick={onClose}>×</button>
+        <div className="kd-eyebrow">Day detail</div>
+        <div className="kd-title">{prettyFull(date)}</div>
+        <div style={{ opacity: 0.7, fontSize: 12.5, marginTop: 12 }}>
+          No kitchen data recorded for this day.
+        </div>
+      </div>
+    );
+  }
+
+  const o = data.overall;
+  const stations = data.stations || [];
+  const slowest = stations.length ? stations[0] : null;
+  const fastest = stations.length ? stations[stations.length - 1] : null;
+  const maxMedian = stations.reduce((m, s) => Math.max(m, s.median_minutes || 0), 0) || 1;
+
+  const spread =
+    slowest && fastest && fastest.median_minutes > 0
+      ? Math.round((slowest.median_minutes / fastest.median_minutes) * 10) / 10
+      : null;
+
+  return (
+    <div className="kd-panel">
+      <button className="kd-close" onClick={onClose} title="Close">×</button>
+      <div className="kd-eyebrow">Kitchen detail</div>
+      <div className="kd-title">{prettyFull(date)}</div>
+
+      <div className="kd-summary">
+        <div>
+          <div className="kd-k">Median</div>
+          <div className="kd-v">{o.median_minutes !== null ? o.median_minutes.toFixed(1) : "—"}<span style={{ fontSize: 11, fontWeight: 600, opacity: 0.6 }}> min</span></div>
+        </div>
+        <div>
+          <div className="kd-k">Average</div>
+          <div className="kd-v" style={{ opacity: 0.85 }}>{o.avg_minutes !== null ? o.avg_minutes.toFixed(1) : "—"}<span style={{ fontSize: 11, fontWeight: 600, opacity: 0.6 }}> min</span></div>
+        </div>
+        <div>
+          <div className="kd-k">Slowest 10%</div>
+          <div className="kd-v" style={{ opacity: 0.85 }}>{o.p90_minutes !== null ? o.p90_minutes.toFixed(1) : "—"}<span style={{ fontSize: 11, fontWeight: 600, opacity: 0.6 }}> min</span></div>
+        </div>
+        <div>
+          <div className="kd-k">Items</div>
+          <div className="kd-v">{o.item_count.toLocaleString("en-US")}</div>
+        </div>
+        <div>
+          <div className="kd-k">Stuck</div>
+          <div className="kd-v" style={{ color: o.stuck_count > 0 ? "#f5d48a" : undefined }}>
+            {o.stuck_count}
+          </div>
+        </div>
+      </div>
+
+      {stations.length > 0 && (
+        <>
+          <div className="kd-sec">By prep station</div>
+          {stations.map((s) => (
+            <div className="kd-st" key={s.prep_station_name}>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="kd-st-name">{s.prep_station_name}</div>
+                <div className="kd-st-sub">
+                  {s.item_count.toLocaleString("en-US")} items
+                  {s.stuck_count > 0 ? ` · ${s.stuck_count} stuck` : ""}
+                </div>
+              </div>
+              <div className="kd-bar-track">
+                <div
+                  className="kd-bar-fill"
+                  style={{
+                    width: Math.max(4, ((s.median_minutes || 0) / maxMedian) * 100) + "%",
+                    background: barColor(s.median_minutes || 0),
+                  }}
+                />
+              </div>
+              <div className="kd-st-val" style={{ color: barColor(s.median_minutes || 0) }}>
+                {s.median_minutes !== null ? s.median_minutes.toFixed(1) : "—"}
+              </div>
+            </div>
+          ))}
+
+          {spread && spread >= 2 && slowest && fastest && (
+            <div className="kd-note">
+              <strong>{slowest.prep_station_name}</strong> runs {spread}× slower than{" "}
+              <strong>{fastest.prep_station_name}</strong> ({slowest.median_minutes} min vs{" "}
+              {fastest.median_minutes} min). The overall median of {o.median_minutes} min hides
+              that gap, so if guests are waiting, this is where to look first.
+            </div>
+          )}
+        </>
+      )}
+
+      {stations.some((s) => s.prep_station_name === "Unassigned") && (
+        <div className="kd-note" style={{ opacity: 0.6 }}>
+          Items showing as Unassigned did not come through a named prep station. That is usually
+          orders from channels that skip the station routing, or a KDS station without a name set.
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function KitchenTrend({ code, weeks }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
+  const [selDate, setSelDate] = useState(null);
 
   useEffect(() => {
     if (!code) return;
     setLoading(true);
     setErr(null);
+    setSelDate(null);
     const today = new Date();
     today.setDate(today.getDate() - 1);
     const isoDate = today.toISOString().slice(0, 10);
@@ -81,10 +220,14 @@ export default function KitchenTrend({ code, weeks }) {
         </div>
       </div>
 
+      {selDate && (
+        <DayPanel storeCode={code} date={selDate} onClose={() => setSelDate(null)} />
+      )}
+
       <div className="tcard">
         <div className="thead">
           <span className="ttl">Ticket time by day</span>
-          <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>fired to fulfilled, median</span>
+          <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>tap any day for station detail</span>
         </div>
         <div style={{ padding: "18px 18px 16px" }}>
           <div className="st-grid">
@@ -111,12 +254,18 @@ export default function KitchenTrend({ code, weeks }) {
                       </div>
                     );
                   }
+                  const isSel = selDate === d.date;
                   return (
                     <div
                       key={d.date}
                       className="st-cell"
-                      style={s}
-                      title={`${d.shortDay} ${d.date}\nMedian ${d.medianMin} min · ${d.itemCount} items\n${d.stuckCount} stuck`}
+                      style={{
+                        ...s,
+                        cursor: "pointer",
+                        boxShadow: isSel ? "0 0 0 3px var(--navy)" : undefined,
+                      }}
+                      onClick={() => setSelDate(isSel ? null : d.date)}
+                      title={`${d.shortDay} ${d.date} — tap for station detail`}
                     >
                       {d.medianMin.toFixed(1)}
                       <small>{d.itemCount}</small>
