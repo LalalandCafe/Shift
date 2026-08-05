@@ -2,7 +2,7 @@ name: Hourly SHIFT Sync
 
 on:
   schedule:
-    - cron: "0 0-4,11-23 * * *"
+    - cron: "17 0-4,11-23 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -47,7 +47,7 @@ jobs:
               RESP=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.APP_URL }}/api/toast/sync-store" \
                 -H "Content-Type: application/json" \
                 -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
-                -d "{\"storeCode\":$CODE,\"restaurantGuid\":\"$GUID\",\"businessDate\":\"$BUSINESS\",\"isoDate\":\"$ISO\"}")
+                -d "{\"storeCode\":$CODE,\"restaurantGuid\":\"$GUID\",\"businessDate\":\"$BUSINESS\",\"isoDate\":\"$ISO\",\"skipKitchen\":true}")
               HTTP=$(echo "$RESP" | tail -n1)
               if [ "$HTTP" = "200" ]; then SUCCESS=1; break; fi
               sleep 4
@@ -59,6 +59,7 @@ jobs:
 
           echo "### Sync en vivo $ISO" >> $GITHUB_STEP_SUMMARY
           echo "Exitosas: $OK · Fallidas: $FAIL" >> $GITHUB_STEP_SUMMARY
+          echo "Kitchen: omitido (se sincroniza en el daily y weekly)" >> $GITHUB_STEP_SUMMARY
           if [ "$FAIL" -gt 0 ]; then
             echo "Fallidas:$FAILED_LIST" >> $GITHUB_STEP_SUMMARY
             echo "::warning::$FAIL tiendas fallaron en el sync en vivo"

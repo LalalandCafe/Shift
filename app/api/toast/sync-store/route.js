@@ -5,12 +5,10 @@ import { supabaseAdmin } from "@/lib/supabase";
 export const maxDuration = 60;
 
 // Un ticket que tarda mas de esto no es lento, es que nunca se marco
-// cumplido en el KDS (se le olvido a alguien, o quedo abierto toda la
-// noche). Se excluye del promedio y se cuenta aparte como "stuck".
+// cumplido en el KDS. Se excluye del promedio y se cuenta aparte.
 const STUCK_THRESHOLD_MIN = 30;
 
-async function computeGrossSales(businessDate, restaurantGuid) {
-  const token = await getToastToken();
+async function computeGrossSales(businessDate, restaurantGuid, token) {
   const headers = {
     Authorization: "Bearer " + token,
     "Toast-Restaurant-External-ID": restaurantGuid,
@@ -57,8 +55,7 @@ function percentile(sorted, p) {
   return sorted[idx];
 }
 
-async function computeKitchenMetrics(businessDate, restaurantGuid) {
-  const token = await getToastToken();
+async function computeKitchenMetrics(businessDate, restaurantGuid, token) {
   const headers = {
     Authorization: "Bearer " + token,
     "Toast-Restaurant-External-ID": restaurantGuid,
@@ -115,7 +112,7 @@ export async function POST(request) {
       return Response.json({ ok: false, error: "No autorizado" }, { status: 401 });
     }
     const body = await request.json();
-    const { storeCode, restaurantGuid, businessDate, isoDate } = body;
+    const { storeCode, restaurantGuid, businessDate, isoDate, skipKitchen } = body;
     if (!storeCode || !restaurantGuid || !businessDate || !isoDate) {
       return Response.json(
         { ok: false, error: "Faltan storeCode, restaurantGuid, businessDate (YYYYMMDD) o isoDate (YYYY-MM-DD)" },
@@ -131,8 +128,22 @@ export async function POST(request) {
     const startDate = isoDate + "T00:00:00.000-0500";
     const endDate = isoDate + "T23:59:59.000-0500";
 
-    const rawEntries = await getTimeEntries({ restaurantGuid, startDate, endDate });
-    const translated = await translateTimeEntries(rawEntries, restaurantGuid);
+    // Un solo token para las tres llamadas, en vez de pedirlo por separado
+    const token = await getToastToken();
+
+    // Las tres lecturas a Toast son independientes, asi que van en paralelo.
+    // Las ESCRITURAS siguen despues y en secuencia: si alguna lectura falla,
+    // no se escribe nada, igual que antes.
+    const [translated, grossSales, kitchenResult] = await Promise.all([
+      getTimeEntries({ restaurantGuid, startDate, endDate })
+        .then((raw) => translateTimeEntries(raw, restaurantGuid)),
+      computeGrossSales(businessDate, restaurantGuid, token),
+      skipKitchen
+        ? Promise.resolve(null)
+        : computeKitchenMetrics(businessDate, restaurantGuid, token)
+            .then((k) => ({ ok: true, data: k }))
+            .catch((e) => ({ ok: false, error: e.message })),
+    ]);
 
     const laborRows = translated.map((t) => ({
       toast_entry_id: t.guid,
@@ -178,7 +189,6 @@ export async function POST(request) {
       if (laborErr) throw new Error("Guardar labor fallo: " + laborErr.message);
     }
 
-    const grossSales = await computeGrossSales(businessDate, restaurantGuid);
     const { error: salesErr } = await supabaseAdmin
       .from("daily_sales")
       .upsert(
@@ -187,30 +197,31 @@ export async function POST(request) {
       );
     if (salesErr) throw new Error("Guardar ventas fallo: " + salesErr.message);
 
-    // Kitchen metrics: si falla, no tumba el sync completo. Las ventas
-    // y horas son lo critico, el tiempo de ticket es un extra.
+    // Kitchen es opcional: si falla o se salta, no tumba el sync.
     let kitchen = null;
     let kitchenError = null;
-    try {
-      kitchen = await computeKitchenMetrics(businessDate, restaurantGuid);
-      const { error: kErr } = await supabaseAdmin
-        .from("kitchen_metrics")
-        .upsert(
-          [{
-            store_code: storeCode,
-            business_date: isoDate,
-            item_count: kitchen.itemCount,
-            median_minutes: kitchen.medianMin,
-            avg_minutes: kitchen.avgMin,
-            p90_minutes: kitchen.p90Min,
-            stuck_count: kitchen.stuckCount,
-            synced_at: new Date().toISOString(),
-          }],
-          { onConflict: "store_code,business_date" }
-        );
-      if (kErr) throw new Error(kErr.message);
-    } catch (e) {
-      kitchenError = e.message;
+    if (kitchenResult) {
+      if (kitchenResult.ok) {
+        kitchen = kitchenResult.data;
+        const { error: kErr } = await supabaseAdmin
+          .from("kitchen_metrics")
+          .upsert(
+            [{
+              store_code: storeCode,
+              business_date: isoDate,
+              item_count: kitchen.itemCount,
+              median_minutes: kitchen.medianMin,
+              avg_minutes: kitchen.avgMin,
+              p90_minutes: kitchen.p90Min,
+              stuck_count: kitchen.stuckCount,
+              synced_at: new Date().toISOString(),
+            }],
+            { onConflict: "store_code,business_date" }
+          );
+        if (kErr) kitchenError = kErr.message;
+      } else {
+        kitchenError = kitchenResult.error;
+      }
     }
 
     return Response.json({
@@ -222,6 +233,7 @@ export async function POST(request) {
       staleRemoved: deletedStale,
       grossSales,
       kitchen,
+      kitchenSkipped: !!skipKitchen,
       kitchenError,
     });
   } catch (err) {

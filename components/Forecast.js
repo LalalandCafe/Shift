@@ -31,13 +31,15 @@ export default function Forecast({ storeCode, storeName }) {
   const [err, setErr] = useState(null);
   const [plan, setPlan] = useState({});
   const [saveState, setSaveState] = useState("idle");
+  const [deleting, setDeleting] = useState(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
-  useEffect(() => {
-    if (!storeCode) return;
+  function loadData() {
     setLoading(true);
     setErr(null);
     setSaveState("idle");
-    fetch(`/api/forecast?store=${storeCode}&weekStart=${weekStart}`)
+    setConfirmClear(false);
+    return fetch(`/api/forecast?store=${storeCode}&weekStart=${weekStart}`)
       .then((r) => r.json())
       .then((d) => {
         if (!d.ok) { setErr(d.error); setData(null); }
@@ -52,6 +54,11 @@ export default function Forecast({ storeCode, storeName }) {
         setLoading(false);
       })
       .catch((e) => { setErr(String(e)); setLoading(false); });
+  }
+
+  useEffect(() => {
+    if (!storeCode) return;
+    loadData();
   }, [storeCode, weekStart]);
 
   function setDay(date, value) {
@@ -96,6 +103,35 @@ export default function Forecast({ storeCode, storeName }) {
     }
   }
 
+  // Borra un dia guardado. Distinto a dejar el campo vacio, que solo
+  // lo ignora al guardar sin quitar lo que ya estaba en la base.
+  async function deleteDay(date) {
+    setDeleting(date);
+    try {
+      const res = await fetch(`/api/forecast?store=${storeCode}&date=${date}`, { method: "DELETE" });
+      const j = await res.json();
+      if (j.ok) {
+        setPlan((prev) => ({ ...prev, [date]: "" }));
+        await loadData();
+      }
+    } catch (e) {
+      // silencioso, el usuario puede reintentar
+    }
+    setDeleting(null);
+  }
+
+  async function clearWeek() {
+    setDeleting("week");
+    try {
+      const res = await fetch(`/api/forecast?store=${storeCode}&weekStart=${weekStart}`, { method: "DELETE" });
+      const j = await res.json();
+      if (j.ok) await loadData();
+    } catch (e) {
+      // silencioso
+    }
+    setDeleting(null);
+  }
+
   // Totales en vivo mientras escriben, sin esperar a guardar
   const livePlanned = Object.keys(plan).reduce((a, k) => {
     const n = Number(plan[k]);
@@ -138,6 +174,7 @@ export default function Forecast({ storeCode, storeName }) {
   const v = data.planVerdict;
   const t = data.totals;
   const liveVar = Math.round(livePlanned - t.allowedHours);
+  const anySaved = data.days.some((d) => d.plannedHours !== null);
 
   return (
     <>
@@ -188,12 +225,40 @@ export default function Forecast({ storeCode, storeName }) {
           <div className="tcard">
             <div className="thead">
               <span className="ttl">Day by day</span>
-              <button
-                onClick={useAllowed}
-                style={{ padding: "6px 13px", borderRadius: 7, border: "1.5px solid var(--border2)", background: "#fff", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "var(--text2)" }}
-              >
-                Fill with suggested
-              </button>
+              <div style={{ display: "flex", gap: 7 }}>
+                <button
+                  onClick={useAllowed}
+                  style={{ padding: "6px 13px", borderRadius: 7, border: "1.5px solid var(--border2)", background: "#fff", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "var(--text2)" }}
+                >
+                  Fill with suggested
+                </button>
+                {anySaved && (
+                  confirmClear ? (
+                    <>
+                      <button
+                        onClick={clearWeek}
+                        disabled={deleting === "week"}
+                        style={{ padding: "6px 13px", borderRadius: 7, border: "1.5px solid #9c0006", background: "#9c0006", color: "#fff", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 700 }}
+                      >
+                        {deleting === "week" ? "Clearing..." : "Yes, clear week"}
+                      </button>
+                      <button
+                        onClick={() => setConfirmClear(false)}
+                        style={{ padding: "6px 11px", borderRadius: 7, border: "1.5px solid var(--border2)", background: "#fff", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, color: "var(--text2)" }}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmClear(true)}
+                      style={{ padding: "6px 13px", borderRadius: 7, border: "1.5px solid var(--border2)", background: "#fff", cursor: "pointer", fontFamily: "inherit", fontSize: 11.5, fontWeight: 600, color: "#9c0006" }}
+                    >
+                      Clear week
+                    </button>
+                  )
+                )}
+              </div>
             </div>
 
             <div className="fc-row head">
@@ -208,6 +273,7 @@ export default function Forecast({ storeCode, storeName }) {
               const val = plan[d.date] ?? "";
               const n = Number(val);
               const diff = val !== "" && isFinite(n) ? Math.round(n - d.allowedHours) : null;
+              const isSaved = d.plannedHours !== null;
               return (
                 <div className="fc-row" key={d.date}>
                   <div>
@@ -232,7 +298,7 @@ export default function Forecast({ storeCode, storeName }) {
                   <div className="fc-allowed">
                     {d.hasForecast ? d.allowedHours : "—"}
                   </div>
-                  <div style={{ textAlign: "right" }}>
+                  <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
                     <input
                       className="fc-input"
                       type="number"
@@ -242,6 +308,21 @@ export default function Forecast({ storeCode, storeName }) {
                       placeholder="—"
                       onChange={(e) => setDay(d.date, e.target.value)}
                     />
+                    {isSaved && (
+                      <button
+                        onClick={() => deleteDay(d.date)}
+                        disabled={deleting === d.date}
+                        title="Remove this day from the saved plan"
+                        style={{
+                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                          border: "1.5px solid var(--border2)", background: "#fff",
+                          color: "#9c0006", cursor: "pointer", fontFamily: "inherit",
+                          fontSize: 13, lineHeight: 1, padding: 0,
+                        }}
+                      >
+                        {deleting === d.date ? "·" : "×"}
+                      </button>
+                    )}
                   </div>
                   <div
                     className="fc-var fc-var-col"
@@ -294,6 +375,8 @@ export default function Forecast({ storeCode, storeName }) {
             target. The dot next to each number shows how consistent that weekday has been: green is steady,
             amber swings some, gray means treat it as a rough guide. Weather, paydays, and local events are not
             factored in, so use the range as your guardrails rather than the single number.
+            The × next to a saved day removes it from the plan entirely, which is different from just clearing
+            the box.
           </div>
         </>
       )}
