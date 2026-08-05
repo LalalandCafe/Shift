@@ -55,6 +55,22 @@ function percentile(sorted, p) {
   return sorted[idx];
 }
 
+function summarize(durationsMin, stuckCount) {
+  durationsMin.sort((a, b) => a - b);
+  return {
+    itemCount: durationsMin.length + stuckCount,
+    medianMin: durationsMin.length ? Math.round(percentile(durationsMin, 0.5) * 10) / 10 : null,
+    avgMin: durationsMin.length
+      ? Math.round((durationsMin.reduce((a, b) => a + b, 0) / durationsMin.length) * 10) / 10
+      : null,
+    p90Min: durationsMin.length ? Math.round(percentile(durationsMin, 0.9) * 10) / 10 : null,
+    stuckCount,
+  };
+}
+
+// Devuelve el agregado general Y el desglose por estacion de preparacion.
+// El desglose es lo que le dice a un GM DONDE esta el cuello de botella,
+// en vez de solo darle un numero general que no dice nada de por que.
 async function computeKitchenMetrics(businessDate, restaurantGuid, token) {
   const headers = {
     Authorization: "Bearer " + token,
@@ -67,42 +83,45 @@ async function computeKitchenMetrics(businessDate, restaurantGuid, token) {
 
   const res = await fetch(url, { headers });
   if (res.status === 204) {
-    return { itemCount: 0, medianMin: null, avgMin: null, p90Min: null, stuckCount: 0 };
+    return { overall: summarize([], 0), byStation: [] };
   }
   if (!res.ok) throw new Error("kitchen fulfillments fallo: " + (await res.text()));
 
   const items = await res.json();
   if (!Array.isArray(items) || !items.length) {
-    return { itemCount: 0, medianMin: null, avgMin: null, p90Min: null, stuckCount: 0 };
+    return { overall: summarize([], 0), byStation: [] };
   }
 
-  const durationsMin = [];
-  let stuckCount = 0;
+  const overallDur = [];
+  let overallStuck = 0;
+  const byStation = {}; // stationName -> { durs: [], stuck: 0 }
 
   items.forEach((it) => {
     if (!it.ticketFiredAt || !it.itemFulfilledAt) return;
     const fired = new Date(it.ticketFiredAt).getTime();
     const done = new Date(it.itemFulfilledAt).getTime();
     if (!isFinite(fired) || !isFinite(done) || done < fired) return;
+
     const min = (done - fired) / 60000;
+    const station = it.prepStationName || "Unassigned";
+    if (!byStation[station]) byStation[station] = { durs: [], stuck: 0 };
+
     if (min > STUCK_THRESHOLD_MIN) {
-      stuckCount++;
+      overallStuck++;
+      byStation[station].stuck++;
       return;
     }
-    durationsMin.push(min);
+    overallDur.push(min);
+    byStation[station].durs.push(min);
   });
 
-  durationsMin.sort((a, b) => a - b);
+  const overall = summarize(overallDur, overallStuck);
+  const stationList = Object.keys(byStation).map((name) => {
+    const s = summarize(byStation[name].durs, byStation[name].stuck);
+    return { prepStationName: name, ...s };
+  });
 
-  return {
-    itemCount: items.length,
-    medianMin: durationsMin.length ? Math.round(percentile(durationsMin, 0.5) * 10) / 10 : null,
-    avgMin: durationsMin.length
-      ? Math.round((durationsMin.reduce((a, b) => a + b, 0) / durationsMin.length) * 10) / 10
-      : null,
-    p90Min: durationsMin.length ? Math.round(percentile(durationsMin, 0.9) * 10) / 10 : null,
-    stuckCount,
-  };
+  return { overall, byStation: stationList };
 }
 
 export async function POST(request) {
@@ -128,12 +147,11 @@ export async function POST(request) {
     const startDate = isoDate + "T00:00:00.000-0500";
     const endDate = isoDate + "T23:59:59.000-0500";
 
-    // Un solo token para las tres llamadas, en vez de pedirlo por separado
     const token = await getToastToken();
 
-    // Las tres lecturas a Toast son independientes, asi que van en paralelo.
-    // Las ESCRITURAS siguen despues y en secuencia: si alguna lectura falla,
-    // no se escribe nada, igual que antes.
+    // Las tres lecturas a Toast son independientes, van en paralelo.
+    // Las ESCRITURAS siguen despues y en secuencia: si alguna lectura
+    // falla, no se escribe nada, igual que antes.
     const [translated, grossSales, kitchenResult] = await Promise.all([
       getTimeEntries({ restaurantGuid, startDate, endDate })
         .then((raw) => translateTimeEntries(raw, restaurantGuid)),
@@ -199,10 +217,13 @@ export async function POST(request) {
 
     // Kitchen es opcional: si falla o se salta, no tumba el sync.
     let kitchen = null;
+    let stationCount = 0;
     let kitchenError = null;
     if (kitchenResult) {
       if (kitchenResult.ok) {
-        kitchen = kitchenResult.data;
+        kitchen = kitchenResult.data.overall;
+        const stations = kitchenResult.data.byStation;
+
         const { error: kErr } = await supabaseAdmin
           .from("kitchen_metrics")
           .upsert(
@@ -219,6 +240,25 @@ export async function POST(request) {
             { onConflict: "store_code,business_date" }
           );
         if (kErr) kitchenError = kErr.message;
+
+        if (stations.length) {
+          const stationRows = stations.map((s) => ({
+            store_code: storeCode,
+            business_date: isoDate,
+            prep_station_name: s.prepStationName,
+            item_count: s.itemCount,
+            median_minutes: s.medianMin,
+            avg_minutes: s.avgMin,
+            p90_minutes: s.p90Min,
+            stuck_count: s.stuckCount,
+            synced_at: new Date().toISOString(),
+          }));
+          const { error: sErr } = await supabaseAdmin
+            .from("kitchen_station_metrics")
+            .upsert(stationRows, { onConflict: "store_code,business_date,prep_station_name" });
+          if (sErr && !kitchenError) kitchenError = sErr.message;
+          else stationCount = stations.length;
+        }
       } else {
         kitchenError = kitchenResult.error;
       }
@@ -233,6 +273,7 @@ export async function POST(request) {
       staleRemoved: deletedStale,
       grossSales,
       kitchen,
+      stationCount,
       kitchenSkipped: !!skipKitchen,
       kitchenError,
     });
