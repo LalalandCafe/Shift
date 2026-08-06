@@ -8,13 +8,17 @@ export const maxDuration = 60;
 // cumplido en el KDS. Se excluye del promedio y se cuenta aparte.
 const STUCK_THRESHOLD_MIN = 30;
 
-async function computeGrossSales(businessDate, restaurantGuid, token) {
+// Cuenta checks cerrados (no orders). Un check = una transaccion real de
+// cliente pagando, misma unidad que usa gross sales. Si se contara por
+// order, una mesa que se divide la cuenta en varios checks se subcontaria.
+async function computeSalesAndTransactions(businessDate, restaurantGuid, token) {
   const headers = {
     Authorization: "Bearer " + token,
     "Toast-Restaurant-External-ID": restaurantGuid,
   };
 
   let grossSales = 0;
+  let transactionCount = 0;
   const PAGE_SIZE = 100;
   let page = 1;
 
@@ -34,6 +38,7 @@ async function computeGrossSales(businessDate, restaurantGuid, token) {
       if (!order || order.voided || order.deleted || order.excessFood) return;
       (order.checks || []).forEach((check) => {
         if (check.voided || check.deleted) return;
+        transactionCount += 1;
         (check.selections || []).forEach((sel) => {
           if (sel.voided) return;
           if (sel.deferred) return;
@@ -46,7 +51,10 @@ async function computeGrossSales(businessDate, restaurantGuid, token) {
     page++;
   }
 
-  return Math.round(grossSales * 100) / 100;
+  return {
+    grossSales: Math.round(grossSales * 100) / 100,
+    transactionCount,
+  };
 }
 
 function percentile(sorted, p) {
@@ -152,16 +160,18 @@ export async function POST(request) {
     // Las tres lecturas a Toast son independientes, van en paralelo.
     // Las ESCRITURAS siguen despues y en secuencia: si alguna lectura
     // falla, no se escribe nada, igual que antes.
-    const [translated, grossSales, kitchenResult] = await Promise.all([
+    const [translated, salesResult, kitchenResult] = await Promise.all([
       getTimeEntries({ restaurantGuid, startDate, endDate })
         .then((raw) => translateTimeEntries(raw, restaurantGuid)),
-      computeGrossSales(businessDate, restaurantGuid, token),
+      computeSalesAndTransactions(businessDate, restaurantGuid, token),
       skipKitchen
         ? Promise.resolve(null)
         : computeKitchenMetrics(businessDate, restaurantGuid, token)
             .then((k) => ({ ok: true, data: k }))
             .catch((e) => ({ ok: false, error: e.message })),
     ]);
+
+    const { grossSales, transactionCount } = salesResult;
 
     const laborRows = translated.map((t) => ({
       toast_entry_id: t.guid,
@@ -214,6 +224,28 @@ export async function POST(request) {
         { onConflict: "store_code,business_date" }
       );
     if (salesErr) throw new Error("Guardar ventas fallo: " + salesErr.message);
+
+    // Transacciones van en su PROPIA tabla y en su propio try/catch, igual
+    // que cocina. Si daily_transactions no existe todavia o falla la escritura,
+    // esto NO tumba labor ni ventas. El reporte diario (Dia/WTD/PTD) no
+    // depende de esto para nada.
+    let transactionError = null;
+    try {
+      const { error: txnErr } = await supabaseAdmin
+        .from("daily_transactions")
+        .upsert(
+          [{
+            store_code: storeCode,
+            business_date: isoDate,
+            transaction_count: transactionCount,
+            synced_at: new Date().toISOString(),
+          }],
+          { onConflict: "store_code,business_date" }
+        );
+      if (txnErr) transactionError = txnErr.message;
+    } catch (e) {
+      transactionError = e.message;
+    }
 
     // Kitchen es opcional: si falla o se salta, no tumba el sync.
     let kitchen = null;
@@ -272,6 +304,8 @@ export async function POST(request) {
       laborEntriesSynced: laborRows.length,
       staleRemoved: deletedStale,
       grossSales,
+      transactionCount,
+      transactionError,
       kitchen,
       stationCount,
       kitchenSkipped: !!skipKitchen,

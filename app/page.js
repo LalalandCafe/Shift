@@ -5,6 +5,7 @@ import "./globals.css";
 import Leaderboard from "../components/Leaderboard";
 import Dashboard from "../components/Dashboard";
 import StoreTrend from "../components/StoreTrend";
+import Throughput from "../components/Throughput";
 
 function yesterdayISO() {
   const d = new Date();
@@ -88,7 +89,7 @@ export default function ShiftApp() {
   function lockReporter() {
     sessionStorage.removeItem("shift_reporter_code");
     setReporterMode(false);
-    if (view === "targets" || view === "email" || view === "dashboard") setView("week");
+    if (view === "targets" || view === "email" || view === "dashboard" || view === "throughput") setView("week");
   }
 
   async function copyEmailHtml() {
@@ -240,6 +241,7 @@ export default function ShiftApp() {
       : view === "email" ? "HTML email"
       : view === "leaderboard" ? "Leaderboard"
       : view === "storetrend" ? "Store detail"
+      : view === "throughput" ? "Throughput"
       : "Store Targets";
 
   return (
@@ -268,6 +270,11 @@ export default function ShiftApp() {
         <button className={"nbtn" + (view === "leaderboard" ? " active" : "")} onClick={() => setView("leaderboard")}>
           <span className="nbtn-ic">🏆</span>Leaderboard
         </button>
+        {reporterMode && (
+          <button className={"nbtn" + (view === "throughput" ? " active" : "")} onClick={() => setView("throughput")}>
+            <span className="nbtn-ic">⏱️</span>Throughput
+          </button>
+        )}
 
         {isDesktop && (
           <>
@@ -650,6 +657,8 @@ export default function ShiftApp() {
           )}
 
           {view === "leaderboard" && <Leaderboard report={report} />}
+
+          {view === "throughput" && reporterMode && <Throughput />}
 
           {view === "email" && reporterMode && (
             <div className="tcard">
