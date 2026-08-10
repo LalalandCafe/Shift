@@ -76,14 +76,14 @@ export default function ShiftApp() {
         body: JSON.stringify({ code: codeInput }),
       });
       const j = await res.json();
-      if (!j.ok) { setUnlockErr("Código incorrecto"); return; }
+      if (!j.ok) { setUnlockErr("Incorrect code"); return; }
       sessionStorage.setItem("shift_reporter_code", codeInput);
       setReporterMode(true);
       setShowUnlock(false);
       setCodeInput("");
       setView("dashboard");
     } catch (e) {
-      setUnlockErr("Error de conexión");
+      setUnlockErr("Connection error");
     }
   }
 
@@ -196,7 +196,7 @@ export default function ShiftApp() {
     const ptdTarget = e.ptd_target !== undefined ? Number(e.ptd_target) : st.ptd_target;
 
     const rcode = sessionStorage.getItem("shift_reporter_code");
-    if (!rcode) { setSaveErr("Reporter mode requerido"); return; }
+    if (!rcode) { setSaveErr("Reporter mode required"); return; }
 
     setSaveErr(null);
     setSavingCode(st.code);
@@ -217,10 +217,10 @@ export default function ShiftApp() {
       if (res.status === 401) {
         sessionStorage.removeItem("shift_reporter_code");
         setReporterMode(false);
-        setSaveErr("Sesión expirada. Desbloquea reporter mode de nuevo.");
+        setSaveErr("Session expired. Please unlock reporter mode again.");
         setView("week");
       } else {
-        setSaveErr(d.error || "Error al guardar");
+        setSaveErr(d.error || "Could not save");
       }
     }
   }
@@ -253,7 +253,7 @@ export default function ShiftApp() {
           <div className="logo-mark">S</div>
           <div>
             <div className="logo-text">SHIFT</div>
-            <div className="logo-sub">Lalaland Cafe</div>
+            <div className="logo-sub">La La Land</div>
           </div>
         </div>
 
@@ -472,7 +472,7 @@ export default function ShiftApp() {
                 </div>
               )}
 
-              {loading && <div className="empty">Cargando...</div>}
+              {loading && <div className="empty">Loading...</div>}
               {error && <div className="empty">Error: {error}</div>}
 
               {report && !loading && (
@@ -651,7 +651,7 @@ export default function ShiftApp() {
                             <div className="scard-block">
                               <div className="scard-block-label">Period to Date</div>
                               {s.ptd.empty ? (
-                                <div style={{ fontSize: 12, color: "var(--text3)", padding: "4px 2px" }}>Sin datos de periodo</div>
+                                <div style={{ fontSize: 12, color: "var(--text3)", padding: "4px 2px" }}>No period data</div>
                               ) : (
                                 <div className="scard-row">
                                   <div className="scard-cell">
@@ -689,6 +689,23 @@ export default function ShiftApp() {
             <div className="tcard">
               <div className="thead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="ttl">Email preview</span>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                
+                  href={`/api/export?date=${isoDate}${groupFilter !== "All" ? `&group=${encodeURIComponent(groupFilter)}` : ""}`}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 7,
+                    border: "1.5px solid var(--border2)",
+                    background: "#fff",
+                    color: "var(--text)",
+                    cursor: "pointer",
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    textDecoration: "none",
+                  }}
+                >
+                  ⬇ Excel
+                </a>
                 <button
                   onClick={copyEmailHtml}
                   disabled={!emailHtml}
@@ -705,19 +722,20 @@ export default function ShiftApp() {
                 >
                   {copyStatus === "copied" ? "✓ Copied" : copyStatus === "error" ? "Copy failed" : "📋 Copy"}
                 </button>
+                </div>
               </div>
               <div style={{ padding: 14 }}>
                 {emailHtml ? (
                   <iframe className="email-frame" srcDoc={emailHtml} style={{ height: 700, width: "100%", border: "none" }} />
                 ) : (
-                  <div className="empty">Cargando email...</div>
+                  <div className="empty">Loading email...</div>
                 )}
               </div>
             </div>
           )}
 
           {view === "targets" && !reporterMode && (
-            <div className="empty">🔒 Reporter mode requerido para editar targets.</div>
+            <div className="empty">🔒 Reporter mode required to edit targets.</div>
           )}
 
           {view === "targets" && reporterMode && (
@@ -727,7 +745,7 @@ export default function ShiftApp() {
                   {saveErr}
                 </div>
               )}
-              {storesLoading && <div className="empty">Cargando tiendas...</div>}
+              {storesLoading && <div className="empty">Loading stores...</div>}
               {!storesLoading && stores && (
                 <div className="tcard">
                   <div className="thead"><span className="ttl">Store Targets (SPLH)</span></div>
