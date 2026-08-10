@@ -690,7 +690,7 @@ export default function ShiftApp() {
               <div className="thead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span className="ttl">Email preview</span>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                
+                <a
                   href={`/api/export?date=${isoDate}${groupFilter !== "All" ? `&group=${encodeURIComponent(groupFilter)}` : ""}`}
                   style={{
                     padding: "6px 14px",
