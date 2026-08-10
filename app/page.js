@@ -6,6 +6,7 @@ import Leaderboard from "../components/Leaderboard";
 import Dashboard from "../components/Dashboard";
 import StoreTrend from "../components/StoreTrend";
 import Throughput from "../components/Throughput";
+import ServiceBoard from "../components/ServiceBoard";
 
 function yesterdayISO() {
   const d = new Date();
@@ -89,7 +90,7 @@ export default function ShiftApp() {
   function lockReporter() {
     sessionStorage.removeItem("shift_reporter_code");
     setReporterMode(false);
-    if (view === "targets" || view === "email" || view === "dashboard" || view === "throughput") setView("week");
+    if (view === "targets" || view === "email" || view === "dashboard" || view === "throughput" || view === "serviceboard") setView("week");
   }
 
   async function copyEmailHtml() {
@@ -242,6 +243,7 @@ export default function ShiftApp() {
       : view === "leaderboard" ? "Leaderboard"
       : view === "storetrend" ? "Store detail"
       : view === "throughput" ? "Throughput"
+      : view === "serviceboard" ? "Service Times"
       : "Store Targets";
 
   return (
@@ -271,8 +273,13 @@ export default function ShiftApp() {
           <span className="nbtn-ic">🏆</span>Leaderboard
         </button>
         {reporterMode && (
+          <button className={"nbtn" + (view === "serviceboard" ? " active" : "")} onClick={() => setView("serviceboard")}>
+            <span className="nbtn-ic">⏱️</span>Service Times
+          </button>
+        )}
+        {reporterMode && (
           <button className={"nbtn" + (view === "throughput" ? " active" : "")} onClick={() => setView("throughput")}>
-            <span className="nbtn-ic">⏱️</span>Throughput
+            <span className="nbtn-ic">⚡</span>Throughput
           </button>
         )}
 
@@ -356,7 +363,7 @@ export default function ShiftApp() {
                 style={{ padding: "5px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 12.5, width: 200 }}
               />
             )}
-            {(view === "week" || view === "leaderboard" || view === "dashboard" || view === "storetrend") && (
+            {(view === "week" || view === "leaderboard" || view === "dashboard" || view === "storetrend" || view === "serviceboard") && (
               <input
                 type="date"
                 value={isoDate}
@@ -413,6 +420,22 @@ export default function ShiftApp() {
           >
             🏆 Board
           </button>
+          {reporterMode && (
+            <button
+              className={"mnav-btn" + (view === "serviceboard" ? " active" : "")}
+              onClick={() => setView("serviceboard")}
+            >
+              ⏱️ Service
+            </button>
+          )}
+          {reporterMode && (
+            <button
+              className={"mnav-btn" + (view === "throughput" ? " active" : "")}
+              onClick={() => setView("throughput")}
+            >
+              ⚡ TPLH
+            </button>
+          )}
         </div>
 
         <div className="content">
@@ -657,6 +680,8 @@ export default function ShiftApp() {
           )}
 
           {view === "leaderboard" && <Leaderboard report={report} />}
+
+          {view === "serviceboard" && reporterMode && <ServiceBoard isoDate={isoDate} />}
 
           {view === "throughput" && reporterMode && <Throughput />}
 
