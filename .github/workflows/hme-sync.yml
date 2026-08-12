@@ -1,0 +1,109 @@
+name: HME Drive-Thru Sync
+
+# Same pattern as Hourly SHIFT Sync: Actions reads the store list from
+# Supabase and curls the Vercel endpoint. The difference is that the inner
+# loop also walks 70h windows, because HME will not serve more than 72h
+# per request.
+#
+# Runs at :40 to stay clear of the Toast sync at :17.
+
+on:
+  schedule:
+    - cron: "40 0-4,11-23 * * *"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days back (1 = incremental, 90 = full backfill)"
+        required: false
+        default: "1"
+
+concurrency:
+  group: hme-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Fetch drive-thru stores
+        run: |
+          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/stores?active=eq.true&hme_store_number=not.is.null&select=code,name,hme_store_number" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -o stores.json
+          COUNT=$(jq 'length' stores.json)
+          echo "Drive-thru stores: $COUNT"
+          if [ "$COUNT" -lt 1 ]; then
+            echo "No store has hme_store_number set. Populate the column in Supabase."
+            exit 1
+          fi
+          jq -r '.[] | "  \(.code)  \(.name)  HME:\(.hme_store_number)"' stores.json
+
+      - name: Sync
+        run: |
+          DAYS="${{ github.event.inputs.days || '1' }}"
+
+          # 20 min buffer: HME cloud data runs at least 15 min behind.
+          END_EPOCH=$(( $(date +%s) - 1200 ))
+          START_EPOCH=$(( END_EPOCH - DAYS * 86400 ))
+
+          # HME only retains 90 days.
+          FLOOR_EPOCH=$(( $(date +%s) - 89 * 86400 ))
+          if [ "$START_EPOCH" -lt "$FLOOR_EPOCH" ]; then START_EPOCH=$FLOOR_EPOCH; fi
+
+          WINDOW=$(( 70 * 3600 ))
+          OK=0; FAIL=0; CARS=0; FAILED_LIST=""
+
+          for row in $(jq -r '.[] | @base64' stores.json); do
+            CODE=$(echo $row | base64 -d | jq -r '.code')
+            HME=$(echo $row | base64 -d | jq -r '.hme_store_number')
+            STORE_CARS=0
+
+            CURSOR=$START_EPOCH
+            while [ "$CURSOR" -lt "$END_EPOCH" ]; do
+              CHUNK_END=$(( CURSOR + WINDOW ))
+              if [ "$CHUNK_END" -gt "$END_EPOCH" ]; then CHUNK_END=$END_EPOCH; fi
+
+              S=$(date -u -d "@$CURSOR" +%Y-%m-%dT%H:%M:%SZ)
+              E=$(date -u -d "@$CHUNK_END" +%Y-%m-%dT%H:%M:%SZ)
+
+              SUCCESS=0
+              for attempt in 1 2; do
+                RESP=$(curl -s -w "\n%{http_code}" -X POST "${{ secrets.APP_URL }}/api/hme/sync-store" \
+                  -H "Content-Type: application/json" \
+                  -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
+                  -d "{\"storeCode\":$CODE,\"hmeStoreNumber\":\"$HME\",\"startDateTime\":\"$S\",\"endDateTime\":\"$E\"}")
+                HTTP=$(echo "$RESP" | tail -n1)
+                BODY=$(echo "$RESP" | sed '$d')
+                if [ "$HTTP" = "200" ]; then
+                  N=$(echo "$BODY" | jq -r '.cars // 0')
+                  STORE_CARS=$(( STORE_CARS + N ))
+                  SUCCESS=1
+                  break
+                fi
+                sleep 5
+              done
+
+              if [ "$SUCCESS" != "1" ]; then
+                FAIL=$((FAIL+1))
+                FAILED_LIST="$FAILED_LIST ${CODE}@${S:0:10}"
+                echo "::warning::Store $CODE failed on window $S"
+              fi
+
+              CURSOR=$CHUNK_END
+              sleep 2
+            done
+
+            OK=$((OK+1))
+            CARS=$(( CARS + STORE_CARS ))
+            echo "Store $CODE (HME $HME): $STORE_CARS cars"
+          done
+
+          echo "### Drive-thru sync" >> $GITHUB_STEP_SUMMARY
+          echo "Range: $DAYS day(s)" >> $GITHUB_STEP_SUMMARY
+          echo "Stores processed: $OK · Failed windows: $FAIL" >> $GITHUB_STEP_SUMMARY
+          echo "Cars synced: $CARS" >> $GITHUB_STEP_SUMMARY
+          if [ "$FAIL" -gt 0 ]; then
+            echo "Failed:$FAILED_LIST" >> $GITHUB_STEP_SUMMARY
+          fi
