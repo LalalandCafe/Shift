@@ -7,6 +7,7 @@ import Dashboard from "../components/Dashboard";
 import StoreTrend from "../components/StoreTrend";
 import Throughput from "../components/Throughput";
 import ServiceBoard from "../components/ServiceBoard";
+import DriveThru from "../components/DriveThru";
 
 function yesterdayISO() {
   const d = new Date();
@@ -90,7 +91,7 @@ export default function ShiftApp() {
   function lockReporter() {
     sessionStorage.removeItem("shift_reporter_code");
     setReporterMode(false);
-    if (view === "targets" || view === "email" || view === "dashboard" || view === "throughput" || view === "serviceboard") setView("week");
+    if (view === "targets" || view === "email" || view === "dashboard" || view === "throughput" || view === "serviceboard" || view === "drivethru") setView("week");
   }
 
   async function copyEmailHtml() {
@@ -244,6 +245,7 @@ export default function ShiftApp() {
       : view === "storetrend" ? "Store detail"
       : view === "throughput" ? "Throughput"
       : view === "serviceboard" ? "Service Times"
+      : view === "drivethru" ? "Drive-Thru"
       : "Store Targets";
 
   return (
@@ -280,6 +282,11 @@ export default function ShiftApp() {
         {reporterMode && (
           <button className={"nbtn" + (view === "throughput" ? " active" : "")} onClick={() => setView("throughput")}>
             <span className="nbtn-ic">⚡</span>Throughput
+          </button>
+        )}
+        {reporterMode && (
+          <button className={"nbtn" + (view === "drivethru" ? " active" : "")} onClick={() => setView("drivethru")}>
+            <span className="nbtn-ic">🚗</span>Drive-Thru
           </button>
         )}
 
@@ -434,6 +441,14 @@ export default function ShiftApp() {
               onClick={() => setView("throughput")}
             >
               ⚡ TPLH
+            </button>
+          )}
+          {reporterMode && (
+            <button
+              className={"mnav-btn" + (view === "drivethru" ? " active" : "")}
+              onClick={() => setView("drivethru")}
+            >
+              🚗 Drive
             </button>
           )}
         </div>
@@ -684,6 +699,8 @@ export default function ShiftApp() {
           {view === "serviceboard" && reporterMode && <ServiceBoard isoDate={isoDate} />}
 
           {view === "throughput" && reporterMode && <Throughput />}
+
+          {view === "drivethru" && reporterMode && <DriveThru />}
 
           {view === "email" && reporterMode && (
             <div className="tcard">
