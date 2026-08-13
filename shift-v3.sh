@@ -1,3 +1,1144 @@
+#!/usr/bin/env bash
+# ============================================================
+#  SHIFT v3
+#    1. Week view: sortable columns, worst first (default look unchanged)
+#    2. Leaderboard: rebuilt with a diverging bar chart
+#    3. Sidebar collapses by clicking the logo, logo gains the Janus crown
+#
+#  Usage, from the repo root:   bash shift-v3.sh
+# ============================================================
+set -euo pipefail
+
+[ -d app ] && [ -d components ] || { echo "Run this from the repo root, the one that holds app/ and components/."; exit 1; }
+[ -f components/ShiftLogo.js ] || { echo "components/ShiftLogo.js is missing. Run shift-logo.sh first."; exit 1; }
+[ -f lib/ui.js ] || { echo "lib/ui.js is missing. Run shift-setup.sh first."; exit 1; }
+
+STAMP=$(date +%Y%m%d-%H%M%S)
+write() {
+  if [ -f "$1" ]; then cp "$1" "$1.$STAMP.bak"; fi
+  cat > "$1"
+  echo "    write   $1"
+}
+
+echo "==> writing v3 files  (backups tagged .$STAMP.bak)"
+write components/ShiftLogo.js << '__SHIFT_EOF__'
+const BLUE = '#3B6FB6';
+const AMBER = '#D08A2C';
+const EYE = '#F4F7F2';
+
+const LEFT = 'M31 8C20 8 12 16 12 26L8 33l4 2v4c0 4 3 6 6 7l5 3v8h8z';
+const RIGHT = 'M33 8c11 0 19 8 19 18l4 7-4 2v4c0 4-3 6-6 7l-5 3v8h-8z';
+
+// Crown, split down the same seam as the faces: a lunate crescent with the
+// horns turned up, on a short stem. Left half blue, right half amber.
+const CROWN_LEFT = 'M12 -15Q14 -2 31.2 -2L31.2 -7.6Q15.4 -7.6 12 -15Z';
+const CROWN_RIGHT = 'M52 -15Q50 -2 32.8 -2L32.8 -7.6Q48.6 -7.6 52 -15Z';
+const STEM_LEFT = 'M28.8 -3.4h2.4V7h-2.4z';
+const STEM_RIGHT = 'M32.8 -3.4h2.4V7h-2.4z';
+
+const WORDMARK_FONT =
+  'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif';
+
+function Faces({ left = BLUE, right = AMBER, eye = EYE, showEyes = true, crown = false }) {
+  return (
+    <>
+      {crown && (
+        <g className="shift-crown">
+          <path d={CROWN_LEFT} fill={left} />
+          <path d={STEM_LEFT} fill={left} />
+          <path d={CROWN_RIGHT} fill={right} />
+          <path d={STEM_RIGHT} fill={right} />
+        </g>
+      )}
+      <path d={LEFT} fill={left} />
+      <path d={RIGHT} fill={right} />
+      {showEyes && (
+        <>
+          <circle cx="17" cy="27" r="2.4" fill={eye} />
+          <circle cx="47" cy="27" r="2.4" fill={eye} />
+        </>
+      )}
+    </>
+  );
+}
+
+/**
+ * SHIFT logo.
+ *
+ * variant:
+ *   'lockup'  mark + wordmark, horizontal (default)
+ *   'stacked' mark above wordmark, centered
+ *   'mark'    Janus mark only, in brand colors
+ *   'mono'    Janus mark only, single color (inherits currentColor)
+ *   'icon'    rounded square app icon, dark background
+ *
+ * size = rendered height in px. Width scales automatically.
+ * The wordmark uses currentColor, so it follows your text color in light and dark mode.
+ */
+export default function ShiftLogo({
+  variant = 'lockup',
+  size = 32,
+  crown = false,
+  className = '',
+  title = 'SHIFT',
+  ...rest
+}) {
+  const common = {
+    className,
+    role: 'img',
+    'aria-label': title,
+    xmlns: 'http://www.w3.org/2000/svg',
+    ...rest,
+  };
+
+  // With the crown on, the viewBox opens up above the head so the faces keep
+  // their exact geometry instead of being squashed to make room.
+  const box = crown ? '0 -18 64 82' : '0 0 64 64';
+  const ratio = crown ? 64 / 82 : 1;
+
+  if (variant === 'mark' || variant === 'mono') {
+    const mono = variant === 'mono';
+    return (
+      <svg viewBox={box} width={size * ratio} height={size} {...common}>
+        {mono ? (
+          <>
+            {crown && (
+              <g className="shift-crown">
+                <path d={CROWN_LEFT} fill="currentColor" />
+                <path d={STEM_LEFT} fill="currentColor" />
+                <path d={CROWN_RIGHT} fill="currentColor" opacity="0.55" />
+                <path d={STEM_RIGHT} fill="currentColor" opacity="0.55" />
+              </g>
+            )}
+            <path d={LEFT} fill="currentColor" />
+            <path d={RIGHT} fill="currentColor" opacity="0.55" />
+          </>
+        ) : (
+          <Faces crown={crown} />
+        )}
+      </svg>
+    );
+  }
+
+  if (variant === 'icon') {
+    return (
+      <svg viewBox="0 0 64 64" width={size} height={size} {...common}>
+        <rect width="64" height="64" rx="14" fill="#132235" />
+        <Faces left="#5B93DA" right="#E5A03F" eye="#132235" />
+      </svg>
+    );
+  }
+
+  if (variant === 'stacked') {
+    return (
+      <svg
+        viewBox="0 0 160 108"
+        width={(size * 160) / 108}
+        height={size}
+        {...common}
+      >
+        <g transform="translate(48 0)">
+          <Faces />
+        </g>
+        <text
+          x="80"
+          y="98"
+          textAnchor="middle"
+          fontFamily={WORDMARK_FONT}
+          fontSize="28"
+          fontWeight="500"
+          letterSpacing="5"
+          fill="currentColor"
+        >
+          SHIFT
+        </text>
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 232 64" width={(size * 232) / 64} height={size} {...common}>
+      <Faces />
+      <text
+        x="82"
+        y="44"
+        fontFamily={WORDMARK_FONT}
+        fontSize="34"
+        fontWeight="500"
+        letterSpacing="6"
+        fill="currentColor"
+      >
+        SHIFT
+      </text>
+    </svg>
+  );
+}
+__SHIFT_EOF__
+write components/WeekView.js << '__SHIFT_EOF__'
+"use client";
+
+import { Fragment, useState } from "react";
+import Icon from "./Icon";
+import { sectionize, money, int, paren, clockTime } from "../lib/ui";
+
+/**
+ * Sortable columns. Region grouping is the default and is what the daily
+ * email mirrors, so sorting is opt in: the moment a column is picked the
+ * table flattens into one ranked list, and clearing it puts the regions back.
+ */
+const SORTS = {
+  hours: (s) => s.day.hours,
+  sales: (s) => s.day.sales,
+  target: (s) => s.day.target,
+  splh: (s) => s.day.splh,
+  gap: (s) => s.day.splh - s.day.target,
+  over: (s) => s.day.overUnder,
+  wtdHours: (s) => s.wtd.hours,
+  wtdSales: (s) => s.wtd.sales,
+  wtdSplh: (s) => s.wtd.splh,
+  wtdGap: (s) => s.wtd.splh - s.day.target,
+  wtdOver: (s) => s.wtd.overUnder,
+  ptdHours: (s) => (s.ptd.empty ? null : s.ptd.hours),
+  ptdSales: (s) => (s.ptd.empty ? null : s.ptd.sales),
+  ptdSplh: (s) => (s.ptd.empty ? null : s.ptd.splh),
+};
+
+/**
+ * Deliberately frozen. This table is the daily email, so its layout, column
+ * order and cell colors have to match what goes out to the field. Everything
+ * here is scoped by .wk-legacy in globals.css, which cancels the new table
+ * styling for this view only. Do not "clean it up".
+ */
+
+function Th({ label, sortKey, sort, onSort, className = "" }) {
+  if (!sortKey) return <th className={className}>{label}</th>;
+  const on = sort && sort.key === sortKey;
+  return (
+    <th
+      className={className + " sortable" + (on ? " sorted" : "")}
+      onClick={() => onSort(sortKey)}
+      title={"Sort by " + label}
+    >
+      <span className="th-in">
+        {label}
+        <Icon name={on && sort.dir === "asc" ? "up" : "down"} size={11} className="th-caret" />
+      </span>
+    </th>
+  );
+}
+
+function Flag({ flags }) {
+  if (!flags || !flags.length) return null;
+  return (
+    <span className="lc-flag" title={flags.join(" \u00b7 ")}>
+      <Icon name="alert" size={11} />
+    </span>
+  );
+}
+
+export default function WeekView({ report, loading, error, groupFilter, search }) {
+  // null means the original region grouping, untouched.
+  const [sort, setSort] = useState(null);
+
+  function onSort(key) {
+    setSort((cur) => {
+      if (!cur || cur.key !== key) return { key, dir: "asc" };
+      if (cur.dir === "asc") return { key, dir: "desc" };
+      return null; // third click returns to the region view
+    });
+  }
+
+  if (loading && !report) return <div className="empty">Loading...</div>;
+  if (error) return <div className="empty">Error: {error}</div>;
+  if (!report) return <div className="empty">Pick a date to load the report.</div>;
+
+  const rows = report.rows || [];
+  let sections = sectionize(rows, { group: groupFilter, search });
+
+  if (sort) {
+    const get = SORTS[sort.key];
+    const flat = sections
+      .flatMap((sec) => sec.stores)
+      .sort((a, b) => {
+        const av = get(a);
+        const bv = get(b);
+        if (av === null) return 1; // stores with no data always sink
+        if (bv === null) return -1;
+        return sort.dir === "asc" ? av - bv : bv - av;
+      });
+    sections = flat.length ? [{ label: null, stores: flat }] : [];
+  }
+  const totals = rows.reduce(
+    (a, r) => ({ hours: a.hours + r.day.hours, sales: a.sales + r.day.sales }),
+    { hours: 0, sales: 0 }
+  );
+  const totalSplh = totals.hours > 0 ? Math.round(totals.sales / totals.hours) : 0;
+
+  return (
+    <div className="wk-legacy">
+      <div style={{ marginBottom: 17 }}>
+        <div
+          style={{
+            background: "#1a1a2e",
+            color: "#fff",
+            padding: "8px 16px",
+            borderRadius: 10,
+            fontSize: 13,
+            display: "inline-block",
+            verticalAlign: "top",
+          }}
+        >
+          <span style={{ fontWeight: 700 }}>Week {report.weekNum}</span>
+          <span style={{ opacity: 0.85 }}>
+            {" \u00b7 "}
+            {report.dayName}
+            {" \u00b7 "}Period {report.period}
+          </span>
+          <div style={{ fontSize: 10.5, opacity: 0.7, marginTop: 2 }}>
+            Week starts {report.weekStart}
+          </div>
+        </div>
+        {report.isLive ? (
+          <div
+            style={{
+              display: "inline-block",
+              marginLeft: 10,
+              background: "#1a6630",
+              color: "#fff",
+              padding: "8px 14px",
+              borderRadius: 10,
+              fontSize: 12,
+              verticalAlign: "top",
+            }}
+          >
+            <span style={{ fontWeight: 700 }}>LIVE</span>
+            <div style={{ fontSize: 10.5, opacity: 0.85, marginTop: 2 }}>
+              {report.lastSyncAt
+                ? "Data as of " + clockTime(report.lastSyncAt)
+                : "Waiting for first sync today"}
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "inline-block",
+              marginLeft: 10,
+              background: "#ededea",
+              color: "#5f5f5c",
+              padding: "8px 14px",
+              borderRadius: 10,
+              fontSize: 12,
+              verticalAlign: "top",
+            }}
+          >
+            <span style={{ fontWeight: 700 }}>Final</span>
+            <div style={{ fontSize: 10.5, opacity: 0.75, marginTop: 2 }}>
+              {report.lastSyncAt ? "Synced " + clockTime(report.lastSyncAt) : "Day closed"}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="mc-grid cols-3">
+        <div className="mc">
+          <div className="mc-l">Total Hours ({report.dayName})</div>
+          <div className="mc-v">{int(totals.hours)}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-l">Total Gross Sales</div>
+          <div className="mc-v">{money(totals.sales)}</div>
+        </div>
+        <div className="mc">
+          <div className="mc-l">Blended SPLH</div>
+          <div className="mc-v">${totalSplh}</div>
+          <div className="mc-s">
+            {groupFilter === "All" ? "34 stores" : groupFilter}
+            {" \u00b7 "}
+            {report.dayName}, {report.date}
+          </div>
+        </div>
+      </div>
+
+      <div className="tcard desktop-table">
+        <div className="thead">
+          <span className="ttl">
+            Labor Dashboard - {report.dayName}, {report.date}
+          </span>
+          <div className="thead-tools">
+            <div className="seg">
+              <button
+                className={"seg-btn" + (!sort ? " active" : "")}
+                onClick={() => setSort(null)}
+              >
+                By region
+              </button>
+              <button
+                className={"seg-btn" + (sort && sort.key === "gap" ? " active" : "")}
+                onClick={() => setSort({ key: "gap", dir: "asc" })}
+              >
+                Worst first
+              </button>
+              <button
+                className={"seg-btn" + (sort && sort.key === "wtdGap" ? " active" : "")}
+                onClick={() => setSort({ key: "wtdGap", dir: "asc" })}
+              >
+                Worst WTD
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="scx">
+          <table className="grid">
+            <thead>
+              <tr>
+                <th>Location Name</th>
+                <Th label="Hours" sortKey="hours" className="r" sort={sort} onSort={onSort} />
+                <Th label="Sales" sortKey="sales" className="r" sort={sort} onSort={onSort} />
+                <Th label="Target" sortKey="target" className="r" sort={sort} onSort={onSort} />
+                <Th label="SPLH" sortKey="splh" className="r" sort={sort} onSort={onSort} />
+                <Th label="(Over)/Under" sortKey="over" className="r" sort={sort} onSort={onSort} />
+                <Th label="WTD Hours" sortKey="wtdHours" className="r sep" sort={sort} onSort={onSort} />
+                <Th label="WTD Sales" sortKey="wtdSales" className="r" sort={sort} onSort={onSort} />
+                <Th label="WTD SPLH" sortKey="wtdSplh" className="r" sort={sort} onSort={onSort} />
+                <Th label="WTD (Over)/Under" sortKey="wtdOver" className="r" sort={sort} onSort={onSort} />
+                <th className="r sep">Total Training</th>
+                <th className="r">Trainee</th>
+                <th className="r">Trainer</th>
+                <Th label="PTD Hours" sortKey="ptdHours" className="r sep" sort={sort} onSort={onSort} />
+                <Th label="PTD Sales" sortKey="ptdSales" className="r" sort={sort} onSort={onSort} />
+                <Th label="PTD SPLH" sortKey="ptdSplh" className="r" sort={sort} onSort={onSort} />
+              </tr>
+            </thead>
+            <tbody>
+              {sections.map((sec) => (
+                <Fragment key={sec.label || "ranked"}>
+                  {sec.label && (
+                    <tr className="rrow">
+                      <td colSpan={16}>{sec.label}</td>
+                    </tr>
+                  )}
+                  {sec.stores.map((s) => (
+                    <tr key={s.code}>
+                      <td>
+                        <div className="lc-code">
+                          {s.code}
+                          {sort && <span className="lc-region">{s.region}</span>}
+                          <Flag flags={s.day.flags} />
+                        </div>
+                        <div className="lc-name">{s.name}</div>
+                      </td>
+                      <td className="num">{s.day.hours}</td>
+                      <td className="num">{money(s.day.sales)}</td>
+                      <td className="num">${s.day.target}</td>
+                      <td className={"num " + (s.day.ok ? "cell-ok" : "cell-bad")}>${s.day.splh}</td>
+                      <td className="num">{paren(s.day.overUnder)}</td>
+
+                      <td className="num sep">{s.wtd.hours}</td>
+                      <td className="num">{money(s.wtd.sales)}</td>
+                      <td className={"num " + (s.wtd.ok ? "cell-ok" : "cell-bad")}>${s.wtd.splh}</td>
+                      <td className="num">{paren(s.wtd.overUnder)}</td>
+
+                      <td className="num sep">{s.wtd.trainTotal || "-"}</td>
+                      <td className="num">{s.wtd.trainee || "-"}</td>
+                      <td className="num">{s.wtd.trainer || "-"}</td>
+
+                      {s.ptd.empty ? (
+                        <>
+                          <td className="num sep cell-dim">-</td>
+                          <td className="num cell-dim">-</td>
+                          <td className="num cell-dim">-</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="num sep">{int(s.ptd.hours)}</td>
+                          <td className="num">{money(s.ptd.sales)}</td>
+                          <td className={"num " + (s.ptd.ok ? "cell-ok" : "cell-bad")}>
+                            ${s.ptd.splh}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="mobile-cards">
+        {sections.map((sec) => (
+          <div key={sec.label || "ranked"}>
+            {sec.label && <div className="scard-region-head">{sec.label}</div>}
+            {sec.stores.map((s) => (
+              <div className={"store-card " + (s.day.ok ? "ok" : "bad")} key={s.code}>
+                <div className="store-card-head">
+                  <div>
+                    <div className="store-card-code">
+                      {s.code}
+                      <Flag flags={s.day.flags} />
+                    </div>
+                    <div className="store-card-name">{s.name}</div>
+                  </div>
+                  <div className="store-card-splh">
+                    ${s.day.target}
+                    <u>TARGET</u>
+                  </div>
+                </div>
+
+                <div className="scard-block">
+                  <div className="scard-block-label">Day - {report.dayName}</div>
+                  <div className="scard-row">
+                    <div className="scard-cell">
+                      <div className="scard-cell-lbl">Hours</div>
+                      <div className="scard-cell-val">{s.day.hours}</div>
+                    </div>
+                    <div className="scard-cell">
+                      <div className="scard-cell-lbl">Sales</div>
+                      <div className="scard-cell-val">{money(s.day.sales)}</div>
+                    </div>
+                    <div className={"scard-cell " + (s.day.ok ? "splh-ok" : "splh-bad")}>
+                      <div className="scard-cell-lbl">SPLH</div>
+                      <div className="scard-cell-val">${s.day.splh}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="scard-block">
+                  <div className="scard-block-label">Week to Date</div>
+                  <div className="scard-row">
+                    <div className="scard-cell">
+                      <div className="scard-cell-lbl">Hours</div>
+                      <div className="scard-cell-val">{s.wtd.hours}</div>
+                    </div>
+                    <div className="scard-cell">
+                      <div className="scard-cell-lbl">Sales</div>
+                      <div className="scard-cell-val">{money(s.wtd.sales)}</div>
+                    </div>
+                    <div className={"scard-cell " + (s.wtd.ok ? "splh-ok" : "splh-bad")}>
+                      <div className="scard-cell-lbl">SPLH</div>
+                      <div className="scard-cell-val">${s.wtd.splh}</div>
+                    </div>
+                  </div>
+                  <div className="scard-row" style={{ marginTop: 8 }}>
+                    <div className="scard-cell">
+                      <div className="scard-cell-lbl">Trainee</div>
+                      <div className="scard-cell-val">{s.wtd.trainee || "-"}</div>
+                    </div>
+                    <div className="scard-cell">
+                      <div className="scard-cell-lbl">Trainer</div>
+                      <div className="scard-cell-val">{s.wtd.trainer || "-"}</div>
+                    </div>
+                    <div className="scard-cell">
+                      <div className="scard-cell-lbl">(Over)/Under</div>
+                      <div className="scard-cell-val">{paren(s.wtd.overUnder)}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="scard-block">
+                  <div className="scard-block-label">Period to Date</div>
+                  {s.ptd.empty ? (
+                    <div style={{ fontSize: 12, color: "#999994", padding: "4px 2px" }}>
+                      No period data
+                    </div>
+                  ) : (
+                    <div className="scard-row">
+                      <div className="scard-cell">
+                        <div className="scard-cell-lbl">Hours</div>
+                        <div className="scard-cell-val">{int(s.ptd.hours)}</div>
+                      </div>
+                      <div className="scard-cell">
+                        <div className="scard-cell-lbl">Sales</div>
+                        <div className="scard-cell-val">{money(s.ptd.sales)}</div>
+                      </div>
+                      <div className={"scard-cell " + (s.ptd.ok ? "splh-ok" : "splh-bad")}>
+                        <div className="scard-cell-lbl">SPLH</div>
+                        <div className="scard-cell-val">${s.ptd.splh}</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+__SHIFT_EOF__
+write components/Leaderboard.js << '__SHIFT_EOF__'
+"use client";
+
+import { useState } from "react";
+import Icon from "./Icon";
+import { GROUPS, money, int, dec, median } from "../lib/ui";
+
+/**
+ * Efficiency = week to date SPLH divided by the store's own target, as a
+ * percentage. 100% means the store hit its sales with exactly the hours the
+ * target allowed. Because every store is measured against its own target, a
+ * $75 target store and a $90 target store compete on even ground.
+ */
+function efficiencyOf(s) {
+  const splh = s.wtd?.splh ?? s.day?.splh ?? null;
+  const target = s.day?.target ?? null;
+  if (!splh || !target) return null;
+  return (splh / target) * 100;
+}
+
+const SCOPES = [
+  { key: "All", label: "All stores", match: () => true },
+  { key: "TX-TN", label: "TX-TN", match: (s) => s.grp === "TX-TN" },
+  { key: "CA-AZ", label: "CA-AZ", match: (s) => s.grp === "CA-AZ" },
+  ...Object.values(GROUPS)
+    .flat()
+    .map((def) => ({
+      key: def.label,
+      label: def.label,
+      match: (s) => def.regions.includes(s.region),
+    })),
+];
+
+const SORTS = [
+  { key: "eff", label: "Efficiency" },
+  { key: "splh", label: "SPLH" },
+  { key: "name", label: "Name" },
+];
+
+export default function Leaderboard({ report }) {
+  const [scope, setScope] = useState("All");
+  const [sort, setSort] = useState("eff");
+  const [pinned, setPinned] = useState(null);
+
+  if (!report) return <div className="empty">Pick a date to build the leaderboard.</div>;
+
+  const scopeDef = SCOPES.find((s) => s.key === scope) || SCOPES[0];
+
+  const all = (report.rows || [])
+    .map((s) => ({ ...s, eff: efficiencyOf(s) }))
+    .filter((s) => s.eff !== null);
+
+  const rows = all.filter(scopeDef.match);
+
+  if (!rows.length) {
+    return (
+      <div className="empty">
+        <div className="empty-title">Nothing to rank</div>
+        <div>No store in this scope reported hours and sales yet.</div>
+      </div>
+    );
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    if (sort === "name") return a.name.localeCompare(b.name);
+    if (sort === "splh") return (b.wtd?.splh ?? 0) - (a.wtd?.splh ?? 0);
+    return b.eff - a.eff;
+  });
+
+  // Ranking is always by efficiency, whatever the display order is.
+  const byEff = [...rows].sort((a, b) => b.eff - a.eff);
+  const rank = {};
+  byEff.forEach((s, i) => (rank[s.code] = i + 1));
+
+  const atTarget = rows.filter((s) => s.eff >= 100).length;
+  const medEff = median(rows.map((s) => s.eff));
+
+  const totalHours = rows.reduce((a, s) => a + (s.wtd?.hours || 0), 0);
+  const totalSales = rows.reduce((a, s) => a + (s.wtd?.sales || 0), 0);
+  const chainSplh = totalHours > 0 ? totalSales / totalHours : 0;
+
+  // Symmetric scale so the two sides of the baseline are visually comparable.
+  const maxDev = Math.max(10, Math.ceil(Math.max(...rows.map((s) => Math.abs(s.eff - 100))) / 5) * 5);
+  const best = byEff[0];
+  const worst = byEff[byEff.length - 1];
+
+  const detail = pinned ? rows.find((s) => s.code === pinned) : null;
+
+  return (
+    <div className="view">
+      <div className="ctx">
+        <div className="ctx-block">
+          <div>
+            <b>Week {report.weekNum} leaderboard</b>
+            <span> · through {report.dayName}, {report.date}</span>
+            <div style={{ fontSize: 10.5, color: "var(--ink-text2)" }}>
+              Week to date SPLH against each store's own target
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="mc-grid">
+        <div className="mc">
+          <div className="mc-l">At or above target</div>
+          <div className="mc-v">
+            {atTarget} <span className="mc-u">/ {rows.length}</span>
+          </div>
+          <div className="mc-s">
+            {Math.round((atTarget / rows.length) * 100)}% of the stores in this scope
+          </div>
+        </div>
+        <div className="mc">
+          <div className="mc-l">Typical store</div>
+          <div className="mc-v">
+            {Math.round(medEff)}<span className="mc-u">%</span>
+          </div>
+          <div className="mc-s">Median efficiency, not the average</div>
+        </div>
+        <div className="mc">
+          <div className="mc-l">Blended SPLH</div>
+          <div className="mc-v">${Math.round(chainSplh)}</div>
+          <div className="mc-s">
+            {int(totalHours)} hours · {money(totalSales)}
+          </div>
+        </div>
+        <div className="mc">
+          <div className="mc-l">Spread</div>
+          <div className="mc-v">
+            {Math.round(best.eff - worst.eff)}<span className="mc-u"> pts</span>
+          </div>
+          <div className="mc-s">
+            {best.name} to {worst.name}
+          </div>
+        </div>
+      </div>
+
+      <div className="lb-controls">
+        <div className="lb-chips">
+          {SCOPES.map((sc) => {
+            const n = all.filter(sc.match).length;
+            if (!n) return null;
+            return (
+              <button
+                key={sc.key}
+                className={"lb-chip" + (scope === sc.key ? " active" : "")}
+                onClick={() => {
+                  setScope(sc.key);
+                  setPinned(null);
+                }}
+              >
+                {sc.label}
+                <span className="lb-chip-n">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="seg">
+          {SORTS.map((s) => (
+            <button
+              key={s.key}
+              className={"seg-btn" + (sort === s.key ? " active" : "")}
+              onClick={() => setSort(s.key)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {detail && (
+        <div className="kd-panel">
+          <button className="kd-close" onClick={() => setPinned(null)} aria-label="Close">
+            <Icon name="close" size={14} />
+          </button>
+          <div className="kd-eyebrow">
+            Rank {rank[detail.code]} of {rows.length} · {detail.region}
+          </div>
+          <div className="kd-title">{detail.name}</div>
+          <div className="kd-summary">
+            <div>
+              <div className="kd-k">Efficiency</div>
+              <div className="kd-v">{Math.round(detail.eff)}%</div>
+            </div>
+            <div>
+              <div className="kd-k">WTD SPLH</div>
+              <div className="kd-v">${detail.wtd?.splh ?? "—"}</div>
+            </div>
+            <div>
+              <div className="kd-k">Target</div>
+              <div className="kd-v">${detail.day?.target}</div>
+            </div>
+            <div>
+              <div className="kd-k">WTD hours</div>
+              <div className="kd-v">{int(detail.wtd?.hours)}</div>
+            </div>
+            <div>
+              <div className="kd-k">WTD sales</div>
+              <div className="kd-v">{money(detail.wtd?.sales)}</div>
+            </div>
+            <div>
+              <div className="kd-k">Yesterday SPLH</div>
+              <div className="kd-v">${detail.day?.splh}</div>
+            </div>
+          </div>
+          <div className="kd-note">
+            At {Math.round(detail.eff)}% this store is{" "}
+            {detail.eff >= 100
+              ? `beating its target by ${Math.round(detail.eff - 100)} points, which means it is producing its sales with fewer hours than budgeted.`
+              : `${Math.round(100 - detail.eff)} points short, which means it used more hours than the target allowed for the sales it produced.`}
+          </div>
+        </div>
+      )}
+
+      <div className="tcard">
+        <div className="thead">
+          <div>
+            <div className="ttl">{scopeDef.label}</div>
+            <div className="tsub">
+              Bars run from the target line. Right is ahead, left is behind. Click a store for
+              the detail.
+            </div>
+          </div>
+          <span className="chip chip-mute">{rows.length} stores</span>
+        </div>
+
+        <div className="lb-axis">
+          <span>-{maxDev} pts</span>
+          <span className="lb-axis-mid">Target</span>
+          <span>+{maxDev} pts</span>
+        </div>
+
+        <div className="lb-chart stagger">
+          {sorted.map((s, i) => {
+            const dev = s.eff - 100;
+            const width = (Math.abs(dev) / maxDev) * 50;
+            const ahead = dev >= 0;
+            return (
+              <button
+                key={s.code}
+                className={"lb-row" + (pinned === s.code ? " pinned" : "")}
+                style={{ "--i": i }}
+                onClick={() => setPinned(pinned === s.code ? null : s.code)}
+              >
+                <span className="lb-rank">{rank[s.code]}</span>
+                <span className="lb-name">
+                  {s.name}
+                  <span className="lb-meta">
+                    ${s.wtd?.splh ?? "—"} SPLH · target ${s.day?.target}
+                  </span>
+                </span>
+                <span className="lb-track">
+                  <span className="lb-base" />
+                  <span
+                    className={"lb-bar " + (ahead ? "up" : "down")}
+                    style={{
+                      left: ahead ? "50%" : `${50 - width}%`,
+                      width: `${Math.max(width, 0.6)}%`,
+                    }}
+                  />
+                </span>
+                <span className={"lb-pct " + (ahead ? "up" : "down")}>
+                  {Math.round(s.eff)}%
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="footnote">
+        Efficiency is week to date SPLH divided by the store's own target. Over 100% means the
+        store hit its sales with fewer hours than the target allowed. Because each store is
+        measured against its own number, a $75 target store and a $90 target store are compared
+        fairly. Stores with no hours or no sales yet this week are left out of the ranking.
+      </div>
+    </div>
+  );
+}
+__SHIFT_EOF__
+write app/page.js << '__SHIFT_EOF__'
+"use client";
+
+import { useState, useEffect } from "react";
+import "./globals.css";
+
+import Icon from "../components/Icon";
+import ShiftLogo from "../components/ShiftLogo";
+import UnlockModal from "../components/UnlockModal";
+import WeekView from "../components/WeekView";
+import Targets from "../components/Targets";
+import EmailPreview from "../components/EmailPreview";
+import Dashboard from "../components/Dashboard";
+import Leaderboard from "../components/Leaderboard";
+import StoreTrend from "../components/StoreTrend";
+import ServiceBoard from "../components/ServiceBoard";
+import TPLH from "../components/TPLH";
+import DriveThru from "../components/DriveThru";
+import { yesterdayISO } from "../lib/ui";
+
+/**
+ * One source of truth for navigation, page titles and which topbar controls
+ * appear. Adding a view means adding a row here, nothing else.
+ *   lock    reporter mode required
+ *   desktop hidden on narrow screens
+ *   date / group / search  which controls the topbar shows
+ */
+const VIEWS = [
+  { key: "dashboard", label: "Dashboard", short: "Dashboard", icon: "dashboard", group: "Today", lock: true, date: true },
+  { key: "week", label: "Week view", short: "Week", icon: "table", group: "Today", date: true, region: true, search: true },
+  { key: "storetrend", label: "Store detail", short: "Store", icon: "search", group: "Stores", date: true },
+  { key: "leaderboard", label: "Leaderboard", short: "Board", icon: "rank", group: "Stores", date: true },
+  { key: "service", label: "Service times", short: "Service", icon: "timer", group: "Operations", lock: true, date: true },
+  { key: "tplh", label: "TPLH", short: "TPLH", icon: "activity", group: "Operations", lock: true },
+  { key: "drivethru", label: "Drive-thru", short: "Drive", icon: "car", group: "Operations", lock: true },
+  { key: "email", label: "HTML email", short: "Email", icon: "mail", group: "Share", lock: true, desktop: true, date: true, region: true },
+  { key: "targets", label: "Store targets", short: "Targets", icon: "target", group: "Share", lock: true, desktop: true },
+];
+
+const NAV_GROUPS = ["Today", "Stores", "Operations", "Share"];
+
+export default function ShiftApp() {
+  const [view, setView] = useState("week");
+  const [isoDate, setIsoDate] = useState(yesterdayISO());
+  const [region, setRegion] = useState("All");
+  const [search, setSearch] = useState("");
+
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [reporter, setReporter] = useState(false);
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const cfg = VIEWS.find((v) => v.key === view) || VIEWS[1];
+  const visible = VIEWS.filter((v) => !v.lock || reporter);
+
+  // Restore a reporter session and land on the dashboard
+  useEffect(() => {
+    if (sessionStorage.getItem("shift_reporter_code")) {
+      setReporter(true);
+      setView("dashboard");
+    }
+    if (localStorage.getItem("shift_nav_collapsed") === "1") setCollapsed(true);
+  }, []);
+
+  function toggleNav() {
+    setCollapsed((c) => {
+      localStorage.setItem("shift_nav_collapsed", c ? "0" : "1");
+      return !c;
+    });
+  }
+
+  // The week view and the leaderboard share one report payload
+  useEffect(() => {
+    if (!isoDate) return;
+    let dead = false;
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/report?date=${isoDate}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (dead) return;
+        if (!d.ok) {
+          setError(d.error);
+          setReport(null);
+        } else {
+          setReport(d);
+        }
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (dead) return;
+        setError(String(e));
+        setLoading(false);
+      });
+
+    return () => {
+      dead = true;
+    };
+  }, [isoDate]);
+
+  // Today's numbers keep moving, so refresh every five minutes
+  useEffect(() => {
+    if (!report?.isLive) return;
+    const id = setInterval(() => {
+      fetch(`/api/report?date=${isoDate}`)
+        .then((r) => r.json())
+        .then((d) => d.ok && setReport(d))
+        .catch(() => {});
+    }, 300000);
+    return () => clearInterval(id);
+  }, [report?.isLive, isoDate]);
+
+  function lock(message) {
+    sessionStorage.removeItem("shift_reporter_code");
+    setReporter(false);
+    setNotice(message || null);
+    if (VIEWS.find((v) => v.key === view)?.lock) setView("week");
+  }
+
+  return (
+    <div className="app">
+      <nav className={"sidebar" + (collapsed ? " collapsed" : "")}>
+        <button
+          className="logo"
+          onClick={toggleNav}
+          title={collapsed ? "Show the menu" : "Hide the menu"}
+          aria-expanded={!collapsed}
+        >
+          <ShiftLogo variant="mark" size={34} crown />
+          <div className="logo-words">
+            <div className="logo-text">SHIFT</div>
+            <div className="logo-sub">La La Land</div>
+          </div>
+        </button>
+
+        {NAV_GROUPS.map((g) => {
+          const items = visible.filter((v) => v.group === g);
+          if (!items.length) return null;
+          return (
+            <div key={g}>
+              <div className="nsec">{g}</div>
+              {items.map((v) => (
+                <button
+                  key={v.key}
+                  className={"nbtn" + (view === v.key ? " active" : "")}
+                  onClick={() => setView(v.key)}
+                  title={collapsed ? v.label : undefined}
+                >
+                  <Icon name={v.icon} />
+                  <span className="nbtn-label">{v.label}</span>
+                </button>
+              ))}
+            </div>
+          );
+        })}
+
+        <div className="sidebar-spacer" />
+
+        <button
+          className="nbtn"
+          onClick={() => (reporter ? lock() : setShowUnlock(true))}
+          title={collapsed ? (reporter ? "Lock reporter mode" : "Unlock reporter mode") : undefined}
+        >
+          <Icon name={reporter ? "lock" : "unlock"} />
+          <span className="nbtn-label">
+            {reporter ? "Lock reporter mode" : "Unlock reporter mode"}
+          </span>
+        </button>
+        <div className="nfoot" title={reporter ? "Reporter access on" : "Read only"}>
+          <span className={"ndot" + (reporter ? " on" : "")} />
+          <span className="nbtn-label">
+            {reporter ? "Reporter access on" : "Read only"}
+          </span>
+        </div>
+      </nav>
+
+      {showUnlock && (
+        <UnlockModal
+          onClose={() => setShowUnlock(false)}
+          onUnlocked={() => {
+            setReporter(true);
+            setShowUnlock(false);
+            setNotice(null);
+            setView("dashboard");
+          }}
+        />
+      )}
+
+      <div className="main">
+        <header className="topbar">
+          <div>
+            <div className="ptitle">{cfg.label}</div>
+            {report && (
+              <div className="psub">
+                Week {report.weekNum} · Period {report.period} · 34 stores
+              </div>
+            )}
+          </div>
+
+          <div className="tbr">
+            {cfg.search && (
+              <label className="field field-search">
+                <Icon name="search" size={14} />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Store or code"
+                />
+              </label>
+            )}
+            {cfg.date && (
+              <label className="field">
+                <Icon name="calendar" size={14} />
+                <input type="date" value={isoDate} onChange={(e) => setIsoDate(e.target.value)} />
+              </label>
+            )}
+            {cfg.region && (
+              <label className="field">
+                <select value={region} onChange={(e) => setRegion(e.target.value)}>
+                  <option value="All">All regions</option>
+                  <option value="TX-TN">TX-TN</option>
+                  <option value="CA-AZ">CA-AZ</option>
+                </select>
+                <Icon name="down" size={14} />
+              </label>
+            )}
+          </div>
+        </header>
+
+        <div className="mobile-nav">
+          {visible
+            .filter((v) => !v.desktop)
+            .map((v) => (
+              <button
+                key={v.key}
+                className={"mnav-btn" + (view === v.key ? " active" : "")}
+                onClick={() => setView(v.key)}
+              >
+                <Icon name={v.icon} size={14} />
+                {v.short}
+              </button>
+            ))}
+        </div>
+
+        <main className="content">
+          {notice && (
+            <div className="note note-warn">
+              <Icon name="alert" size={15} />
+              <div>{notice}</div>
+            </div>
+          )}
+
+          {view === "week" && (
+            <WeekView
+              report={report}
+              loading={loading}
+              error={error}
+              groupFilter={region}
+              search={search}
+            />
+          )}
+          {view === "leaderboard" && <Leaderboard report={report} />}
+          {view === "storetrend" && <StoreTrend isoDate={isoDate} />}
+          {view === "dashboard" && reporter && <Dashboard isoDate={isoDate} />}
+          {view === "service" && reporter && <ServiceBoard isoDate={isoDate} />}
+          {view === "tplh" && reporter && <TPLH />}
+          {view === "drivethru" && reporter && <DriveThru />}
+          {view === "email" && reporter && (
+            <EmailPreview isoDate={isoDate} groupFilter={region} />
+          )}
+          {view === "targets" && reporter && <Targets onAuthExpired={lock} />}
+
+          {cfg.lock && !reporter && (
+            <div className="empty">
+              <Icon name="lock" size={22} />
+              <div className="empty-title">Reporter mode required</div>
+              <div>Unlock from the sidebar to open this view.</div>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+__SHIFT_EOF__
+write app/globals.css << '__SHIFT_EOF__'
 /* ============================================================
    SHIFT design system
    Tokens first, then shell, then components. Legacy class names
@@ -2642,3 +3783,18 @@ th.sorted .th-caret {
     display: none;
   }
 }
+__SHIFT_EOF__
+
+echo
+echo "==> sanity check"
+MISS=0
+for f in components/ShiftLogo.js components/WeekView.js components/Leaderboard.js app/page.js app/globals.css; do
+  [ -s "$f" ] && echo "    ok      $f" || { echo "    MISSING $f"; MISS=1; }
+done
+grep -q "shift_nav_collapsed" app/page.js && echo "    ok      sidebar collapse wired" || echo "    WARNING collapse not found in page.js"
+grep -q "lb-chart" app/globals.css && echo "    ok      leaderboard styles present" || echo "    WARNING leaderboard styles missing"
+grep -q "CROWN_LEFT" components/ShiftLogo.js && echo "    ok      crown present" || echo "    WARNING crown missing"
+
+echo
+[ "$MISS" = "0" ] && echo "All good. Run:  npm run dev" || echo "Fix the items above first."
+echo "To undo any single file:  mv <file>.$STAMP.bak <file>"

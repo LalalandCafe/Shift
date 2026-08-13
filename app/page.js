@@ -51,6 +51,7 @@ export default function ShiftApp() {
   const [reporter, setReporter] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   const cfg = VIEWS.find((v) => v.key === view) || VIEWS[1];
   const visible = VIEWS.filter((v) => !v.lock || reporter);
@@ -61,7 +62,15 @@ export default function ShiftApp() {
       setReporter(true);
       setView("dashboard");
     }
+    if (localStorage.getItem("shift_nav_collapsed") === "1") setCollapsed(true);
   }, []);
+
+  function toggleNav() {
+    setCollapsed((c) => {
+      localStorage.setItem("shift_nav_collapsed", c ? "0" : "1");
+      return !c;
+    });
+  }
 
   // The week view and the leaderboard share one report payload
   useEffect(() => {
@@ -114,14 +123,19 @@ export default function ShiftApp() {
 
   return (
     <div className="app">
-      <nav className="sidebar">
-        <div className="logo">
-          <ShiftLogo variant="mark" size={30} />
-          <div>
+      <nav className={"sidebar" + (collapsed ? " collapsed" : "")}>
+        <button
+          className="logo"
+          onClick={toggleNav}
+          title={collapsed ? "Show the menu" : "Hide the menu"}
+          aria-expanded={!collapsed}
+        >
+          <ShiftLogo variant="mark" size={34} crown />
+          <div className="logo-words">
             <div className="logo-text">SHIFT</div>
             <div className="logo-sub">La La Land</div>
           </div>
-        </div>
+        </button>
 
         {NAV_GROUPS.map((g) => {
           const items = visible.filter((v) => v.group === g);
@@ -134,9 +148,10 @@ export default function ShiftApp() {
                   key={v.key}
                   className={"nbtn" + (view === v.key ? " active" : "")}
                   onClick={() => setView(v.key)}
+                  title={collapsed ? v.label : undefined}
                 >
                   <Icon name={v.icon} />
-                  {v.label}
+                  <span className="nbtn-label">{v.label}</span>
                 </button>
               ))}
             </div>
@@ -148,13 +163,18 @@ export default function ShiftApp() {
         <button
           className="nbtn"
           onClick={() => (reporter ? lock() : setShowUnlock(true))}
+          title={collapsed ? (reporter ? "Lock reporter mode" : "Unlock reporter mode") : undefined}
         >
           <Icon name={reporter ? "lock" : "unlock"} />
-          {reporter ? "Lock reporter mode" : "Unlock reporter mode"}
+          <span className="nbtn-label">
+            {reporter ? "Lock reporter mode" : "Unlock reporter mode"}
+          </span>
         </button>
-        <div className="nfoot">
+        <div className="nfoot" title={reporter ? "Reporter access on" : "Read only"}>
           <span className={"ndot" + (reporter ? " on" : "")} />
-          {reporter ? "Reporter access on" : "Read only"}
+          <span className="nbtn-label">
+            {reporter ? "Reporter access on" : "Read only"}
+          </span>
         </div>
       </nav>
 
