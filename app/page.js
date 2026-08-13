@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import "./globals.css";
 
 import Icon from "../components/Icon";
+import ShiftLogo from "../components/ShiftLogo";
 import UnlockModal from "../components/UnlockModal";
 import WeekView from "../components/WeekView";
 import Targets from "../components/Targets";
@@ -115,7 +116,7 @@ export default function ShiftApp() {
     <div className="app">
       <nav className="sidebar">
         <div className="logo">
-          <div className="logo-mark">S</div>
+          <ShiftLogo variant="mark" size={30} />
           <div>
             <div className="logo-text">SHIFT</div>
             <div className="logo-sub">La La Land</div>
