@@ -2795,3 +2795,125 @@ th.sorted .th-caret {
     font-size: 12.5px;
   }
 }
+
+/* ============================================================
+   v5: mobile logo, tighter week cards
+   ============================================================ */
+
+.topbar-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+/* the sidebar already carries the logo on desktop */
+.mobile-logo {
+  display: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: var(--r);
+  transition: transform var(--dur) var(--ease);
+}
+.mobile-logo:active {
+  transform: scale(0.94);
+}
+
+@media (max-width: 900px) {
+  .mobile-logo {
+    display: block;
+    flex-shrink: 0;
+  }
+  .topbar {
+    padding: 9px 12px;
+    gap: 8px;
+  }
+  .ptitle {
+    font-size: 15px;
+  }
+  .psub {
+    font-size: 10px;
+  }
+  .mobile-nav {
+    top: 49px;
+  }
+
+  /* ---- week view, compact ---- */
+  .wk-legacy .mc-grid,
+  .wk-legacy .mc-grid.cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .wk-legacy .mc {
+    padding: 9px 9px;
+    border-radius: 9px;
+  }
+  .wk-legacy .mc-l {
+    font-size: 8px;
+    letter-spacing: 0.03em;
+    margin-bottom: 3px;
+    line-height: 1.25;
+  }
+  .wk-legacy .mc-v {
+    font-size: 16px;
+  }
+  .wk-legacy .mc-s {
+    display: none;
+  }
+
+  .wk-legacy .store-card {
+    padding: 11px;
+    margin-bottom: 9px;
+    border-radius: 10px;
+    border-left-width: 4px;
+  }
+  .wk-legacy .store-card-head {
+    margin-bottom: 9px;
+    padding-bottom: 8px;
+  }
+  .wk-legacy .store-card-name {
+    font-size: 13.5px;
+  }
+  .wk-legacy .store-card-code {
+    font-size: 9.5px;
+  }
+  .wk-legacy .store-card-splh {
+    font-size: 17px;
+    min-width: 58px;
+    padding: 3px 9px;
+  }
+  .wk-legacy .scard-block {
+    margin-bottom: 8px;
+  }
+  .wk-legacy .scard-block-label {
+    font-size: 8.5px;
+    margin-bottom: 4px;
+    letter-spacing: 0.07em;
+  }
+  .wk-legacy .scard-row {
+    gap: 5px;
+  }
+  .wk-legacy .scard-cell {
+    padding: 6px 5px;
+    border-radius: 6px;
+  }
+  .wk-legacy .scard-cell-lbl {
+    font-size: 8px;
+    margin-bottom: 1px;
+  }
+  .wk-legacy .scard-cell-val {
+    font-size: 12.5px;
+  }
+  .wk-legacy .scard-region-head {
+    font-size: 10.5px;
+    padding: 5px 10px;
+    margin: 12px 0 7px;
+    border-radius: 6px;
+  }
+  /* the week and sync banner */
+  .wk-legacy .ctx-block,
+  .wk-legacy > div:first-child > div {
+    font-size: 11.5px !important;
+  }
+}

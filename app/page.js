@@ -192,13 +192,23 @@ export default function ShiftApp() {
 
       <div className="main">
         <header className="topbar">
-          <div>
-            <div className="ptitle">{cfg.label}</div>
-            {report && (
-              <div className="psub">
-                Week {report.weekNum} · Period {report.period} · 34 stores
-              </div>
-            )}
+          <div className="topbar-id">
+            <button
+              className="mobile-logo"
+              onClick={toggleNav}
+              title="SHIFT"
+              aria-label="SHIFT"
+            >
+              <ShiftLogo variant="mark" size={30} crown />
+            </button>
+            <div>
+              <div className="ptitle">{cfg.label}</div>
+              {report && (
+                <div className="psub">
+                  Week {report.weekNum} · Period {report.period} · 34 stores
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="tbr">

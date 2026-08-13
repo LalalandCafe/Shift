@@ -7,35 +7,45 @@ const EYE = '#F4F7F2';
 const LEFT = 'M31 8C20 8 12 16 12 26L8 33l4 2v4c0 4 3 6 6 7l5 3v8h8z';
 const RIGHT = 'M33 8c11 0 19 8 19 18l4 7-4 2v4c0 4-3 6-6 7l-5 3v8h-8z';
 
-// Diadem, modelled on the Janus bust: a fillet hugging the skull, a pair of
-// vertical strips down the seam, and the horizontal knot on top. It is drawn
-// OVER the faces in the opposite color of the half it crosses, amber across the
-// blue face and blue across the amber one, so it reads as one piece worn by
-// both heads and never needs an outline to separate it from the hair.
-const CROWN = {
-  bandL: 'M11 24 Q17 11 31.4 10.5',
-  bandR: 'M53 24 Q47 11 32.6 10.5',
-  stemL: 'M30.3 -1 L30.3 11',
-  stemR: 'M33.7 -1 L33.7 11',
-  knotL: 'M24 -1 L31.4 -1',
-  knotR: 'M40 -1 L32.6 -1',
-};
+// Fillet, modelled on the Janus bust: a straight braided band across both
+// skulls, a double strip down the seam and a knot on top. Drawn OVER the faces
+// in the opposite color of the half it crosses, amber across the blue face and
+// blue across the amber one, so it reads as one piece worn by both heads and
+// never needs an outline. The notches are painted in the face color underneath,
+// which is what gives the band its braided texture for free.
+const BAND_Y = 18.5;
+const BAND_H = 5;
+const BAND_X = 13.2;
+const NOTCHES = 5;
+
+function notchRects(x0, x1, color) {
+  const step = (x1 - x0) / NOTCHES;
+  return Array.from({ length: NOTCHES - 1 }, (_, i) => (
+    <rect
+      key={i}
+      x={(x0 + step * (i + 1) - 0.45).toFixed(2)}
+      y={BAND_Y - 0.2}
+      width="0.9"
+      height={BAND_H + 0.4}
+      fill={color}
+    />
+  ));
+}
 
 const WORDMARK_FONT =
   'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif';
 
-function Crown({ on, left = AMBER, right = BLUE }) {
-  const band = { fill: 'none', strokeWidth: 4, strokeLinecap: 'round' };
-  const stem = { strokeWidth: 2.6, strokeLinecap: 'round' };
-  const knot = { strokeWidth: 4.6, strokeLinecap: 'round' };
+function Crown({ on, left = AMBER, right = BLUE, faceLeft = BLUE, faceRight = AMBER }) {
   return (
     <g className={'shift-crown' + (on ? ' on' : '')}>
-      <path d={CROWN.bandL} stroke={left} {...band} />
-      <path d={CROWN.bandR} stroke={right} {...band} />
-      <path d={CROWN.stemL} stroke={left} {...stem} />
-      <path d={CROWN.stemR} stroke={right} {...stem} />
-      <path d={CROWN.knotL} stroke={left} {...knot} />
-      <path d={CROWN.knotR} stroke={right} {...knot} />
+      <rect x={BAND_X} y={BAND_Y} width={31.7 - BAND_X} height={BAND_H} fill={left} />
+      <rect x="32.3" y={BAND_Y} width={64 - BAND_X - 32.3} height={BAND_H} fill={right} />
+      {notchRects(BAND_X, 31.7, faceLeft)}
+      {notchRects(32.3, 64 - BAND_X, faceRight)}
+      <rect x="28.7" y="3.4" width="3" height="21.6" fill={left} />
+      <rect x="32.3" y="3.4" width="3" height="21.6" fill={right} />
+      <rect x="23.6" y="0" width="8.1" height="3.4" rx="1.5" fill={left} />
+      <rect x="32.3" y="0" width="8.1" height="3.4" rx="1.5" fill={right} />
     </g>
   );
 }
@@ -92,8 +102,8 @@ export default function ShiftLogo({
 
   // With a crown the viewBox opens upward so the faces keep their exact
   // geometry, and the head never shifts when the crown toggles.
-  const box = hasCrown ? '0 -6 64 70' : '0 0 64 64';
-  const ratio = hasCrown ? 64 / 70 : 1;
+  const box = hasCrown ? '0 -3 64 67' : '0 0 64 64';
+  const ratio = hasCrown ? 64 / 67 : 1;
 
   if (variant === 'mark' || variant === 'mono') {
     const mono = variant === 'mono';
@@ -112,6 +122,8 @@ export default function ShiftLogo({
             on={crown}
             left={mono ? 'currentColor' : AMBER}
             right={mono ? 'currentColor' : BLUE}
+            faceLeft={mono ? 'transparent' : BLUE}
+            faceRight={mono ? 'transparent' : AMBER}
           />
         )}
       </svg>
