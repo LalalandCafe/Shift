@@ -2,13 +2,13 @@
 
 import { useState } from "react";
 import Icon from "./Icon";
-import { GROUPS, money, int, dec, median } from "../lib/ui";
+import { GROUPS, money, int, median } from "../lib/ui";
 
 /**
  * Efficiency = week to date SPLH divided by the store's own target, as a
- * percentage. 100% means the store hit its sales with exactly the hours the
- * target allowed. Because every store is measured against its own target, a
- * $75 target store and a $90 target store compete on even ground.
+ * percentage. 100% means the store produced its sales with exactly the hours
+ * the target allowed. Measuring each store against its own number is what lets
+ * a $75 target store and a $90 target store compete fairly.
  */
 function efficiencyOf(s) {
   const splh = s.wtd?.splh ?? s.day?.splh ?? null;
@@ -36,52 +36,81 @@ const SORTS = [
   { key: "name", label: "Name" },
 ];
 
+const PLACES = ["gold", "silver", "bronze"];
+
+/** Struck medal: ribbon tails, ring, disc, rank number. No emoji. */
+function Medal({ place, rank, size = 46 }) {
+  return (
+    <svg className={"lb-medal " + place} width={size} height={size} viewBox="0 0 44 44" aria-hidden="true">
+      <path className="ribbon l" d="M13 2 L20 17 L14.5 20.5 L7.5 5 Z" />
+      <path className="ribbon r" d="M31 2 L24 17 L29.5 20.5 L36.5 5 Z" />
+      <circle className="ring" cx="22" cy="28" r="13" />
+      <circle className="disc" cx="22" cy="28" r="9.6" />
+      <text className="num" x="22" y="28" textAnchor="middle" dominantBaseline="central">
+        {rank}
+      </text>
+    </svg>
+  );
+}
+
+/** Progress toward the store's own target, with the target marked on the track. */
+function GoalBar({ eff, scale }) {
+  const fill = Math.min(100, (eff / scale) * 100);
+  const mark = (100 / scale) * 100;
+  return (
+    <div className="lb-goal">
+      <div
+        className={"lb-goal-fill " + (eff >= 100 ? "up" : "down")}
+        style={{ width: fill + "%" }}
+      />
+      <div className="lb-goal-mark" style={{ left: mark + "%" }} />
+    </div>
+  );
+}
+
 export default function Leaderboard({ report }) {
   const [scope, setScope] = useState("All");
   const [sort, setSort] = useState("eff");
   const [pinned, setPinned] = useState(null);
+  const [showAll, setShowAll] = useState(false);
 
   if (!report) return <div className="empty">Pick a date to build the leaderboard.</div>;
 
   const scopeDef = SCOPES.find((s) => s.key === scope) || SCOPES[0];
-
   const all = (report.rows || [])
     .map((s) => ({ ...s, eff: efficiencyOf(s) }))
     .filter((s) => s.eff !== null);
-
   const rows = all.filter(scopeDef.match);
 
   if (!rows.length) {
     return (
       <div className="empty">
         <div className="empty-title">Nothing to rank</div>
-        <div>No store in this scope reported hours and sales yet.</div>
+        <div>No store in this scope has reported hours and sales yet.</div>
       </div>
     );
   }
 
-  const sorted = [...rows].sort((a, b) => {
-    if (sort === "name") return a.name.localeCompare(b.name);
-    if (sort === "splh") return (b.wtd?.splh ?? 0) - (a.wtd?.splh ?? 0);
-    return b.eff - a.eff;
-  });
-
-  // Ranking is always by efficiency, whatever the display order is.
   const byEff = [...rows].sort((a, b) => b.eff - a.eff);
   const rank = {};
   byEff.forEach((s, i) => (rank[s.code] = i + 1));
 
+  const podium = byEff.slice(0, 3);
+  const ordered = [...rows].sort((a, b) => {
+    if (sort === "name") return a.name.localeCompare(b.name);
+    if (sort === "splh") return (b.wtd?.splh ?? 0) - (a.wtd?.splh ?? 0);
+    return b.eff - a.eff;
+  });
+  // On the default sort the podium already covers the top three.
+  const listSource = sort === "eff" ? ordered.slice(3) : ordered;
+  const list = showAll ? listSource : listSource.slice(0, 10);
+
   const atTarget = rows.filter((s) => s.eff >= 100).length;
   const medEff = median(rows.map((s) => s.eff));
-
   const totalHours = rows.reduce((a, s) => a + (s.wtd?.hours || 0), 0);
   const totalSales = rows.reduce((a, s) => a + (s.wtd?.sales || 0), 0);
   const chainSplh = totalHours > 0 ? totalSales / totalHours : 0;
-
-  // Symmetric scale so the two sides of the baseline are visually comparable.
-  const maxDev = Math.max(10, Math.ceil(Math.max(...rows.map((s) => Math.abs(s.eff - 100))) / 5) * 5);
-  const best = byEff[0];
-  const worst = byEff[byEff.length - 1];
+  const scale = Math.max(120, Math.ceil(Math.max(...rows.map((s) => s.eff)) / 10) * 10);
 
   const detail = pinned ? rows.find((s) => s.code === pinned) : null;
 
@@ -105,16 +134,15 @@ export default function Leaderboard({ report }) {
           <div className="mc-v">
             {atTarget} <span className="mc-u">/ {rows.length}</span>
           </div>
-          <div className="mc-s">
-            {Math.round((atTarget / rows.length) * 100)}% of the stores in this scope
-          </div>
+          <div className="mc-s">{Math.round((atTarget / rows.length) * 100)}% of this scope</div>
         </div>
         <div className="mc">
           <div className="mc-l">Typical store</div>
           <div className="mc-v">
-            {Math.round(medEff)}<span className="mc-u">%</span>
+            {Math.round(medEff)}
+            <span className="mc-u">%</span>
           </div>
-          <div className="mc-s">Median efficiency, not the average</div>
+          <div className="mc-s">Median, so one outlier cannot move it</div>
         </div>
         <div className="mc">
           <div className="mc-l">Blended SPLH</div>
@@ -126,11 +154,10 @@ export default function Leaderboard({ report }) {
         <div className="mc">
           <div className="mc-l">Spread</div>
           <div className="mc-v">
-            {Math.round(best.eff - worst.eff)}<span className="mc-u"> pts</span>
+            {Math.round(byEff[0].eff - byEff[byEff.length - 1].eff)}
+            <span className="mc-u"> pts</span>
           </div>
-          <div className="mc-s">
-            {best.name} to {worst.name}
-          </div>
+          <div className="mc-s">First place to last place</div>
         </div>
       </div>
 
@@ -146,6 +173,7 @@ export default function Leaderboard({ report }) {
                 onClick={() => {
                   setScope(sc.key);
                   setPinned(null);
+                  setShowAll(false);
                 }}
               >
                 {sc.label}
@@ -167,6 +195,30 @@ export default function Leaderboard({ report }) {
         </div>
       </div>
 
+      <div className="lb-podium stagger">
+        {podium.map((s, i) => (
+          <button
+            key={s.code}
+            className={"lb-pod " + PLACES[i] + (pinned === s.code ? " pinned" : "")}
+            style={{ "--i": i }}
+            onClick={() => setPinned(pinned === s.code ? null : s.code)}
+          >
+            <Medal place={PLACES[i]} rank={i + 1} />
+            <div className="lb-pod-body">
+              <div className="lb-pod-name">{s.name}</div>
+              <div className="lb-pod-meta">
+                ${s.wtd?.splh} SPLH · target ${s.day?.target} · {s.region}
+              </div>
+              <GoalBar eff={s.eff} scale={scale} />
+            </div>
+            <div className={"lb-pod-pct " + (s.eff >= 100 ? "up" : "down")}>
+              {Math.round(s.eff)}
+              <span>%</span>
+            </div>
+          </button>
+        ))}
+      </div>
+
       {detail && (
         <div className="kd-panel">
           <button className="kd-close" onClick={() => setPinned(null)} aria-label="Close">
@@ -183,7 +235,7 @@ export default function Leaderboard({ report }) {
             </div>
             <div>
               <div className="kd-k">WTD SPLH</div>
-              <div className="kd-v">${detail.wtd?.splh ?? "—"}</div>
+              <div className="kd-v">${detail.wtd?.splh ?? "-"}</div>
             </div>
             <div>
               <div className="kd-k">Target</div>
@@ -198,15 +250,14 @@ export default function Leaderboard({ report }) {
               <div className="kd-v">{money(detail.wtd?.sales)}</div>
             </div>
             <div>
-              <div className="kd-k">Yesterday SPLH</div>
+              <div className="kd-k">Yesterday</div>
               <div className="kd-v">${detail.day?.splh}</div>
             </div>
           </div>
           <div className="kd-note">
-            At {Math.round(detail.eff)}% this store is{" "}
             {detail.eff >= 100
-              ? `beating its target by ${Math.round(detail.eff - 100)} points, which means it is producing its sales with fewer hours than budgeted.`
-              : `${Math.round(100 - detail.eff)} points short, which means it used more hours than the target allowed for the sales it produced.`}
+              ? `Beating target by ${Math.round(detail.eff - 100)} points: the sales came in with fewer hours than budgeted.`
+              : `Short by ${Math.round(100 - detail.eff)} points: the hours used ran ahead of what the sales supported.`}
           </div>
         </div>
       )}
@@ -214,64 +265,52 @@ export default function Leaderboard({ report }) {
       <div className="tcard">
         <div className="thead">
           <div>
-            <div className="ttl">{scopeDef.label}</div>
+            <div className="ttl">{sort === "eff" ? "Rest of the field" : scopeDef.label}</div>
             <div className="tsub">
-              Bars run from the target line. Right is ahead, left is behind. Click a store for
-              the detail.
+              The line on each bar is the store's own target. Click a row for the detail.
             </div>
           </div>
           <span className="chip chip-mute">{rows.length} stores</span>
         </div>
 
-        <div className="lb-axis">
-          <span>-{maxDev} pts</span>
-          <span className="lb-axis-mid">Target</span>
-          <span>+{maxDev} pts</span>
+        <div className="lb-list stagger">
+          {list.map((s, i) => (
+            <button
+              key={s.code}
+              className={"lb-row" + (pinned === s.code ? " pinned" : "")}
+              style={{ "--i": i }}
+              onClick={() => setPinned(pinned === s.code ? null : s.code)}
+            >
+              <span className={"lb-rank" + (rank[s.code] <= 3 ? " top" : "")}>{rank[s.code]}</span>
+              <span className="lb-name">
+                {s.name}
+                <span className="lb-meta">
+                  ${s.wtd?.splh} SPLH · target ${s.day?.target}
+                </span>
+              </span>
+              <GoalBar eff={s.eff} scale={scale} />
+              <span className={"lb-pct " + (s.eff >= 100 ? "up" : "down")}>
+                {Math.round(s.eff)}%
+              </span>
+            </button>
+          ))}
         </div>
 
-        <div className="lb-chart stagger">
-          {sorted.map((s, i) => {
-            const dev = s.eff - 100;
-            const width = (Math.abs(dev) / maxDev) * 50;
-            const ahead = dev >= 0;
-            return (
-              <button
-                key={s.code}
-                className={"lb-row" + (pinned === s.code ? " pinned" : "")}
-                style={{ "--i": i }}
-                onClick={() => setPinned(pinned === s.code ? null : s.code)}
-              >
-                <span className="lb-rank">{rank[s.code]}</span>
-                <span className="lb-name">
-                  {s.name}
-                  <span className="lb-meta">
-                    ${s.wtd?.splh ?? "—"} SPLH · target ${s.day?.target}
-                  </span>
-                </span>
-                <span className="lb-track">
-                  <span className="lb-base" />
-                  <span
-                    className={"lb-bar " + (ahead ? "up" : "down")}
-                    style={{
-                      left: ahead ? "50%" : `${50 - width}%`,
-                      width: `${Math.max(width, 0.6)}%`,
-                    }}
-                  />
-                </span>
-                <span className={"lb-pct " + (ahead ? "up" : "down")}>
-                  {Math.round(s.eff)}%
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {listSource.length > 10 && (
+          <div style={{ padding: 12 }}>
+            <button className="btn btn-quiet" onClick={() => setShowAll(!showAll)}>
+              <Icon name={showAll ? "up" : "down"} size={14} />
+              {showAll ? "Show fewer" : `Show all ${listSource.length}`}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="footnote">
         Efficiency is week to date SPLH divided by the store's own target. Over 100% means the
-        store hit its sales with fewer hours than the target allowed. Because each store is
-        measured against its own number, a $75 target store and a $90 target store are compared
-        fairly. Stores with no hours or no sales yet this week are left out of the ranking.
+        store hit its sales with fewer hours than the target allowed. Since each store is measured
+        against its own number, targets of $75 and $90 compare fairly. Stores with no hours or
+        sales yet this week are left out.
       </div>
     </div>
   );

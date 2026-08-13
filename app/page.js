@@ -130,7 +130,7 @@ export default function ShiftApp() {
           title={collapsed ? "Show the menu" : "Hide the menu"}
           aria-expanded={!collapsed}
         >
-          <ShiftLogo variant="mark" size={34} crown />
+          <ShiftLogo variant="mark" size={34} crown={!collapsed} />
           <div className="logo-words">
             <div className="logo-text">SHIFT</div>
             <div className="logo-sub">La La Land</div>

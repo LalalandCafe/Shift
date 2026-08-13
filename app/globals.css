@@ -2346,15 +2346,6 @@ table.stores tr:hover td {
 .logo:hover {
   background: var(--ink-2);
 }
-.logo .shift-crown {
-  transform-origin: 32px 20px;
-  transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
-  opacity: 0.92;
-}
-.logo:hover .shift-crown {
-  transform: translateY(-1.5px);
-  opacity: 1;
-}
 .logo-words {
   min-width: 0;
   overflow: hidden;
@@ -2487,49 +2478,219 @@ th.sorted .th-caret {
   color: #fff;
 }
 
-.lb-axis {
-  display: grid;
-  grid-template-columns: 34px minmax(150px, 1.1fr) minmax(220px, 2.4fr) 62px;
-  gap: 12px;
-  padding: 9px 16px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text3);
-}
-.lb-axis span:first-child,
-.lb-axis span:nth-child(2) {
-  grid-column: auto;
-}
-.lb-axis > span:nth-child(1) {
-  grid-column: 3;
-  text-align: left;
-}
-.lb-axis > span:nth-child(2) {
-  grid-column: 3;
-  text-align: center;
-}
-.lb-axis > span:nth-child(3) {
-  grid-column: 3;
-  text-align: right;
-}
-.lb-axis-mid {
-  color: var(--text2);
+
+.lb-row:hover 
+@media (max-width: 900px) {
+        .lb-controls {
+    margin-bottom: 10px;
+  }
+  .lb-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .lb-chips::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-.lb-chart {
-  padding: 6px 0;
+/* ---- crown reacts to the nav state ----
+   Mounted at all times so it can animate both ways. It lifts off and fades
+   when the menu closes, drops back on when it opens. */
+.shift-crown {
+  transform-origin: 32px 12px;
+  transition: opacity 220ms var(--ease), transform 260ms var(--ease);
+  opacity: 0;
+  transform: translateY(-6px) scaleY(0.7);
+}
+.shift-crown.on {
+  opacity: 1;
+  transform: none;
+}
+.logo:hover .shift-crown.on {
+  transform: translateY(-1.5px);
+}
+
+/* ============================================================
+   Leaderboard v2: podium, struck medals, goal bars
+   ============================================================ */
+
+.lb-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0 4px;
+}
+.lb-pod {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--line-2);
+  border-radius: var(--rl);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.lb-pod:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sh-2);
+}
+.lb-pod.pinned {
+  border-color: var(--cobalt);
+  box-shadow: 0 0 0 3px rgba(34, 88, 216, 0.12);
+}
+.lb-pod.gold {
+  border-top-color: #c9a227;
+  background: linear-gradient(175deg, #fdf8e8 0%, var(--surface) 55%);
+}
+.lb-pod.silver {
+  border-top-color: #9aa4ae;
+  background: linear-gradient(175deg, #f4f6f8 0%, var(--surface) 55%);
+}
+.lb-pod.bronze {
+  border-top-color: #b0733e;
+  background: linear-gradient(175deg, #fbf1e8 0%, var(--surface) 55%);
+}
+.lb-pod-body {
+  flex: 1;
+  min-width: 0;
+}
+.lb-pod-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-pod-meta {
+  font-size: 10.5px;
+  color: var(--text3);
+  margin: 2px 0 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-pod-pct {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.lb-pod-pct span {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+.lb-pod-pct.up {
+  color: var(--pos);
+}
+.lb-pod-pct.down {
+  color: var(--neg);
+}
+
+/* ---- medal ---- */
+.lb-medal {
+  flex-shrink: 0;
+}
+.lb-medal .ring {
+  fill: none;
+  stroke-width: 3;
+}
+.lb-medal .num {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  fill: #fff;
+}
+.lb-medal.gold .ribbon {
+  fill: #e0bb4a;
+}
+.lb-medal.gold .ribbon.r {
+  fill: #c9a227;
+}
+.lb-medal.gold .ring {
+  stroke: #a8851b;
+}
+.lb-medal.gold .disc {
+  fill: #c9a227;
+}
+.lb-medal.silver .ribbon {
+  fill: #bcc4cc;
+}
+.lb-medal.silver .ribbon.r {
+  fill: #9aa4ae;
+}
+.lb-medal.silver .ring {
+  stroke: #7d8892;
+}
+.lb-medal.silver .disc {
+  fill: #9aa4ae;
+}
+.lb-medal.bronze .ribbon {
+  fill: #c98d59;
+}
+.lb-medal.bronze .ribbon.r {
+  fill: #b0733e;
+}
+.lb-medal.bronze .ring {
+  stroke: #8d5a2d;
+}
+.lb-medal.bronze .disc {
+  fill: #b0733e;
+}
+
+/* ---- goal bar ---- */
+.lb-goal {
+  position: relative;
+  height: 8px;
+  border-radius: 100px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.lb-goal-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 100px;
+  transform-origin: left center;
+  animation: grow 460ms var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 18ms);
+}
+.lb-goal-fill.up {
+  background: var(--pos);
+}
+.lb-goal-fill.down {
+  background: var(--neg);
+}
+.lb-goal-mark {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  opacity: 0.55;
+  z-index: 2;
+}
+
+/* ---- ranked list ---- */
+.lb-list {
+  padding: 4px 0;
 }
 .lb-row {
   display: grid;
-  grid-template-columns: 34px minmax(150px, 1.1fr) minmax(220px, 2.4fr) 62px;
-  gap: 12px;
+  grid-template-columns: 30px minmax(140px, 1.2fr) minmax(120px, 2fr) 58px;
+  gap: 14px;
   align-items: center;
   width: 100%;
-  padding: 9px 16px;
+  padding: 11px 16px;
   border: none;
   border-left: 2px solid transparent;
   background: transparent;
@@ -2545,11 +2706,18 @@ th.sorted .th-caret {
   border-left-color: var(--cobalt);
 }
 .lb-rank {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--text3);
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: center;
+  padding: 3px 0;
+  border-radius: 6px;
+  background: var(--surface-3);
+}
+.lb-rank.top {
+  background: var(--ink);
+  color: #fff;
 }
 .lb-name {
   display: flex;
@@ -2557,7 +2725,6 @@ th.sorted .th-caret {
   min-width: 0;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text);
 }
 .lb-meta {
   font-size: 10.5px;
@@ -2567,42 +2734,6 @@ th.sorted .th-caret {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.lb-track {
-  position: relative;
-  height: 18px;
-  border-radius: 4px;
-  background: var(--surface-2);
-  overflow: hidden;
-}
-.lb-base {
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1.5px;
-  margin-left: -0.75px;
-  background: var(--line-2);
-  z-index: 2;
-}
-.lb-bar {
-  position: absolute;
-  top: 3px;
-  bottom: 3px;
-  border-radius: 3px;
-  transform-origin: left center;
-  animation: grow 460ms var(--ease) both;
-  animation-delay: calc(var(--i, 0) * 16ms);
-}
-.lb-bar.up {
-  background: var(--pos);
-}
-.lb-bar.down {
-  background: var(--neg);
-  transform-origin: right center;
-}
-.lb-row:hover .lb-bar {
-  filter: brightness(1.12);
 }
 .lb-pct {
   font-size: 14px;
@@ -2617,28 +2748,50 @@ th.sorted .th-caret {
   color: var(--neg);
 }
 
+/* ---- red and green sort buttons ---- */
+.seg-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.seg-dot.green {
+  background: var(--pos);
+}
+.seg-dot.red {
+  background: var(--neg);
+}
+.seg-btn.seg-green.active {
+  background: var(--pos);
+  border-color: var(--pos);
+}
+.seg-btn.seg-red.active {
+  background: var(--neg);
+  border-color: var(--neg);
+}
+.seg-btn.seg-green.active .seg-dot,
+.seg-btn.seg-red.active .seg-dot {
+  background: #fff;
+}
+
 @media (max-width: 900px) {
-  .lb-axis,
-  .lb-row {
-    grid-template-columns: 26px minmax(0, 1.3fr) minmax(90px, 1fr) 48px;
-    gap: 8px;
-    padding: 9px 12px;
+  .lb-podium {
+    grid-template-columns: 1fr;
+    gap: 9px;
   }
-  .lb-meta {
-    font-size: 9.5px;
+  .lb-pod {
+    padding: 13px;
+  }
+  .lb-pod-pct {
+    font-size: 22px;
+  }
+  .lb-row {
+    grid-template-columns: 26px minmax(0, 1.4fr) minmax(60px, 1fr) 46px;
+    gap: 9px;
+    padding: 10px 12px;
   }
   .lb-pct {
     font-size: 12.5px;
-  }
-  .lb-controls {
-    margin-bottom: 10px;
-  }
-  .lb-chips {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    scrollbar-width: none;
-  }
-  .lb-chips::-webkit-scrollbar {
-    display: none;
   }
 }

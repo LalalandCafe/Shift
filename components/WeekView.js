@@ -196,16 +196,24 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                 By region
               </button>
               <button
-                className={"seg-btn" + (sort && sort.key === "gap" ? " active" : "")}
-                onClick={() => setSort({ key: "gap", dir: "asc" })}
+                className={
+                  "seg-btn seg-green" +
+                  (sort && sort.key === "gap" && sort.dir === "desc" ? " active" : "")
+                }
+                onClick={() => setSort({ key: "gap", dir: "desc" })}
               >
-                Worst first
+                <span className="seg-dot green" />
+                Green first
               </button>
               <button
-                className={"seg-btn" + (sort && sort.key === "wtdGap" ? " active" : "")}
-                onClick={() => setSort({ key: "wtdGap", dir: "asc" })}
+                className={
+                  "seg-btn seg-red" +
+                  (sort && sort.key === "gap" && sort.dir === "asc" ? " active" : "")
+                }
+                onClick={() => setSort({ key: "gap", dir: "asc" })}
               >
-                Worst WTD
+                <span className="seg-dot red" />
+                Red first
               </button>
             </div>
           </div>
