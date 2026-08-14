@@ -1,0 +1,40 @@
+name: Tattle Sync
+
+on:
+  schedule:
+    - cron: '0 11 * * *'      # 6am Central
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 'Full backfill instead of incremental'
+        type: boolean
+        default: false
+      cer:
+        description: 'Also sync Tattle CER survey scores'
+        type: boolean
+        default: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Sync Tattle reviews
+        run: |
+          QS="days=45"
+          if [ "${{ inputs.full }}" = "true" ]; then QS="$QS&full=1"; fi
+          if [ "${{ inputs.cer }}" = "true" ]; then QS="$QS&cer=1"; fi
+
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "https://shift-wine-tau.vercel.app/api/sync/tattle?$QS" \
+            -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
+            --max-time 600)
+
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          CODE=$(echo "$RESPONSE" | tail -n1)
+          echo "$BODY"
+
+          if [ "$CODE" != "200" ]; then
+            echo "::error::Tattle sync failed with HTTP $CODE"
+            exit 1
+          fi
