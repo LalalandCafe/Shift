@@ -14,17 +14,39 @@ import {
   addDays,
   shortDate,
 } from "../lib/ui";
+import { BANDS, bandByQuantile, fillOfBand, inkOfBand } from "../lib/scale";
 
 /**
  * There is no TPLH target yet, on purpose. Every judgement on this screen is
  * relative: to the rest of the chain this week, or to the same store last week.
+ *
+ * Colors still come from lib/scale.js so this screen reads the same as the ones
+ * that do have a target. Because there is no goal to measure against, the bands
+ * are cut on the chain's own quartiles instead: top quarter green, above median
+ * light green, below median light red, bottom quarter red.
  */
 
 const MIX = {
-  both: { label: "Volume + ticket", chip: "chip-pos", why: "Above the chain on speed and on ticket size" },
-  speed: { label: "Speed-led", chip: "chip-info", why: "Serves more people per hour, smaller tickets" },
-  ticket: { label: "Ticket-led", chip: "chip-info", why: "Fewer transactions per hour, bigger tickets" },
-  under: { label: "Behind on both", chip: "chip-neg", why: "Below the chain on speed and on ticket size" },
+  both: {
+    label: "Volume + ticket",
+    chip: "chip-pos",
+    why: "Above the chain on speed and on ticket size",
+  },
+  speed: {
+    label: "Speed-led",
+    chip: "chip-info",
+    why: "Serves more people per hour, smaller tickets",
+  },
+  ticket: {
+    label: "Ticket-led",
+    chip: "chip-info",
+    why: "Fewer transactions per hour, bigger tickets",
+  },
+  under: {
+    label: "Behind on both",
+    chip: "chip-neg",
+    why: "Below the chain on speed and on ticket size",
+  },
   even: { label: "Even", chip: "chip-mute", why: "Close to the chain on both" },
 };
 
@@ -143,6 +165,10 @@ export default function TPLH() {
   const lo = values[0];
   const hi = values[values.length - 1];
 
+  // One quartile object, used by every colored element on the screen.
+  const q = { p25, median: med, p75 };
+  const bandOf = (v) => bandByQuantile(v, q, true);
+
   const ranked = [...reporting].sort((a, b) => b.tplh - a.tplh);
   const rank = {};
   ranked.forEach((r, i) => (rank[r.code] = i + 1));
@@ -205,9 +231,7 @@ export default function TPLH() {
         <div className="mc">
           <div className="mc-l">Transactions</div>
           <div className="mc-v">{int(totalTxn)}</div>
-          <div className="mc-s">
-            Closed checks · avg ticket {money(companyTicket)}
-          </div>
+          <div className="mc-s">Closed checks · avg ticket {money(companyTicket)}</div>
         </div>
         <div className="mc">
           <div className="mc-l">Reporting</div>
@@ -248,20 +272,24 @@ export default function TPLH() {
               data-label={`median ${dec(med)}`}
               style={{ left: railPos(med, lo, hi) + "%" }}
             />
-            {reporting.map((r, i) => (
-              <div
-                key={r.code}
-                className={
-                  "rail-dot " + (r.tplh >= p75 ? "fast" : r.tplh <= p25 ? "watch" : "pace")
-                }
-                style={{
-                  left: railPos(r.tplh, lo, hi) + "%",
-                  transform: "translate(-50%, -50%)",
-                  "--i": i,
-                }}
-                title={`${r.name} · ${dec(r.tplh)} TPLH`}
-              />
-            ))}
+            {reporting.map((r, i) => {
+              const b = bandOf(r.tplh);
+              return (
+                <div
+                  key={r.code}
+                  className="rail-dot"
+                  style={{
+                    left: railPos(r.tplh, lo, hi) + "%",
+                    transform: "translate(-50%, -50%)",
+                    background: fillOfBand(b),
+                    // Light bands would vanish against the rail without this.
+                    border: `1px solid ${inkOfBand(b)}`,
+                    "--i": i,
+                  }}
+                  title={`${r.name} · ${dec(r.tplh)} TPLH`}
+                />
+              );
+            })}
           </div>
 
           <div className="rail-axis">
@@ -271,15 +299,19 @@ export default function TPLH() {
 
           <div className="rail-legend">
             <span>
-              <i style={{ background: "var(--pos)" }} />
+              <i style={{ background: BANDS.green.fill }} />
               Top quarter
             </span>
             <span>
-              <i style={{ background: "var(--cobalt)" }} />
-              Middle half
+              <i style={{ background: BANDS.lightGreen.fill, border: "1px solid var(--border2)" }} />
+              Above median
             </span>
             <span>
-              <i style={{ background: "var(--warn)" }} />
+              <i style={{ background: BANDS.lightRed.fill, border: "1px solid var(--border2)" }} />
+              Below median
+            </span>
+            <span>
+              <i style={{ background: BANDS.red.fill }} />
               Bottom quarter
             </span>
             <span style={{ marginLeft: "auto" }}>
@@ -375,6 +407,7 @@ export default function TPLH() {
                                 minWidth: 38,
                                 textAlign: "right",
                                 fontVariantNumeric: "tabular-nums",
+                                color: inkOfBand(bandOf(s.tplh)),
                               }}
                             >
                               {dec(s.tplh)}
@@ -382,11 +415,11 @@ export default function TPLH() {
                             <div className="bar-track">
                               {s.tplh !== null && (
                                 <div
-                                  className={
-                                    "bar-fill " +
-                                    (s.tplh >= p75 ? "pos" : s.tplh <= p25 ? "warn" : "cobalt")
-                                  }
-                                  style={{ width: railPos(s.tplh, 0, hi) + "%" }}
+                                  className="bar-fill"
+                                  style={{
+                                    width: railPos(s.tplh, 0, hi) + "%",
+                                    background: fillOfBand(bandOf(s.tplh)),
+                                  }}
                                 />
                               )}
                             </div>
@@ -400,7 +433,9 @@ export default function TPLH() {
                         </td>
                         <td className="num sep">{int(s.transactions)}</td>
                         <td className="num">{dec(s.hours, 1)}</td>
-                        <td className="num">{s.avgTicket === null ? "—" : "$" + dec(s.avgTicket)}</td>
+                        <td className="num">
+                          {s.avgTicket === null ? "—" : "$" + dec(s.avgTicket)}
+                        </td>
                         <td className="num">{s.splh === null ? "—" : "$" + dec(s.splh, 0)}</td>
                         <td style={{ textAlign: "right" }}>
                           {mix ? (
@@ -429,13 +464,15 @@ export default function TPLH() {
               const mix = mixOf(s.tplh, s.avgTicket, data.companyTplh, companyTicket);
               const last = prev && prev[s.code];
               const wow = last && s.tplh ? ((s.tplh - last) / last) * 100 : null;
-              const top = s.tplh !== null && s.tplh >= p75;
-              const bottom = s.tplh !== null && s.tplh <= p25;
+              const b = bandOf(s.tplh);
               return (
                 <div
-                  className={"store-card " + (top ? "ok" : bottom ? "bad" : "")}
+                  className={
+                    "store-card " +
+                    (b === "green" || b === "lightGreen" ? "ok" : b === "none" ? "" : "bad")
+                  }
                   key={s.code}
-                  style={{ "--i": i }}
+                  style={{ "--i": i, borderLeft: `6px solid ${fillOfBand(b)}` }}
                 >
                   <div className="store-card-head">
                     <div>
@@ -450,7 +487,7 @@ export default function TPLH() {
                         </span>
                       )}
                     </div>
-                    <div className="store-card-splh">
+                    <div className="store-card-splh" style={{ color: inkOfBand(b) }}>
                       {dec(s.tplh)}
                       <u>TPLH</u>
                     </div>
@@ -510,7 +547,8 @@ export default function TPLH() {
         TPLH counts closed checks divided by labor hours, so it does not move when prices change or
         when average ticket runs high. Labor hours use the same exclusions as the week view: NSO
         trainer, general manager and the excluded employee list. Open shifts count elapsed time,
-        capped at 18 hours. There is no TPLH target yet, so nothing here is scored against a goal.
+        capped at 18 hours. There is no TPLH target yet, so colors here rank stores against each
+        other rather than against a goal.
         {data.generatedAt ? ` Generated ${new Date(data.generatedAt).toLocaleString()}.` : ""}
       </div>
     </div>

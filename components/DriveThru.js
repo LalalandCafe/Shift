@@ -3,20 +3,30 @@
 //
 // Single view, progressive disclosure. Click a store card to switch stores,
 // click a day in the calendar to drill into that day's hour-by-hour.
+//
+// Every color and every threshold on this screen comes from lib/scale.js and
+// metric_targets. There is no goal number and no hex in this file, which is
+// why moving the target from 45s to 1:45 was a database update rather than a
+// rewrite.
 
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  BANDS,
+  bandFor,
+  bandStyle,
+  bandInk,
+  bandLegend,
+  styleOfBand,
+  fillOfBand,
+  cfgFromTarget,
+  fmtSeconds,
+} from "../lib/scale";
 
 const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
-function fmtSeconds(s) {
-  if (s == null) return "--";
-  const n = Math.round(s);
-  const m = Math.floor(n / 60);
-  const r = n % 60;
-  return m > 0 ? `${m}:${String(r).padStart(2, "0")}` : `${r}s`;
-}
+const AT_TARGET_BANDS = ["green", "lightGreen"];
 
 function shortDate(iso) {
   const [y, m, d] = iso.split("-").map(Number);
@@ -34,26 +44,6 @@ function mondayOf(iso) {
 function dowIndex(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   return (new Date(y, m - 1, d).getDay() + 6) % 7;
-}
-
-/**
- * Green is reserved for hitting the goal, so it never lies. Above the goal
- * the scale spreads across the store's own observed range, otherwise every
- * cell would be the same red and no pattern would be visible.
- */
-function cellColor(value, goal, max) {
-  if (value == null) return "transparent";
-  if (value <= goal) return "#0f6e3e";
-  const span = Math.max(max - goal, 1);
-  const t = Math.min((value - goal) / span, 1);
-  if (t < 0.25) return "#f6d98a";
-  if (t < 0.5) return "#f0b04a";
-  if (t < 0.75) return "#dd6b4a";
-  return "#a11d1d";
-}
-
-function textOn(bg) {
-  return ["#f6d98a", "#f0b04a"].includes(bg) ? "#3a2a05" : "#fff";
 }
 
 export default function DriveThru() {
@@ -95,18 +85,19 @@ export default function DriveThru() {
 
   if (loading) return <div className="empty">Loading drive-thru data...</div>;
   if (error) return <div className="empty">Error: {error}</div>;
-  if (!summary?.stores?.length) return <div className="empty">No drive-thru stores configured yet.</div>;
+  if (!summary?.stores?.length)
+    return <div className="empty">No drive-thru stores configured yet.</div>;
 
-  const targets = summary.targets;
-  const goal = targets.green_seconds;
+  // The whole screen hangs off this one object. Nothing below invents a number.
+  const cfg = cfgFromTarget(summary.targets);
+  if (!cfg) return <div className="empty">No drive-thru target is configured.</div>;
+
   const store = summary.stores.find((s) => s.storeCode === selectedStore) || summary.stores[0];
 
   // Daily rows for the selected store
   const dailyRows = (summary.daily || [])
     .filter((r) => r.store_code === store.storeCode)
     .sort((a, b) => a.business_date.localeCompare(b.business_date));
-
-  const maxDaily = dailyRows.reduce((m, r) => Math.max(m, r.avg_window_time || 0), goal + 1);
 
   // Group days into Monday-anchored weeks
   const weekMap = new Map();
@@ -141,41 +132,80 @@ export default function DriveThru() {
       cars: hourAgg[h].n,
     }));
 
-  const maxHourly = hours.reduce((m, h) => Math.max(m, h.avg || 0), goal + 1);
   const worstHour = hours.reduce((w, h) => (h.avg != null && (!w || h.avg > w.avg) ? h : w), null);
   const bestHour = hours.reduce((b, h) => (h.avg != null && (!b || h.avg < b.avg) ? h : b), null);
 
-  const selectedDayRow = selectedDay ? dailyRows.find((r) => r.business_date === selectedDay) : null;
+  const selectedDayRow = selectedDay
+    ? dailyRows.find((r) => r.business_date === selectedDay)
+    : null;
 
-  // Distribution
-  const distTotal = distribution?.rows?.reduce((a, r) => a + r.car_count, 0) || 0;
-  const buckets = ["00-30s", "31-45s", "46-60s", "61-90s", "91-120s", "121-180s", "180s+"];
-  const distBy = {};
-  for (const r of distribution?.rows || []) distBy[r.bucket] = r.car_count;
-  const pctAtGoal = distTotal
-    ? (100 * ((distBy["00-30s"] || 0) + (distBy["31-45s"] || 0))) / distTotal
-    : 0;
+  // Distribution. The band ships with each row, so this component never has to
+  // work out which buckets count as at-target.
+  const distRows = (distribution?.rows || [])
+    .slice()
+    .sort((a, b) => a.bucket_order - b.bucket_order);
+  const distTotal = distRows.reduce((a, r) => a + r.car_count, 0);
+  const atGoalCars = distRows
+    .filter((r) => AT_TARGET_BANDS.includes(r.band))
+    .reduce((a, r) => a + r.car_count, 0);
+  const pctAtGoal = distTotal ? (100 * atGoalCars) / distTotal : 0;
 
   // Headline
-  const gap = store.avgWindowTime != null ? store.avgWindowTime - goal : null;
-  const onTarget = gap != null && gap <= 0;
-  const headline = onTarget ? "Running at target" : gap <= 30 ? "Close to target" : "Above target";
-  const detail = onTarget
-    ? `Average window time is ${fmtSeconds(store.avgWindowTime)}, at or under the ${goal}s goal.`
-    : `Average window time is ${fmtSeconds(store.avgWindowTime)}. That is ${fmtSeconds(gap)} over the ${goal}s goal, with ${pctAtGoal.toFixed(0)}% of cars already making it.`;
-  const bannerBg = onTarget ? "#0f6e3e" : gap <= 30 ? "#8a6a12" : "#8a1f1f";
+  const storeBand = bandFor(store.avgWindowTime, cfg);
+  const headline =
+    storeBand === "green"
+      ? "Running clear of target"
+      : storeBand === "lightGreen"
+      ? "Running at target"
+      : storeBand === "lightRed"
+      ? "Just over target"
+      : storeBand === "red"
+      ? "Well over target"
+      : "No data yet";
+  const gap = store.avgWindowTime != null ? store.avgWindowTime - cfg.target : null;
+  const detail =
+    store.avgWindowTime == null
+      ? "No cars recorded in this window."
+      : gap <= 0
+      ? `Average window time is ${fmtSeconds(store.avgWindowTime)}, at or under the ${fmtSeconds(
+          cfg.target
+        )} target, with ${pctAtGoal.toFixed(0)}% of cars making it.`
+      : `Average window time is ${fmtSeconds(store.avgWindowTime)}. That is ${fmtSeconds(
+          gap
+        )} over the ${fmtSeconds(cfg.target)} target, with ${pctAtGoal.toFixed(
+          0
+        )}% of cars already making it.`;
+  const banner = styleOfBand(storeBand);
+
+  const legend = bandLegend(cfg, fmtSeconds);
 
   return (
     <div>
       {/* Window selector */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-end",
+          marginBottom: 16,
+          flexWrap: "wrap",
+          gap: 12,
+        }}
+      >
         <div style={{ fontSize: 13, color: "var(--text2)" }}>
-          Window time is measured at the service window, the same number the store sees on its own timer.
+          Window time is measured at the service window, the same number the store sees on its own
+          timer. Target {fmtSeconds(cfg.target)}, red over {fmtSeconds(cfg.redLine)}.
         </div>
         <select
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          style={{ padding: "7px 12px", borderRadius: 8, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 13 }}
+          style={{
+            padding: "7px 12px",
+            borderRadius: 8,
+            border: "1.5px solid var(--border2)",
+            fontFamily: "inherit",
+            fontSize: 13,
+          }}
         >
           <option value={7}>Last 7 days</option>
           <option value={30}>Last 30 days</option>
@@ -183,29 +213,47 @@ export default function DriveThru() {
         </select>
       </div>
 
-      {/* Store cards, click to switch */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(summary.stores.length, 4)}, 1fr)`, gap: 12, marginBottom: 20 }}>
+      {/* Store cards, click to switch. Fixed order by store number. */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${Math.min(summary.stores.length, 4)}, 1fr)`,
+          gap: 12,
+          marginBottom: 20,
+        }}
+      >
         {summary.stores.map((s) => {
           const active = s.storeCode === store.storeCode;
+          const b = bandFor(s.avgWindowTime, cfg);
           return (
             <div
               key={s.storeCode}
               onClick={() => setSelectedStore(s.storeCode)}
               style={{
                 border: active ? "2px solid var(--navy)" : "1.5px solid var(--border2)",
+                borderLeft: `6px solid ${fillOfBand(b)}`,
                 background: active ? "var(--bg3)" : "#fff",
                 borderRadius: 12,
                 padding: "14px 16px",
                 cursor: "pointer",
               }}
             >
-              <div style={{ fontSize: 11.5, color: "var(--text3)", fontWeight: 700, letterSpacing: 0.4 }}>
+              <div
+                style={{
+                  fontSize: 11.5,
+                  color: "var(--text3)",
+                  fontWeight: 700,
+                  letterSpacing: 0.4,
+                }}
+              >
                 {s.storeCode}
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{s.storeName}</div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontSize: 24, fontWeight: 700 }}>{fmtSeconds(s.avgWindowTime)}</span>
-                <span style={{ fontSize: 12, color: "var(--text2)" }}>{s.pctGreen}% at goal</span>
+                <span style={{ fontSize: 24, fontWeight: 700, color: bandInk(s.avgWindowTime, cfg) }}>
+                  {fmtSeconds(s.avgWindowTime)}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text2)" }}>{s.pctGreen}% at target</span>
               </div>
             </div>
           );
@@ -213,8 +261,24 @@ export default function DriveThru() {
       </div>
 
       {/* Headline */}
-      <div style={{ background: bannerBg, borderRadius: 14, padding: "22px 28px", marginBottom: 20, color: "#fff" }}>
-        <div style={{ fontSize: 11.5, fontWeight: 700, opacity: 0.75, letterSpacing: 0.5, marginBottom: 6 }}>
+      <div
+        style={{
+          background: banner.background,
+          color: banner.color,
+          borderRadius: 14,
+          padding: "22px 28px",
+          marginBottom: 20,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11.5,
+            fontWeight: 700,
+            opacity: 0.75,
+            letterSpacing: 0.5,
+            marginBottom: 6,
+          }}
+        >
           {store.storeCode} &middot; {store.storeName.toUpperCase()} &middot; LAST {days} DAYS
         </div>
         <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>{headline}</div>
@@ -225,56 +289,102 @@ export default function DriveThru() {
       <div className="mc-grid" style={{ marginBottom: 22 }}>
         <div className="mc">
           <div className="mc-l">Average Window Time</div>
-          <div className="mc-v">{fmtSeconds(store.avgWindowTime)}</div>
-          <div className="mc-s">{store.cars.toLocaleString()} cars &middot; goal {goal}s</div>
+          <div className="mc-v" style={{ color: bandInk(store.avgWindowTime, cfg) }}>
+            {fmtSeconds(store.avgWindowTime)}
+          </div>
+          <div className="mc-s">
+            {store.cars.toLocaleString()} cars &middot; target {fmtSeconds(cfg.target)}
+          </div>
         </div>
         <div className="mc">
-          <div className="mc-l">Cars At Goal</div>
-          <div className="mc-v" style={{ color: pctAtGoal >= 50 ? "#0f6e3e" : "#a11d1d" }}>
+          <div className="mc-l">Cars At Target</div>
+          <div className="mc-v" style={{ color: pctAtGoal >= 50 ? BANDS.green.ink : BANDS.red.ink }}>
             {pctAtGoal.toFixed(0)}%
           </div>
-          <div className="mc-s">{(100 - pctAtGoal).toFixed(0)}% still above {goal}s</div>
+          <div className="mc-s">
+            {(100 - pctAtGoal).toFixed(0)}% still over {fmtSeconds(cfg.target)}
+          </div>
         </div>
         <div className="mc">
           <div className="mc-l">Toughest Hour</div>
-          <div className="mc-v" style={{ color: "#a11d1d" }}>{worstHour ? `${worstHour.hour}:00` : "--"}</div>
+          <div className="mc-v" style={{ color: bandInk(worstHour?.avg, cfg) }}>
+            {worstHour ? `${worstHour.hour}:00` : "--"}
+          </div>
           <div className="mc-s">{worstHour ? `avg ${fmtSeconds(worstHour.avg)}` : "no data"}</div>
         </div>
         <div className="mc">
           <div className="mc-l">Best Hour</div>
-          <div className="mc-v" style={{ color: "#0f6e3e" }}>{bestHour ? `${bestHour.hour}:00` : "--"}</div>
+          <div className="mc-v" style={{ color: bandInk(bestHour?.avg, cfg) }}>
+            {bestHour ? `${bestHour.hour}:00` : "--"}
+          </div>
           <div className="mc-s">{bestHour ? `avg ${fmtSeconds(bestHour.avg)}` : "no data"}</div>
         </div>
       </div>
 
       {/* Calendar grid */}
       <div className="tcard" style={{ marginBottom: 22 }}>
-        <div className="thead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          className="thead"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        >
           <span className="ttl">Every day, every week</span>
-          <span style={{ fontSize: 12, color: "var(--text2)" }}>tap any day for the hour by hour</span>
+          <span style={{ fontSize: 12, color: "var(--text2)" }}>
+            tap any day for the hour by hour
+          </span>
         </div>
         <div style={{ padding: 16, overflowX: "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "58px repeat(7, minmax(74px, 1fr))", gap: 6, minWidth: 620 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "58px repeat(7, minmax(74px, 1fr))",
+              gap: 6,
+              minWidth: 620,
+            }}
+          >
             <div />
             {DOW.map((d) => (
-              <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "var(--text3)", letterSpacing: 0.4, paddingBottom: 4 }}>
+              <div
+                key={d}
+                style={{
+                  textAlign: "center",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "var(--text3)",
+                  letterSpacing: 0.4,
+                  paddingBottom: 4,
+                }}
+              >
                 {d}
               </div>
             ))}
 
             {weeks.map(([wk, byDow]) => (
               <div key={wk} style={{ display: "contents" }}>
-                <div style={{ fontSize: 10.5, color: "var(--text3)", display: "flex", alignItems: "center", fontWeight: 600 }}>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    color: "var(--text3)",
+                    display: "flex",
+                    alignItems: "center",
+                    fontWeight: 600,
+                  }}
+                >
                   {shortDate(wk)}
                 </div>
                 {DOW.map((_, i) => {
                   const r = byDow[i];
                   if (!r) {
                     return (
-                      <div key={i} style={{ height: 62, borderRadius: 8, border: "1px dashed var(--border2)" }} />
+                      <div
+                        key={i}
+                        style={{
+                          height: 62,
+                          borderRadius: 8,
+                          border: "1px dashed var(--border2)",
+                        }}
+                      />
                     );
                   }
-                  const bg = cellColor(r.avg_window_time, goal, maxDaily);
                   const isSel = selectedDay === r.business_date;
                   return (
                     <div
@@ -282,10 +392,9 @@ export default function DriveThru() {
                       onClick={() => setSelectedDay(isSel ? null : r.business_date)}
                       title={`${r.business_date} · ${r.car_count} cars`}
                       style={{
+                        ...bandStyle(r.avg_window_time, cfg),
                         height: 62,
                         borderRadius: 8,
-                        background: bg,
-                        color: textOn(bg),
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
@@ -295,7 +404,9 @@ export default function DriveThru() {
                         outlineOffset: 1,
                       }}
                     >
-                      <div style={{ fontSize: 15, fontWeight: 700 }}>{fmtSeconds(r.avg_window_time)}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700 }}>
+                        {fmtSeconds(r.avg_window_time)}
+                      </div>
                       <div style={{ fontSize: 10, opacity: 0.85 }}>{r.car_count} cars</div>
                     </div>
                   );
@@ -304,25 +415,62 @@ export default function DriveThru() {
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 18, marginTop: 16, fontSize: 12, color: "var(--text2)", flexWrap: "wrap" }}>
-            <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "#0f6e3e", marginRight: 6 }} />at goal ({goal}s)</span>
-            <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "#f6d98a", marginRight: 6 }} />closest</span>
-            <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "#a11d1d", marginRight: 6 }} />furthest</span>
-            <span style={{ fontStyle: "italic" }}>above goal, shading spreads across this store's own range</span>
+          {/* Legend is generated from the same config the cells use, so it can
+              never describe thresholds that are no longer in force. */}
+          <div
+            style={{
+              display: "flex",
+              gap: 18,
+              marginTop: 16,
+              fontSize: 12,
+              color: "var(--text2)",
+              flexWrap: "wrap",
+            }}
+          >
+            {legend.map((l) => (
+              <span key={l.band}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: 11,
+                    height: 11,
+                    borderRadius: 3,
+                    background: l.fill,
+                    marginRight: 6,
+                    border: "1px solid var(--border2)",
+                    verticalAlign: "baseline",
+                  }}
+                />
+                {l.text}
+              </span>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Hour detail, reacts to the selected day */}
       <div className="tcard" style={{ marginBottom: 22 }}>
-        <div className="thead" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div
+          className="thead"
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}
+        >
           <span className="ttl">
-            {selectedDay ? `Hour by hour · ${shortDate(selectedDay)}` : `Hour by hour · all ${days} days`}
+            {selectedDay
+              ? `Hour by hour · ${shortDate(selectedDay)}`
+              : `Hour by hour · all ${days} days`}
           </span>
           {selectedDay && (
             <button
               onClick={() => setSelectedDay(null)}
-              style={{ padding: "4px 12px", borderRadius: 6, border: "1.5px solid var(--border2)", background: "#fff", cursor: "pointer", fontSize: 12, fontFamily: "inherit" }}
+              style={{
+                padding: "4px 12px",
+                borderRadius: 6,
+                border: "1.5px solid var(--border2)",
+                background: "#fff",
+                cursor: "pointer",
+                fontSize: 12,
+                fontFamily: "inherit",
+              }}
             >
               Back to all days
             </button>
@@ -330,12 +478,31 @@ export default function DriveThru() {
         </div>
 
         {selectedDayRow && (
-          <div style={{ display: "flex", gap: 28, padding: "14px 20px", borderBottom: "1px solid var(--border2)", fontSize: 13, flexWrap: "wrap" }}>
-            <span><strong>{selectedDayRow.car_count}</strong> cars</span>
-            <span>median <strong>{fmtSeconds(selectedDayRow.median_window_time)}</strong></span>
-            <span>p90 <strong>{fmtSeconds(selectedDayRow.p90_window_time)}</strong></span>
-            <span style={{ color: "#0f6e3e" }}><strong>{selectedDayRow.pct_green}%</strong> at goal</span>
-            <span style={{ color: "#a11d1d" }}><strong>{selectedDayRow.pct_red}%</strong> over {targets.yellow_seconds}s</span>
+          <div
+            style={{
+              display: "flex",
+              gap: 28,
+              padding: "14px 20px",
+              borderBottom: "1px solid var(--border2)",
+              fontSize: 13,
+              flexWrap: "wrap",
+            }}
+          >
+            <span>
+              <strong>{selectedDayRow.car_count}</strong> cars
+            </span>
+            <span>
+              median <strong>{fmtSeconds(selectedDayRow.median_window_time)}</strong>
+            </span>
+            <span>
+              p90 <strong>{fmtSeconds(selectedDayRow.p90_window_time)}</strong>
+            </span>
+            <span style={{ color: BANDS.green.ink }}>
+              <strong>{selectedDayRow.pct_green}%</strong> at target
+            </span>
+            <span style={{ color: BANDS.red.ink }}>
+              <strong>{selectedDayRow.pct_red}%</strong> over {fmtSeconds(cfg.redLine)}
+            </span>
           </div>
         )}
 
@@ -344,61 +511,78 @@ export default function DriveThru() {
             <div style={{ fontSize: 13, color: "var(--text2)" }}>No cars recorded for this day.</div>
           ) : (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {hours.map((h) => {
-                const bg = cellColor(h.avg, goal, maxHourly);
-                return (
-                  <div
-                    key={h.hour}
-                    title={`${h.cars} cars · menu ${fmtSeconds(h.menu)} · ${h.queue?.toFixed(1)} avg in queue`}
-                    style={{
-                      width: 84,
-                      borderRadius: 10,
-                      background: bg,
-                      color: textOn(bg),
-                      padding: "10px 4px",
-                      textAlign: "center",
-                    }}
-                  >
-                    <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 600 }}>{h.hour}:00</div>
-                    <div style={{ fontSize: 18, fontWeight: 700, margin: "2px 0" }}>{fmtSeconds(h.avg)}</div>
-                    <div style={{ fontSize: 10, opacity: 0.85 }}>{h.cars} cars</div>
+              {hours.map((h) => (
+                <div
+                  key={h.hour}
+                  title={`${h.cars} cars · menu ${fmtSeconds(h.menu)} · ${h.queue?.toFixed(
+                    1
+                  )} avg in queue`}
+                  style={{
+                    ...bandStyle(h.avg, cfg),
+                    width: 84,
+                    borderRadius: 10,
+                    padding: "10px 4px",
+                    textAlign: "center",
+                  }}
+                >
+                  <div style={{ fontSize: 11, opacity: 0.85, fontWeight: 600 }}>{h.hour}:00</div>
+                  <div style={{ fontSize: 18, fontWeight: 700, margin: "2px 0" }}>
+                    {fmtSeconds(h.avg)}
                   </div>
-                );
-              })}
+                  <div style={{ fontSize: 10, opacity: 0.85 }}>{h.cars} cars</div>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {/* Distribution, the calibration question */}
+      {/* Distribution. Buckets and their bands are computed in the view, so the
+          boundaries move with the target instead of staying pinned to numbers
+          nobody is measured against any more. */}
       <div className="tcard">
-        <div className="thead"><span className="ttl">How far are we from {goal} seconds</span></div>
+        <div className="thead">
+          <span className="ttl">How far are we from {fmtSeconds(cfg.target)}</span>
+        </div>
         <div style={{ padding: "20px 24px 14px" }}>
           <div style={{ fontSize: 13, color: "var(--text2)", marginBottom: 18 }}>
-            Every car at {store.storeName}, grouped by window time. {distTotal.toLocaleString()} cars total.
+            Every car at {store.storeName}, grouped by window time. {distTotal.toLocaleString()}{" "}
+            cars total.
           </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
-            {buckets.map((b) => {
-              const count = distBy[b] || 0;
-              const pct = distTotal ? (100 * count) / distTotal : 0;
-              const atGoal = b === "00-30s" || b === "31-45s";
-              const mid = b === "46-60s" || b === "61-90s";
-              return (
-                <div key={b} style={{ flex: 1, textAlign: "center" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 5 }}>{pct.toFixed(0)}%</div>
-                  <div
-                    style={{
-                      height: `${Math.max(pct * 1.15, 3)}px`,
-                      background: atGoal ? "#0f6e3e" : mid ? "#f0b04a" : "#a11d1d",
-                      borderRadius: "5px 5px 0 0",
-                    }}
-                    title={`${b}: ${count.toLocaleString()} cars`}
-                  />
-                  <div style={{ fontSize: 11.5, color: "var(--text2)", marginTop: 8, fontWeight: 600 }}>{b}</div>
-                </div>
-              );
-            })}
-          </div>
+          {distRows.length === 0 ? (
+            <div style={{ fontSize: 13, color: "var(--text2)" }}>No distribution data yet.</div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
+              {distRows.map((r) => {
+                const p = distTotal ? (100 * r.car_count) / distTotal : 0;
+                return (
+                  <div key={r.bucket_order} style={{ flex: 1, textAlign: "center" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 5 }}>
+                      {p.toFixed(0)}%
+                    </div>
+                    <div
+                      style={{
+                        height: `${Math.max(p * 1.15, 3)}px`,
+                        background: fillOfBand(r.band),
+                        borderRadius: "5px 5px 0 0",
+                      }}
+                      title={`${r.bucket}: ${r.car_count.toLocaleString()} cars`}
+                    />
+                    <div
+                      style={{
+                        fontSize: 11.5,
+                        color: "var(--text2)",
+                        marginTop: 8,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {r.bucket}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
