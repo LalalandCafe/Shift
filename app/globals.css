@@ -43,6 +43,21 @@
   --warn-bg: #fdf4e3;
   --warn-line: #efd49a;
 
+  /* ---- performance bands ----
+     The four fills that express how a store is doing against a target.
+     Read by lib/scale.js, which is the only thing allowed to decide which
+     band a number falls into. Values are lifted from the WeekView table so
+     every report reads like the daily email that goes out to the field.
+
+     These are distinct from --warn above on purpose: --warn means "something
+     needs your attention" (missing data, partial week, a flag), while the
+     bands mean "this is how the number scored". Amber never appears as a
+     band. The chain reads red or green. */
+  --band-green: #1a6630;
+  --band-green-soft: #c6efce;
+  --band-red: #9c0006;
+  --band-red-soft: #ffc7ce;
+
   --r: 8px;
   --rl: 12px;
   --rx: 16px;
@@ -1021,17 +1036,19 @@ table.stores tr:hover td {
   box-shadow: var(--sh-2);
   z-index: 4;
 }
+/* Kept for any view still passing these class names. TPLH now sets the fill
+   inline from lib/scale.js, so the band colors stay in one place. */
 .rail-dot.fast {
-  background: var(--pos);
+  background: var(--band-green);
 }
 .rail-dot.pace {
   background: var(--cobalt);
 }
 .rail-dot.watch {
-  background: var(--warn);
+  background: var(--band-red-soft);
 }
 .rail-dot.slow {
-  background: var(--neg);
+  background: var(--band-red);
 }
 .rail-axis {
   display: flex;
@@ -1382,10 +1399,10 @@ table.stores tr:hover td {
   box-shadow: var(--sh-1);
 }
 .store-card.ok {
-  border-left: 3px solid var(--pos);
+  border-left: 3px solid var(--band-green);
 }
 .store-card.bad {
-  border-left: 3px solid var(--neg);
+  border-left: 3px solid var(--band-red);
 }
 .store-card-head {
   display: flex;
@@ -1466,20 +1483,20 @@ table.stores tr:hover td {
   font-variant-numeric: tabular-nums;
 }
 .scard-cell.splh-ok {
-  background: var(--pos-bg);
-  border-color: var(--pos-line);
+  background: var(--band-green-soft);
+  border-color: var(--band-green);
 }
 .scard-cell.splh-ok .scard-cell-val,
 .scard-cell.splh-ok .scard-cell-lbl {
-  color: var(--pos);
+  color: var(--band-green);
 }
 .scard-cell.splh-bad {
-  background: var(--neg-bg);
-  border-color: var(--neg-line);
+  background: var(--band-red-soft);
+  border-color: var(--band-red);
 }
 .scard-cell.splh-bad .scard-cell-val,
 .scard-cell.splh-bad .scard-cell-lbl {
-  color: var(--neg);
+  color: var(--band-red);
 }
 .scard-region-head {
   font-size: 9.5px;
@@ -1628,7 +1645,7 @@ table.stores tr:hover td {
   box-shadow: var(--sh-1);
 }
 .dash-row.sev-critical {
-  border-left-color: var(--neg);
+  border-left-color: var(--band-red);
 }
 .dash-row.sev-data {
   border-left-color: var(--warn);
@@ -1706,7 +1723,7 @@ table.stores tr:hover td {
   padding-bottom: 4px;
 }
 .st-colhead.flagged {
-  color: var(--neg);
+  color: var(--band-red);
 }
 .st-rowhead {
   font-size: 10.5px;
@@ -1931,6 +1948,8 @@ table.stores tr:hover td {
   font-weight: 700;
   text-align: right;
 }
+/* Forecast confidence is not a performance band, it is how much to trust the
+   number. It keeps its own scale on purpose. */
 .fc-conf {
   display: inline-block;
   width: 7px;
@@ -2160,6 +2179,9 @@ table.stores tr:hover td {
    The Week view feeds the daily email, so it keeps the original
    spreadsheet look. This block cancels the new table styling for
    that view only. Nothing else on the app is affected.
+
+   The green and red here are the source of the --band-* tokens,
+   so this view and every other report now share one definition.
    ============================================================ */
 
 .wk-legacy table.grid {
@@ -2191,13 +2213,13 @@ table.stores tr:hover td {
   background: #fafaf8;
 }
 .wk-legacy .cell-ok {
-  background: #c6efce !important;
-  color: #1a6630;
+  background: var(--band-green-soft) !important;
+  color: var(--band-green);
   font-weight: 700;
 }
 .wk-legacy .cell-bad {
-  background: #ffc7ce !important;
-  color: #9c0006;
+  background: var(--band-red-soft) !important;
+  color: var(--band-red);
   font-weight: 700;
 }
 .wk-legacy .grid .rrow td,
@@ -2269,10 +2291,10 @@ table.stores tr:hover td {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .wk-legacy .store-card.ok {
-  border-left: 5px solid #1a6630;
+  border-left: 5px solid var(--band-green);
 }
 .wk-legacy .store-card.bad {
-  border-left: 5px solid #9c0006;
+  border-left: 5px solid var(--band-red);
 }
 .wk-legacy .store-card-splh {
   background: #ededea;
@@ -2301,20 +2323,20 @@ table.stores tr:hover td {
   font-size: 15px;
 }
 .wk-legacy .scard-cell.splh-ok {
-  background: #c6efce;
-  border: 1px solid #1a6630;
+  background: var(--band-green-soft);
+  border: 1px solid var(--band-green);
 }
 .wk-legacy .scard-cell.splh-ok .scard-cell-val,
 .wk-legacy .scard-cell.splh-ok .scard-cell-lbl {
-  color: #1a6630;
+  color: var(--band-green);
 }
 .wk-legacy .scard-cell.splh-bad {
-  background: #ffc7ce;
-  border: 1px solid #9c0006;
+  background: var(--band-red-soft);
+  border: 1px solid var(--band-red);
 }
 .wk-legacy .scard-cell.splh-bad .scard-cell-val,
 .wk-legacy .scard-cell.splh-bad .scard-cell-lbl {
-  color: #9c0006;
+  color: var(--band-red);
 }
 .wk-legacy .scard-region-head {
   font-size: 12px;
@@ -2478,10 +2500,10 @@ th.sorted .th-caret {
   color: #fff;
 }
 
-
-.lb-row:hover 
+/* Fixed: a dangling ".lb-row:hover" selector with no block used to sit here,
+   which swallowed the @media below it. Every mobile leaderboard rule was dead. */
 @media (max-width: 900px) {
-        .lb-controls {
+  .lb-controls {
     margin-bottom: 10px;
   }
   .lb-chips {
@@ -2588,10 +2610,10 @@ th.sorted .th-caret {
   opacity: 0.6;
 }
 .lb-pod-pct.up {
-  color: var(--pos);
+  color: var(--band-green);
 }
 .lb-pod-pct.down {
-  color: var(--neg);
+  color: var(--band-red);
 }
 
 /* ---- medal ---- */
@@ -2664,10 +2686,10 @@ th.sorted .th-caret {
   animation-delay: calc(var(--i, 0) * 18ms);
 }
 .lb-goal-fill.up {
-  background: var(--pos);
+  background: var(--band-green);
 }
 .lb-goal-fill.down {
-  background: var(--neg);
+  background: var(--band-red);
 }
 .lb-goal-mark {
   position: absolute;
@@ -2742,10 +2764,10 @@ th.sorted .th-caret {
   font-variant-numeric: tabular-nums;
 }
 .lb-pct.up {
-  color: var(--pos);
+  color: var(--band-green);
 }
 .lb-pct.down {
-  color: var(--neg);
+  color: var(--band-red);
 }
 
 /* ---- red and green sort buttons ---- */
@@ -2757,18 +2779,18 @@ th.sorted .th-caret {
   margin-right: 6px;
 }
 .seg-dot.green {
-  background: var(--pos);
+  background: var(--band-green);
 }
 .seg-dot.red {
-  background: var(--neg);
+  background: var(--band-red);
 }
 .seg-btn.seg-green.active {
-  background: var(--pos);
-  border-color: var(--pos);
+  background: var(--band-green);
+  border-color: var(--band-green);
 }
 .seg-btn.seg-red.active {
-  background: var(--neg);
-  border-color: var(--neg);
+  background: var(--band-red);
+  border-color: var(--band-red);
 }
 .seg-btn.seg-green.active .seg-dot,
 .seg-btn.seg-red.active .seg-dot {
