@@ -3,6 +3,21 @@
 import { Fragment, useState } from "react";
 import Icon from "./Icon";
 import { sectionize, money, int, paren, clockTime } from "../lib/ui";
+import { bandForRating, bonusTierFor, BONUS_TIER_LABEL, styleOfBand } from "../lib/scale";
+
+/**
+ * Reviews below this count are shown but greyed out. Two or three reviews say
+ * more about who happened to post than about the store, and the bonus is not
+ * decided on that kind of sample.
+ */
+const MIN_REVIEWS = 5;
+
+/** Short forms, because the table column is narrow. */
+const BONUS_SHORT = {
+  base_plus: "+$100",
+  base_only: "Base",
+  none: "None",
+};
 
 /**
  * Sortable columns. Region grouping is the default and is what the daily
@@ -24,6 +39,8 @@ const SORTS = {
   ptdHours: (s) => (s.ptd.empty ? null : s.ptd.hours),
   ptdSales: (s) => (s.ptd.empty ? null : s.ptd.sales),
   ptdSplh: (s) => (s.ptd.empty ? null : s.ptd.splh),
+  rating: (s) => s.reviews?.period?.rating ?? null,
+  reviewCount: (s) => s.reviews?.period?.count ?? null,
 };
 
 /**
@@ -31,6 +48,11 @@ const SORTS = {
  * order and cell colors have to match what goes out to the field. Everything
  * here is scoped by .wk-legacy in globals.css, which cancels the new table
  * styling for this view only. Do not "clean it up".
+ *
+ * The three review columns at the end are the exception, and they are the
+ * automated replacement for the Tattle Report spreadsheet that used to be
+ * pivoted by hand each period. They use the period window, not the week,
+ * because that is the window the bonus is paid on.
  */
 
 function Th({ label, sortKey, sort, onSort, className = "" }) {
@@ -57,6 +79,16 @@ function Flag({ flags }) {
       <Icon name="alert" size={11} />
     </span>
   );
+}
+
+/**
+ * Background for a rating cell. Thin samples get no color at all, so nobody
+ * reads a red cell built on two reviews as a real result.
+ */
+function ratingCellStyle(rev) {
+  if (!rev || rev.rating === null) return undefined;
+  if (rev.count < MIN_REVIEWS) return undefined;
+  return styleOfBand(bandForRating(rev.rating));
 }
 
 export default function WeekView({ report, loading, error, groupFilter, search }) {
@@ -96,6 +128,16 @@ export default function WeekView({ report, loading, error, groupFilter, search }
     { hours: 0, sales: 0 }
   );
   const totalSplh = totals.hours > 0 ? Math.round(totals.sales / totals.hours) : 0;
+
+  // Chain rating for the period, weighted by review count so a store with
+  // four reviews does not swing the company number.
+  const rated = rows
+    .map((r) => r.reviews?.period)
+    .filter((r) => r && r.rating !== null && r.count > 0);
+  const reviewTotal = rated.reduce((a, r) => a + r.count, 0);
+  const chainRating = reviewTotal
+    ? rated.reduce((a, r) => a + r.rating * r.count, 0) / reviewTotal
+    : null;
 
   return (
     <div className="wk-legacy">
@@ -188,6 +230,18 @@ export default function WeekView({ report, loading, error, groupFilter, search }
             Labor Dashboard - {report.dayName}, {report.date}
           </span>
           <div className="thead-tools">
+            {chainRating !== null && (
+              <span
+                className="chip"
+                style={{
+                  ...styleOfBand(bandForRating(chainRating)),
+                  border: "none",
+                }}
+                title={`${reviewTotal} Google and Yelp reviews in period ${report.period}`}
+              >
+                P{report.period} {chainRating.toFixed(2)} ★
+              </span>
+            )}
             <div className="seg">
               <button
                 className={"seg-btn" + (!sort ? " active" : "")}
@@ -238,6 +292,9 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                 <Th label="PTD Hours" sortKey="ptdHours" className="r sep" sort={sort} onSort={onSort} />
                 <Th label="PTD Sales" sortKey="ptdSales" className="r" sort={sort} onSort={onSort} />
                 <Th label="PTD SPLH" sortKey="ptdSplh" className="r" sort={sort} onSort={onSort} />
+                <Th label="Rating" sortKey="rating" className="r sep" sort={sort} onSort={onSort} />
+                <Th label="Reviews" sortKey="reviewCount" className="r" sort={sort} onSort={onSort} />
+                <th className="r">Bonus</th>
               </tr>
             </thead>
             <tbody>
@@ -245,51 +302,90 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                 <Fragment key={sec.label || "ranked"}>
                   {sec.label && (
                     <tr className="rrow">
-                      <td colSpan={16}>{sec.label}</td>
+                      <td colSpan={19}>{sec.label}</td>
                     </tr>
                   )}
-                  {sec.stores.map((s) => (
-                    <tr key={s.code}>
-                      <td>
-                        <div className="lc-code">
-                          {s.code}
-                          {sort && <span className="lc-region">{s.region}</span>}
-                          <Flag flags={s.day.flags} />
-                        </div>
-                        <div className="lc-name">{s.name}</div>
-                      </td>
-                      <td className="num">{s.day.hours}</td>
-                      <td className="num">{money(s.day.sales)}</td>
-                      <td className="num">${s.day.target}</td>
-                      <td className={"num " + (s.day.ok ? "cell-ok" : "cell-bad")}>${s.day.splh}</td>
-                      <td className="num">{paren(s.day.overUnder)}</td>
+                  {sec.stores.map((s) => {
+                    const rev = s.reviews?.period || null;
+                    const thin = rev && rev.count < MIN_REVIEWS;
+                    return (
+                      <tr key={s.code}>
+                        <td>
+                          <div className="lc-code">
+                            {s.code}
+                            {sort && <span className="lc-region">{s.region}</span>}
+                            <Flag flags={s.day.flags} />
+                          </div>
+                          <div className="lc-name">{s.name}</div>
+                        </td>
+                        <td className="num">{s.day.hours}</td>
+                        <td className="num">{money(s.day.sales)}</td>
+                        <td className="num">${s.day.target}</td>
+                        <td className={"num " + (s.day.ok ? "cell-ok" : "cell-bad")}>${s.day.splh}</td>
+                        <td className="num">{paren(s.day.overUnder)}</td>
 
-                      <td className="num sep">{s.wtd.hours}</td>
-                      <td className="num">{money(s.wtd.sales)}</td>
-                      <td className={"num " + (s.wtd.ok ? "cell-ok" : "cell-bad")}>${s.wtd.splh}</td>
-                      <td className="num">{paren(s.wtd.overUnder)}</td>
+                        <td className="num sep">{s.wtd.hours}</td>
+                        <td className="num">{money(s.wtd.sales)}</td>
+                        <td className={"num " + (s.wtd.ok ? "cell-ok" : "cell-bad")}>${s.wtd.splh}</td>
+                        <td className="num">{paren(s.wtd.overUnder)}</td>
 
-                      <td className="num sep">{s.wtd.trainTotal || "-"}</td>
-                      <td className="num">{s.wtd.trainee || "-"}</td>
-                      <td className="num">{s.wtd.trainer || "-"}</td>
+                        <td className="num sep">{s.wtd.trainTotal || "-"}</td>
+                        <td className="num">{s.wtd.trainee || "-"}</td>
+                        <td className="num">{s.wtd.trainer || "-"}</td>
 
-                      {s.ptd.empty ? (
-                        <>
-                          <td className="num sep cell-dim">-</td>
-                          <td className="num cell-dim">-</td>
-                          <td className="num cell-dim">-</td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="num sep">{int(s.ptd.hours)}</td>
-                          <td className="num">{money(s.ptd.sales)}</td>
-                          <td className={"num " + (s.ptd.ok ? "cell-ok" : "cell-bad")}>
-                            ${s.ptd.splh}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
+                        {s.ptd.empty ? (
+                          <>
+                            <td className="num sep cell-dim">-</td>
+                            <td className="num cell-dim">-</td>
+                            <td className="num cell-dim">-</td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="num sep">{int(s.ptd.hours)}</td>
+                            <td className="num">{money(s.ptd.sales)}</td>
+                            <td className={"num " + (s.ptd.ok ? "cell-ok" : "cell-bad")}>
+                              ${s.ptd.splh}
+                            </td>
+                          </>
+                        )}
+
+                        {!rev || rev.rating === null ? (
+                          <>
+                            <td className="num sep cell-dim">-</td>
+                            <td className="num cell-dim">-</td>
+                            <td className="num cell-dim">-</td>
+                          </>
+                        ) : (
+                          <>
+                            <td
+                              className={"num sep" + (thin ? " cell-dim" : "")}
+                              style={ratingCellStyle(rev)}
+                              title={
+                                thin
+                                  ? `Only ${rev.count} reviews, too few to judge`
+                                  : `${rev.google} Google, ${rev.yelp} Yelp`
+                              }
+                            >
+                              {rev.rating.toFixed(2)}
+                            </td>
+                            <td
+                              className="num"
+                              title={
+                                rev.unanswered
+                                  ? `${rev.unanswered} with no reply`
+                                  : "All replied to"
+                              }
+                            >
+                              {rev.count}
+                            </td>
+                            <td className={"num" + (thin ? " cell-dim" : "")}>
+                              {thin ? "-" : BONUS_SHORT[bonusTierFor(rev.rating)]}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </Fragment>
               ))}
             </tbody>
@@ -301,97 +397,138 @@ export default function WeekView({ report, loading, error, groupFilter, search }
         {sections.map((sec) => (
           <div key={sec.label || "ranked"}>
             {sec.label && <div className="scard-region-head">{sec.label}</div>}
-            {sec.stores.map((s) => (
-              <div className={"store-card " + (s.day.ok ? "ok" : "bad")} key={s.code}>
-                <div className="store-card-head">
-                  <div>
-                    <div className="store-card-code">
-                      {s.code}
-                      <Flag flags={s.day.flags} />
+            {sec.stores.map((s) => {
+              const rev = s.reviews?.period || null;
+              const thin = rev && rev.count < MIN_REVIEWS;
+              return (
+                <div className={"store-card " + (s.day.ok ? "ok" : "bad")} key={s.code}>
+                  <div className="store-card-head">
+                    <div>
+                      <div className="store-card-code">
+                        {s.code}
+                        <Flag flags={s.day.flags} />
+                      </div>
+                      <div className="store-card-name">{s.name}</div>
                     </div>
-                    <div className="store-card-name">{s.name}</div>
+                    <div className="store-card-splh">
+                      ${s.day.target}
+                      <u>TARGET</u>
+                    </div>
                   </div>
-                  <div className="store-card-splh">
-                    ${s.day.target}
-                    <u>TARGET</u>
-                  </div>
-                </div>
 
-                <div className="scard-block">
-                  <div className="scard-block-label">Day - {report.dayName}</div>
-                  <div className="scard-row">
-                    <div className="scard-cell">
-                      <div className="scard-cell-lbl">Hours</div>
-                      <div className="scard-cell-val">{s.day.hours}</div>
-                    </div>
-                    <div className="scard-cell">
-                      <div className="scard-cell-lbl">Sales</div>
-                      <div className="scard-cell-val">{money(s.day.sales)}</div>
-                    </div>
-                    <div className={"scard-cell " + (s.day.ok ? "splh-ok" : "splh-bad")}>
-                      <div className="scard-cell-lbl">SPLH</div>
-                      <div className="scard-cell-val">${s.day.splh}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="scard-block">
-                  <div className="scard-block-label">Week to Date</div>
-                  <div className="scard-row">
-                    <div className="scard-cell">
-                      <div className="scard-cell-lbl">Hours</div>
-                      <div className="scard-cell-val">{s.wtd.hours}</div>
-                    </div>
-                    <div className="scard-cell">
-                      <div className="scard-cell-lbl">Sales</div>
-                      <div className="scard-cell-val">{money(s.wtd.sales)}</div>
-                    </div>
-                    <div className={"scard-cell " + (s.wtd.ok ? "splh-ok" : "splh-bad")}>
-                      <div className="scard-cell-lbl">SPLH</div>
-                      <div className="scard-cell-val">${s.wtd.splh}</div>
-                    </div>
-                  </div>
-                  <div className="scard-row" style={{ marginTop: 8 }}>
-                    <div className="scard-cell">
-                      <div className="scard-cell-lbl">Trainee</div>
-                      <div className="scard-cell-val">{s.wtd.trainee || "-"}</div>
-                    </div>
-                    <div className="scard-cell">
-                      <div className="scard-cell-lbl">Trainer</div>
-                      <div className="scard-cell-val">{s.wtd.trainer || "-"}</div>
-                    </div>
-                    <div className="scard-cell">
-                      <div className="scard-cell-lbl">(Over)/Under</div>
-                      <div className="scard-cell-val">{paren(s.wtd.overUnder)}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="scard-block">
-                  <div className="scard-block-label">Period to Date</div>
-                  {s.ptd.empty ? (
-                    <div style={{ fontSize: 12, color: "#999994", padding: "4px 2px" }}>
-                      No period data
-                    </div>
-                  ) : (
+                  <div className="scard-block">
+                    <div className="scard-block-label">Day - {report.dayName}</div>
                     <div className="scard-row">
                       <div className="scard-cell">
                         <div className="scard-cell-lbl">Hours</div>
-                        <div className="scard-cell-val">{int(s.ptd.hours)}</div>
+                        <div className="scard-cell-val">{s.day.hours}</div>
                       </div>
                       <div className="scard-cell">
                         <div className="scard-cell-lbl">Sales</div>
-                        <div className="scard-cell-val">{money(s.ptd.sales)}</div>
+                        <div className="scard-cell-val">{money(s.day.sales)}</div>
                       </div>
-                      <div className={"scard-cell " + (s.ptd.ok ? "splh-ok" : "splh-bad")}>
+                      <div className={"scard-cell " + (s.day.ok ? "splh-ok" : "splh-bad")}>
                         <div className="scard-cell-lbl">SPLH</div>
-                        <div className="scard-cell-val">${s.ptd.splh}</div>
+                        <div className="scard-cell-val">${s.day.splh}</div>
                       </div>
                     </div>
-                  )}
+                  </div>
+
+                  <div className="scard-block">
+                    <div className="scard-block-label">Week to Date</div>
+                    <div className="scard-row">
+                      <div className="scard-cell">
+                        <div className="scard-cell-lbl">Hours</div>
+                        <div className="scard-cell-val">{s.wtd.hours}</div>
+                      </div>
+                      <div className="scard-cell">
+                        <div className="scard-cell-lbl">Sales</div>
+                        <div className="scard-cell-val">{money(s.wtd.sales)}</div>
+                      </div>
+                      <div className={"scard-cell " + (s.wtd.ok ? "splh-ok" : "splh-bad")}>
+                        <div className="scard-cell-lbl">SPLH</div>
+                        <div className="scard-cell-val">${s.wtd.splh}</div>
+                      </div>
+                    </div>
+                    <div className="scard-row" style={{ marginTop: 8 }}>
+                      <div className="scard-cell">
+                        <div className="scard-cell-lbl">Trainee</div>
+                        <div className="scard-cell-val">{s.wtd.trainee || "-"}</div>
+                      </div>
+                      <div className="scard-cell">
+                        <div className="scard-cell-lbl">Trainer</div>
+                        <div className="scard-cell-val">{s.wtd.trainer || "-"}</div>
+                      </div>
+                      <div className="scard-cell">
+                        <div className="scard-cell-lbl">(Over)/Under</div>
+                        <div className="scard-cell-val">{paren(s.wtd.overUnder)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="scard-block">
+                    <div className="scard-block-label">Period to Date</div>
+                    {s.ptd.empty ? (
+                      <div style={{ fontSize: 12, color: "#999994", padding: "4px 2px" }}>
+                        No period data
+                      </div>
+                    ) : (
+                      <div className="scard-row">
+                        <div className="scard-cell">
+                          <div className="scard-cell-lbl">Hours</div>
+                          <div className="scard-cell-val">{int(s.ptd.hours)}</div>
+                        </div>
+                        <div className="scard-cell">
+                          <div className="scard-cell-lbl">Sales</div>
+                          <div className="scard-cell-val">{money(s.ptd.sales)}</div>
+                        </div>
+                        <div className={"scard-cell " + (s.ptd.ok ? "splh-ok" : "splh-bad")}>
+                          <div className="scard-cell-lbl">SPLH</div>
+                          <div className="scard-cell-val">${s.ptd.splh}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="scard-block">
+                    <div className="scard-block-label">
+                      Guest Reviews - Period {report.period}
+                    </div>
+                    {!rev || rev.rating === null ? (
+                      <div style={{ fontSize: 12, color: "#999994", padding: "4px 2px" }}>
+                        No Google or Yelp reviews this period
+                      </div>
+                    ) : (
+                      <div className="scard-row">
+                        <div
+                          className="scard-cell"
+                          style={ratingCellStyle(rev)}
+                          title={thin ? `Only ${rev.count} reviews` : undefined}
+                        >
+                          <div className="scard-cell-lbl">Rating</div>
+                          <div className="scard-cell-val">{rev.rating.toFixed(2)}</div>
+                        </div>
+                        <div className="scard-cell">
+                          <div className="scard-cell-lbl">Reviews</div>
+                          <div className="scard-cell-val">{rev.count}</div>
+                        </div>
+                        <div className="scard-cell">
+                          <div className="scard-cell-lbl">Bonus</div>
+                          <div className="scard-cell-val" style={{ fontSize: 11.5 }}>
+                            {thin ? "-" : BONUS_TIER_LABEL[bonusTierFor(rev.rating)]}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {rev && rev.unanswered > 0 && (
+                      <div style={{ fontSize: 10.5, color: "#999994", marginTop: 5 }}>
+                        {rev.unanswered} of {rev.count} still have no reply
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ))}
       </div>

@@ -2939,3 +2939,108 @@ th.sorted .th-caret {
     font-size: 11.5px !important;
   }
 }
+/* ============================================================
+   Reviews in the leaderboard and week view
+   Append to the very end of app/globals.css.
+   These override the earlier .lb-row rules by source order.
+   ============================================================ */
+
+/* One more column for the rating, between the goal bar and the score. */
+.lb-row {
+  grid-template-columns: 30px minmax(140px, 1.2fr) minmax(120px, 2fr) 64px 52px;
+}
+
+/* Score is a 0 to 100 percentile blend, not a pass or fail against a
+   target, so it does not take the green or red treatment. */
+.lb-pct {
+  color: var(--text);
+}
+.lb-pod-pct.neutral {
+  color: var(--text);
+}
+
+.lb-rating {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lb-rating b {
+  font-size: 13px;
+  font-weight: 700;
+}
+.lb-rating-n {
+  font-size: 9.5px;
+  color: var(--text3);
+  font-weight: 500;
+}
+.lb-rating.none {
+  color: var(--text3);
+}
+/* Thin sample: visible, but visibly not load bearing. */
+.lb-rating.thin b {
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+/* The window and sort toggles sit together on the right. */
+.lb-segs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px;
+  color: var(--text2);
+}
+.lb-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.lb-legend-item i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+@media (max-width: 900px) {
+  /* The goal bar is the first thing to go on a narrow screen, so the row
+     drops to four columns: rank, name, rating, score. */
+  .lb-row {
+    grid-template-columns: 26px minmax(0, 1.4fr) 56px 40px;
+    gap: 9px;
+    padding: 10px 12px;
+  }
+  .lb-row .lb-goal {
+    display: none;
+  }
+  .lb-rating b {
+    font-size: 12px;
+  }
+  .lb-rating-n {
+    display: none;
+  }
+  .lb-segs {
+    width: 100%;
+  }
+  .lb-legend {
+    padding: 9px 12px;
+    gap: 9px;
+  }
+}
+
+/* ---- week view review columns ----
+   The rating cell paints its own background from lib/scale.js, so it must
+   not inherit the .wk-legacy cell padding tweaks that assume plain text. */
+.wk-legacy table.grid td[style*="background"] {
+  font-weight: 700;
+}
