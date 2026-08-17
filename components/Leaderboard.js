@@ -83,9 +83,7 @@ const SCOPES = [
 
 const SORTS = [
   { key: "score", label: "Score" },
-  { key: "eff", label: "Efficiency" },
   { key: "rating", label: "Reviews" },
-  { key: "name", label: "Name" },
 ];
 
 // Period first. It is the window the bonus is paid on and the only one with
