@@ -3959,3 +3959,31 @@ th.sorted .th-caret {
     border-top: 1px solid var(--line);
   }
 }
+/* ============================================================
+   v10: week view header wrapping
+
+   v8 let headers wrap, but "(OVER)/UNDER" and "WTD (OVER)/UNDER"
+   carry no spaces, so the browser found no break opportunity and
+   let them spill over the neighbouring column instead.
+
+   overflow-wrap: anywhere gives it somewhere to break. Greedy line
+   filling puts the break after the slash, which is where a person
+   would have put it. overflow: hidden is the safety net so nothing
+   can ever paint outside its own cell again.
+   ============================================================ */
+
+.wk-legacy table.grid th {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  hyphens: none;
+  overflow: hidden;
+  line-height: 1.2;
+  vertical-align: bottom;
+  /* Tighter than the 0.05em the rest of the table uses. Uppercase
+     tracking is what pushed these labels past their column in the
+     first place. */
+  letter-spacing: 0.02em;
+  font-size: 9.5px;
+  padding: 8px 6px 6px;
+}
