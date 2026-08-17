@@ -1,162 +1,471 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import WeekOverWeekChart from "./WeekOverWeekChart";
+import Icon from "./Icon";
+import CupMedal from "./CupMedal";
 import EfficiencyQuadrant from "./EfficiencyQuadrant";
+import { GROUPS, money, int } from "../lib/ui";
+import { bandForRating, bonusTierFor, inkOfBand } from "../lib/scale";
+import { scoreStores, weightedRating, MIN_REVIEWS_TO_RANK } from "../lib/leaderboard";
 
+/**
+ * The main screen. Everything here is a summary of a tab that already exists,
+ * so every block is a link rather than a dead end: the number tells you
+ * something is off, the click takes you to where you can act on it.
+ *
+ * Scope is chosen once at the top and drives every block on the page. That is
+ * the shape access control will take later: today the picker is open to
+ * everyone, and locking a user to their own markets means narrowing this list
+ * rather than rebuilding the screen.
+ */
+
+const SCOPES = [
+  { key: "All", label: "All stores", match: () => true },
+  { key: "TX-TN", label: "TX-TN", match: (s) => s.grp === "TX-TN" },
+  { key: "CA-AZ", label: "CA-AZ", match: (s) => s.grp === "CA-AZ" },
+  ...Object.values(GROUPS)
+    .flat()
+    .map((def) => ({
+      key: def.label,
+      label: def.label,
+      match: (s) => def.regions.includes(s.region),
+    })),
+];
+
+const PLACES = ["gold", "silver", "bronze"];
 const SEV_LABEL = { data: "Data issue", critical: "Critical", warning: "Watch" };
 
-function ExceptionRow({ e }) {
+/** A number that means something, and a place to go do something about it. */
+function Tile({ label, value, unit, note, tone, onClick, to }) {
   return (
-    <div className={"dash-row sev-" + e.severity}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="dash-row-name">{e.name}</div>
-        <div
-          className="dash-row-label"
-          style={{ color: e.severity === "critical" ? "#9c0006" : e.severity === "data" ? "#9a5e0a" : "var(--text2)" }}
-        >
-          {e.label}
-        </div>
-        <div className="dash-row-detail">{e.detail}</div>
+    <button className={"db-tile" + (tone ? " tone-" + tone : "")} onClick={onClick}>
+      <div className="db-tile-l">{label}</div>
+      <div className="db-tile-v">
+        {value}
+        {unit && <span className="db-tile-u">{unit}</span>}
       </div>
-      <span
-        className="dash-chip"
-        style={{
-          background: e.severity === "critical" ? "#fdf0ee" : e.severity === "data" ? "#fdf5e6" : "var(--bg3)",
-          color: e.severity === "critical" ? "#9c0006" : e.severity === "data" ? "#9a5e0a" : "var(--text2)",
-        }}
-      >
-        {SEV_LABEL[e.severity]}
-      </span>
+      <div className="db-tile-s">{note}</div>
+      <div className="db-tile-go">
+        {to}
+        <Icon name="right" size={12} />
+      </div>
+    </button>
+  );
+}
+
+function SectionHead({ title, sub, action, onAction }) {
+  return (
+    <div className="thead">
+      <div>
+        <div className="ttl">{title}</div>
+        {sub && <div className="tsub">{sub}</div>}
+      </div>
+      {action && (
+        <button className="db-link" onClick={onAction}>
+          {action}
+          <Icon name="right" size={12} />
+        </button>
+      )}
     </div>
   );
 }
 
-export default function Dashboard({ isoDate }) {
+export default function Dashboard({ isoDate, report, onNavigate }) {
+  const [scope, setScope] = useState("All");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
 
+  // The scope survives a reload, so a market lead is not re-picking their own
+  // region every morning.
+  useEffect(() => {
+    const saved = localStorage.getItem("shift_dash_scope");
+    if (saved && SCOPES.some((s) => s.key === saved)) setScope(saved);
+  }, []);
+
+  function pickScope(key) {
+    setScope(key);
+    localStorage.setItem("shift_dash_scope", key);
+  }
+
   useEffect(() => {
     if (!isoDate) return;
+    let dead = false;
     setLoading(true);
     setErr(null);
     fetch(`/api/dashboard?date=${isoDate}`)
       .then((r) => r.json())
       .then((d) => {
+        if (dead) return;
         if (!d.ok) setErr(d.error);
         else setData(d);
         setLoading(false);
       })
-      .catch((e) => { setErr(String(e)); setLoading(false); });
+      .catch((e) => {
+        if (dead) return;
+        setErr(String(e));
+        setLoading(false);
+      });
+    return () => {
+      dead = true;
+    };
   }, [isoDate]);
 
-  if (loading) return <div className="empty">Loading dashboard...</div>;
+  if (loading && !data) return <div className="empty">Loading dashboard...</div>;
   if (err) return <div className="empty">Error: {err}</div>;
-  if (!data) return <div className="empty">No data.</div>;
+  if (!data) return <div className="empty">No data for this date.</div>;
 
-  const t = data.trend;
-  const urgent = data.counts.critical + data.counts.data;
-  const total = urgent + data.counts.warning;
-  const clean = total === 0;
+  const scopeDef = SCOPES.find((s) => s.key === scope) || SCOPES[0];
+  const allRows = report?.rows || [];
+  const rows = allRows.filter(scopeDef.match);
+
+  // One set of store codes drives every block, so the exceptions list, the
+  // movers chart and the podium can never disagree about who is in scope.
+  const codes = new Set(rows.map((r) => r.code));
+  const inScope = (x) => codes.size === 0 || codes.has(x.code);
+
+  // ---- labor ----
+  let curH = 0, curS = 0;
+  rows.forEach((r) => {
+    curH += r.wtd.hours;
+    curS += r.wtd.sales;
+  });
+  const blended = curH > 0 ? Math.round(curS / curH) : null;
+
+  // The delta is computed only across stores that reported both weeks, and on
+  // summed hours and sales rather than an average of ratios.
+  const comps = (data.trend.all || []).filter(inScope);
+  let cH = 0, cS = 0, pH = 0, pS = 0;
+  comps.forEach((t) => {
+    cH += t.curHours;
+    cS += t.curSales;
+    pH += t.priHours;
+    pS += t.priSales;
+  });
+  const delta = cH > 0 && pH > 0 ? Math.round(cS / cH - pS / pH) : null;
+
+  const atTarget = rows.filter((r) => r.wtd.hours > 0 && r.wtd.splh >= r.day.target).length;
+
+  // ---- reviews ----
+  const chain = weightedRating(rows, "period");
+  const rated = rows.filter(
+    (r) => r.reviews?.period?.rating != null && r.reviews.period.count >= MIN_REVIEWS_TO_RANK
+  );
+  const unanswered = rated.reduce((a, r) => a + (r.reviews.period.unanswered || 0), 0);
+  const reviewTotal = rated.reduce((a, r) => a + r.reviews.period.count, 0);
+  const watchlist = [...rated]
+    .filter((r) => r.reviews.period.rating < 4.5)
+    .sort((a, b) => a.reviews.period.rating - b.reviews.period.rating)
+    .slice(0, 5);
+
+  // ---- podium ----
+  const { byScore } = scoreStores(rows, "period");
+  const podium = byScore.slice(0, 3);
+
+  // ---- movers ----
+  const movers = [...comps].sort((a, b) => b.delta - a.delta);
+  const up = movers.filter((t) => t.delta > 0).slice(0, 4);
+  const down = movers.filter((t) => t.delta < 0).slice(-4).reverse();
+  const shown = [...up, ...down];
+  const maxAbs = shown.length ? Math.max(...shown.map((t) => Math.abs(t.delta))) : 1;
+
+  // ---- exceptions ----
+  const exceptions = (data.exceptions || []).filter(inScope);
+  const urgent = exceptions.filter((e) => e.severity === "critical" || e.severity === "data").length;
+  const clean = exceptions.length === 0;
 
   return (
-    <>
-      <div className={"dash-hero " + (clean ? "clear" : "alert")} style={{ marginBottom: 18 }}>
-        <div className="dash-hero-icon">{clean ? "✓" : "⚠️"}</div>
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <div className="dash-hero-num" style={clean ? { color: "#1a6630" } : undefined}>
-            {clean ? "All clear" : urgent + (urgent === 1 ? " store needs" : " stores need") + " attention"}
+    <div className="view">
+      <div className="db-scopes">
+        <div className="lb-chips">
+          {SCOPES.map((sc) => {
+            const n = allRows.filter(sc.match).length;
+            if (!n) return null;
+            return (
+              <button
+                key={sc.key}
+                className={"lb-chip" + (scope === sc.key ? " active" : "")}
+                onClick={() => pickScope(sc.key)}
+              >
+                {sc.label}
+                <span className="lb-chip-n">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+        <span className={"chip " + (data.isLive ? "chip-live" : "chip-mute")}>
+          {data.isLive
+            ? "Live · " +
+              (data.lastSyncAt
+                ? new Date(data.lastSyncAt).toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })
+                : "syncing")
+            : "Final"}
+        </span>
+      </div>
+
+      <div className={"db-rail" + (clean ? " clear" : "")}>
+        <div className="db-rail-main">
+          <div className="db-rail-eyebrow">
+            {scopeDef.label} · Week {data.weekNum} · {data.dayName} · Period {data.period}
           </div>
-          <div className="dash-hero-sub" style={clean ? { color: "var(--text2)", opacity: 1 } : undefined}>
+          <div className="db-rail-num">
+            {blended === null ? "--" : "$" + blended}
+            <span className="db-rail-unit">blended WTD SPLH</span>
+          </div>
+          <div className="db-rail-sub">
+            {delta === null ? (
+              <>No comparable week to measure against yet.</>
+            ) : (
+              <>
+                <b className={delta >= 0 ? "up" : "down"}>
+                  {delta >= 0 ? "+" : ""}
+                  {delta}
+                </b>{" "}
+                vs Week {data.trend.priorWeekNum}, across {comps.length} comparable{" "}
+                {comps.length === 1 ? "store" : "stores"}
+              </>
+            )}
+          </div>
+        </div>
+        <button className="db-rail-cta" onClick={() => onNavigate("week")}>
+          <div className="db-rail-cta-num">{clean ? "0" : urgent}</div>
+          <div className="db-rail-cta-lbl">
             {clean
-              ? `Every one of ${data.storeCount} stores is at or above target, and every sync came through clean.`
-              : `${data.counts.critical} critical, ${data.counts.data} with missing data, and ${data.counts.warning} worth a look, out of ${data.storeCount} stores.`}
+              ? "nothing to flag"
+              : urgent === 1
+              ? "store needs attention"
+              : "stores need attention"}
           </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              opacity: clean ? 0.7 : 0.75,
-              textTransform: "uppercase",
-              letterSpacing: ".05em",
-              color: clean ? "var(--text2)" : undefined,
-            }}
-          >
-            Week {data.weekNum} &middot; {data.dayName}
+          <div className="db-rail-cta-go">
+            Open week view
+            <Icon name="right" size={12} />
           </div>
-          <div style={{ fontSize: 10.5, opacity: clean ? 0.55 : 0.65, marginTop: 2 }}>
-            {data.isLive && data.lastSyncAt
-              ? "Live · updated " + new Date(data.lastSyncAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-              : "Period " + data.period}
-          </div>
-        </div>
+        </button>
       </div>
 
-      <div className="mc-grid">
-        <div className="mc">
-          <div className="mc-l">Blended WTD SPLH</div>
-          <div className="mc-v" style={{ fontSize: 32 }}>${t.blendedCurrent}</div>
-          <div className="mc-s">
-            {t.blendedPrior !== null ? `$${t.blendedPrior} same point last week` : "no prior week to compare"}
-          </div>
-        </div>
-        <div className="mc">
-          <div className="mc-l">Week over week</div>
-          <div
-            className="mc-v"
-            style={{ fontSize: 32, color: t.blendedDelta === null ? undefined : t.blendedDelta >= 0 ? "#1a6630" : "#9c0006" }}
-          >
-            {t.blendedDelta === null ? "—" : (t.blendedDelta >= 0 ? "+" : "") + t.blendedDelta}
-          </div>
-          <div className="mc-s">{t.priorWeekNum ? `vs Week ${t.priorWeekNum}` : "needs prior week data"}</div>
-        </div>
-        <div className="mc">
-          <div className="mc-l">Stores tracked</div>
-          <div className="mc-v" style={{ fontSize: 32 }}>{data.storeCount}</div>
-          <div className="mc-s">{t.comparable} comparable to last week</div>
-        </div>
+      <div className="db-tiles">
+        <Tile
+          label="At or above target"
+          value={atTarget}
+          unit={"/ " + rows.length}
+          note="Week to date SPLH vs each store's own target"
+          tone={rows.length && atTarget / rows.length >= 0.6 ? "pos" : "neg"}
+          to="Week view"
+          onClick={() => onNavigate("week")}
+        />
+        <Tile
+          label={"Guest rating · period " + data.period}
+          value={chain.rating === null ? "--" : chain.rating.toFixed(2)}
+          note={
+            chain.count
+              ? `${int(chain.count)} Google and Yelp reviews, weighted by count`
+              : "No reviews in this period yet"
+          }
+          tone={chain.rating === null ? null : chain.rating >= 4.5 ? "pos" : chain.rating >= 4 ? "warn" : "neg"}
+          to="Leaderboard"
+          onClick={() => onNavigate("leaderboard")}
+        />
+        <Tile
+          label="Reviews with no reply"
+          value={unanswered}
+          unit={"/ " + reviewTotal}
+          note={
+            reviewTotal
+              ? `${Math.round((unanswered / reviewTotal) * 100)}% never got an answer`
+              : "Nothing to reply to yet"
+          }
+          tone={reviewTotal && unanswered / reviewTotal > 0.5 ? "neg" : null}
+          to="Leaderboard"
+          onClick={() => onNavigate("leaderboard")}
+        />
+        <Tile
+          label="Hours logged, week to date"
+          value={int(curH)}
+          note={money(curS) + " in sales behind them"}
+          to="Store detail"
+          onClick={() => onNavigate("storetrend")}
+        />
       </div>
 
-      <EfficiencyQuadrant isoDate={isoDate} />
-
-      <div className="tcard">
-        <div className="thead">
-          <span className="ttl">Week over week movers</span>
-          <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>SPLH change vs. last week</span>
-        </div>
-        <div style={{ padding: "18px 20px 8px" }}>
-          {t.comparable > 0 ? (
-            <WeekOverWeekChart improving={t.improving} declining={t.declining} />
+      <div className="db-cols">
+        <div className="tcard">
+          <SectionHead
+            title="Leading the board"
+            sub="Half labor efficiency, half guest reviews"
+            action="Full board"
+            onAction={() => onNavigate("leaderboard")}
+          />
+          {podium.length ? (
+            <div className="db-podium">
+              {podium.map((s, i) => (
+                <button
+                  key={s.code}
+                  className={"lb-pod " + PLACES[i]}
+                  onClick={() => onNavigate("leaderboard")}
+                >
+                  <CupMedal place={PLACES[i]} rank={i + 1} size={34} />
+                  <div className="lb-pod-body">
+                    <div className="lb-pod-name">{s.name}</div>
+                    <div className="lb-pod-meta">
+                      {Math.round(s.eff)}% eff
+                      {s.rev?.rating != null && (
+                        <>
+                          {" · "}
+                          <b style={{ color: inkOfBand(bandForRating(s.rev.rating)) }}>
+                            {s.rev.rating.toFixed(2)}
+                          </b>
+                        </>
+                      )}
+                      {" · "}
+                      {s.region}
+                    </div>
+                  </div>
+                  <div className="lb-pod-pct neutral">{Math.round(s.score)}</div>
+                </button>
+              ))}
+            </div>
           ) : (
-            <div className="empty" style={{ padding: 30 }}>
-              Not enough history yet. This needs the same weekday from last week.
+            <div className="empty" style={{ padding: 28 }}>
+              No store in this scope has reported hours and sales yet.
+            </div>
+          )}
+        </div>
+
+        <div className="tcard">
+          <SectionHead
+            title="Week over week movers"
+            sub={
+              data.trend.priorWeekNum
+                ? `WTD SPLH against Week ${data.trend.priorWeekNum}, same weekday`
+                : "Needs the same weekday from last week"
+            }
+            action="Store detail"
+            onAction={() => onNavigate("storetrend")}
+          />
+          {shown.length ? (
+            <div className="db-movers">
+              {shown.map((t) => {
+                const up = t.delta >= 0;
+                return (
+                  <button
+                    key={t.code}
+                    className="db-mover"
+                    onClick={() => onNavigate("storetrend")}
+                    title={`$${t.prior} to $${t.current} SPLH`}
+                  >
+                    <span className="db-mover-name">{t.name}</span>
+                    <span className="db-mover-track">
+                      <span
+                        className={"db-mover-fill " + (up ? "up" : "down")}
+                        style={{ width: (Math.abs(t.delta) / maxAbs) * 50 + "%" }}
+                      />
+                    </span>
+                    <span className={"db-mover-val " + (up ? "up" : "down")}>
+                      {up ? "+" : ""}
+                      {t.delta}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty" style={{ padding: 28 }}>
+              Not enough history in this scope yet.
             </div>
           )}
         </div>
       </div>
 
-      <div className="tcard">
-        <div className="thead">
-          <span className="ttl">Needs attention</span>
-          <span style={{ fontSize: 11, color: "var(--text3)", fontWeight: 600 }}>
-            {total} item{total === 1 ? "" : "s"}
-          </span>
+      <div className="db-cols">
+        <div className="tcard">
+          <SectionHead
+            title="Needs attention"
+            sub={exceptions.length + (exceptions.length === 1 ? " item" : " items")}
+            action="Week view"
+            onAction={() => onNavigate("week")}
+          />
+          {clean ? (
+            <div className="empty" style={{ padding: 28 }}>
+              Every store in {scopeDef.label} is at target and every sync came through clean.
+            </div>
+          ) : (
+            <div className="db-list">
+              {exceptions.slice(0, 6).map((e, i) => (
+                <button
+                  key={e.code + "-" + i}
+                  className={"dash-row sev-" + e.severity}
+                  onClick={() => onNavigate("week")}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="dash-row-name">{e.name}</div>
+                    <div className="dash-row-label">{e.label}</div>
+                    <div className="dash-row-detail">{e.detail}</div>
+                  </div>
+                  <span className={"chip sev-chip-" + e.severity}>{SEV_LABEL[e.severity]}</span>
+                </button>
+              ))}
+              {exceptions.length > 6 && (
+                <div className="db-more">
+                  {exceptions.length - 6} more in the week view
+                </div>
+              )}
+            </div>
+          )}
         </div>
-        {clean ? (
-          <div className="empty" style={{ padding: 34 }}>
-            Nothing to flag right now.
-          </div>
-        ) : (
-          <div style={{ padding: "12px 14px" }}>
-            {data.exceptions.map((e, i) => (
-              <ExceptionRow key={e.code + "-" + i} e={e} />
-            ))}
-          </div>
-        )}
+
+        <div className="tcard">
+          <SectionHead
+            title="Reviews to work on"
+            sub={`Below the $100 bonus line in period ${data.period}`}
+            action="Leaderboard"
+            onAction={() => onNavigate("leaderboard")}
+          />
+          {watchlist.length ? (
+            <div className="db-list">
+              {watchlist.map((s) => {
+                const rev = s.reviews.period;
+                return (
+                  <button
+                    key={s.code}
+                    className="db-watch"
+                    onClick={() => onNavigate("leaderboard")}
+                  >
+                    <div className="db-watch-main">
+                      <div className="db-watch-name">{s.name}</div>
+                      <div className="db-watch-sub">
+                        {rev.count} reviews
+                        {rev.unanswered > 0 && ` · ${rev.unanswered} with no reply`}
+                      </div>
+                    </div>
+                    <div
+                      className="db-watch-rating"
+                      style={{ color: inkOfBand(bandForRating(rev.rating)) }}
+                    >
+                      {rev.rating.toFixed(2)}
+                      <span>
+                        {rev.rating >= 4
+                          ? `+${(4.5 - rev.rating).toFixed(2)} to the bonus`
+                          : "no bonus"}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="empty" style={{ padding: 28 }}>
+              {rated.length
+                ? `Every rated store in ${scopeDef.label} is at 4.50 or better.`
+                : "No store has five or more reviews in this period yet."}
+            </div>
+          )}
+        </div>
       </div>
-    </>
+
+      <EfficiencyQuadrant isoDate={isoDate} />
+    </div>
   );
 }

@@ -87,6 +87,10 @@ export async function GET(request) {
     };
 
     // ── TENDENCIA ──
+    // Cada entrada lleva horas y ventas de ambas semanas. Sin eso el cliente
+    // solo puede promediar SPLH por tienda, y el promedio de un ratio no es el
+    // ratio de la suma. Con estos cuatro campos el Dashboard calcula el blended
+    // exacto de cualquier region sin volver a llamar al API.
     const priorByCode = {};
     if (prior) prior.rows.forEach((r) => { priorByCode[r.code] = r; });
 
@@ -103,6 +107,10 @@ export async function GET(request) {
           current: r.wtd.splh,
           prior: p.wtd.splh,
           delta,
+          curHours: r.wtd.hours,
+          curSales: r.wtd.sales,
+          priHours: p.wtd.hours,
+          priSales: p.wtd.sales,
         };
       })
       .filter(Boolean)
@@ -128,6 +136,9 @@ export async function GET(request) {
         blendedCurrent: Math.round(curBlended),
         blendedPrior: priBlended !== null ? Math.round(priBlended) : null,
         blendedDelta: priBlended !== null ? Math.round(curBlended - priBlended) : null,
+        // Serie completa. declining e improving se conservan para que nada de
+        // lo que ya consume este endpoint se rompa.
+        all: trends,
         declining: trends.filter((t) => t.delta < 0).slice(0, 5),
         improving: trends.filter((t) => t.delta > 0).slice(-5).reverse(),
         comparable: trends.length,

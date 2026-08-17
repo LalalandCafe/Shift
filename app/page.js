@@ -133,7 +133,15 @@ export default function ShiftApp() {
           <ShiftLogo variant="mark" size={34} crown={!collapsed} />
           <div className="logo-words">
             <div className="logo-text">SHIFT</div>
-            <div className="logo-sub">La La Land</div>
+            {/* The brand lockup, not a typed name. Flattened to cream in CSS
+                so the brown mark stays legible on the dark rail. */}
+            <img
+              className="logo-lockup"
+              src="/logo/lalaland.png"
+              alt="La La Land"
+              width={90}
+              height={13}
+            />
           </div>
         </button>
 
@@ -275,7 +283,12 @@ export default function ShiftApp() {
           )}
           {view === "leaderboard" && <Leaderboard report={report} />}
           {view === "storetrend" && <StoreTrend isoDate={isoDate} />}
-          {view === "dashboard" && reporter && <Dashboard isoDate={isoDate} />}
+          {/* The dashboard summarises the other tabs, so it gets the report
+              payload that is already in memory and a way to hand the user off
+              to the tab a number came from. */}
+          {view === "dashboard" && reporter && (
+            <Dashboard isoDate={isoDate} report={report} onNavigate={setView} />
+          )}
           {view === "service" && reporter && <ServiceBoard isoDate={isoDate} />}
           {view === "tplh" && reporter && <TPLH />}
           {view === "drivethru" && reporter && <DriveThru />}

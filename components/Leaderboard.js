@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Icon from "./Icon";
+import CupMedal from "./CupMedal";
 import { GROUPS, money, int, median } from "../lib/ui";
 import {
   bandForRating,
@@ -10,63 +11,12 @@ import {
   inkOfBand,
   reviewLegend,
 } from "../lib/scale";
+import { scoreStores, efficiencyOf, MIN_REVIEWS_TO_RANK } from "../lib/leaderboard";
 
 /**
- * Efficiency = week to date SPLH divided by the store's own target, as a
- * percentage. 100% means the store produced its sales with exactly the hours
- * the target allowed. Measuring each store against its own number is what lets
- * a $75 target store and a $90 target store compete fairly.
+ * The ranking math lives in lib/leaderboard.js because the Dashboard shows the
+ * same top three. Two copies would drift the first time a weight changed.
  */
-function efficiencyOf(s) {
-  const splh = s.wtd?.splh ?? s.day?.splh ?? null;
-  const target = s.day?.target ?? null;
-  if (!splh || !target) return null;
-  return (splh / target) * 100;
-}
-
-/**
- * Percentile rank against the rest of the field, 0 to 100, ties averaged.
- * Nulls stay null.
- *
- * Efficiency and star ratings cannot be averaged directly: 112% and 4.6 are
- * different units on different scales. Converting both to a percentile of the
- * stores currently in view puts them in the same space, so a 50/50 blend
- * actually means half labor and half guest experience.
- */
-function percentiles(values) {
-  const out = values.map(() => null);
-  const valid = values
-    .map((v, i) => ({ v: Number(v), i }))
-    .filter((x) => Number.isFinite(x.v));
-
-  if (!valid.length) return out;
-  if (valid.length === 1) {
-    out[valid[0].i] = 100;
-    return out;
-  }
-
-  const sorted = [...valid].sort((a, b) => a.v - b.v);
-  const last = sorted.length - 1;
-
-  let i = 0;
-  while (i < sorted.length) {
-    let j = i;
-    while (j + 1 < sorted.length && sorted[j + 1].v === sorted[i].v) j++;
-    const pct = (((i + j) / 2) / last) * 100;
-    for (let k = i; k <= j; k++) out[sorted[k].i] = pct;
-    i = j + 1;
-  }
-  return out;
-}
-
-const WEIGHTS = { efficiency: 0.5, reviews: 0.5 };
-
-/**
- * Below this a rating is displayed but greyed out and left out of the score.
- * A single week regularly gives a store two or three reviews, and two bad
- * ones would drop it to the bottom on noise rather than performance.
- */
-const MIN_REVIEWS_TO_RANK = 5;
 
 const SCOPES = [
   { key: "All", label: "All stores", match: () => true },
@@ -94,21 +44,6 @@ const WINDOWS = [
 ];
 
 const PLACES = ["gold", "silver", "bronze"];
-
-/** Struck medal: ribbon tails, ring, disc, rank number. No emoji. */
-function Medal({ place, rank, size = 46 }) {
-  return (
-    <svg className={"lb-medal " + place} width={size} height={size} viewBox="0 0 44 44" aria-hidden="true">
-      <path className="ribbon l" d="M13 2 L20 17 L14.5 20.5 L7.5 5 Z" />
-      <path className="ribbon r" d="M31 2 L24 17 L29.5 20.5 L36.5 5 Z" />
-      <circle className="ring" cx="22" cy="28" r="13" />
-      <circle className="disc" cx="22" cy="28" r="9.6" />
-      <text className="num" x="22" y="28" textAnchor="middle" dominantBaseline="central">
-        {rank}
-      </text>
-    </svg>
-  );
-}
 
 /** Progress toward the store's own target, with the target marked on the track. */
 function GoalBar({ eff, scale }) {
@@ -158,12 +93,13 @@ export default function Leaderboard({ report }) {
   const scopeDef = SCOPES.find((s) => s.key === scope) || SCOPES[0];
 
   const all = (report.rows || [])
-    .map((s) => ({ ...s, eff: efficiencyOf(s), rev: s.reviews?.[windowKey] || null }))
+    .map((s) => ({ ...s, eff: efficiencyOf(s) }))
     .filter((s) => s.eff !== null);
 
-  const base = all.filter(scopeDef.match);
+  const base = (report.rows || []).filter(scopeDef.match);
+  const { rows, byScore, rank } = scoreStores(base, windowKey);
 
-  if (!base.length) {
+  if (!rows.length) {
     return (
       <div className="empty">
         <div className="empty-title">Nothing to rank</div>
@@ -171,35 +107,6 @@ export default function Leaderboard({ report }) {
       </div>
     );
   }
-
-  // Scored against the stores currently in view. Changing scope rescores,
-  // which is the point: a region board should rank within that region.
-  const effPct = percentiles(base.map((s) => s.eff));
-  const revPct = percentiles(
-    base.map((s) => (s.rev && s.rev.count >= MIN_REVIEWS_TO_RANK ? s.rev.rating : null))
-  );
-
-  const rows = base.map((s, i) => {
-    const e = effPct[i];
-    const r = revPct[i];
-    // A store without enough reviews is ranked on labor alone rather than
-    // pushed to the bottom for something it has not had a chance to earn.
-    const score =
-      e !== null && r !== null
-        ? e * WEIGHTS.efficiency + r * WEIGHTS.reviews
-        : e !== null
-        ? e
-        : r;
-    return {
-      ...s,
-      score: score === null ? null : Math.round(score * 10) / 10,
-      scoredOnLaborOnly: r === null,
-    };
-  });
-
-  const byScore = [...rows].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
-  const rank = {};
-  byScore.forEach((s, i) => (rank[s.code] = i + 1));
 
   const podium = byScore.slice(0, 3);
   const ordered = [...rows].sort((a, b) => {
@@ -338,7 +245,7 @@ export default function Leaderboard({ report }) {
             style={{ "--i": i }}
             onClick={() => setPinned(pinned === s.code ? null : s.code)}
           >
-            <Medal place={PLACES[i]} rank={i + 1} />
+            <CupMedal place={PLACES[i]} rank={i + 1} size={40} />
             <div className="lb-pod-body">
               <div className="lb-pod-name">{s.name}</div>
               <div className="lb-pod-meta">
