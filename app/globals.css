@@ -3044,3 +3044,650 @@ th.sorted .th-caret {
 .wk-legacy table.grid td[style*="background"] {
   font-weight: 700;
 }
+/* ============================================================
+   v6: panel close button, one chevron per select, week view
+   frozen columns, La La Land lockup, cup places.
+
+   Append this block to the very end of app/globals.css. Nothing
+   above it is edited: every rule here wins on source order, so
+   the existing design system stays intact and reversible.
+   ============================================================ */
+
+/* ---- 1. panel close button ----
+   .kd-close used float: right, which took the button out of flow and left the
+   glyph sitting off centre in its own box. Store detail never floated its
+   close button, which is why only that panel looked correct. One definition
+   now, both panels use it, and the icon is centred by the grid rather than by
+   a line-height guess. */
+.kd-panel,
+.day-panel {
+  position: relative;
+  padding-right: 58px;
+}
+.kd-close,
+.day-panel-close {
+  float: none;
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: var(--ink-3);
+  color: #fff;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.kd-close:hover,
+.day-panel-close:hover {
+  background: #313c4c;
+}
+.kd-close:active,
+.day-panel-close:active {
+  transform: scale(0.92);
+}
+.kd-close .ic,
+.day-panel-close .ic {
+  display: block;
+}
+
+/* ---- 2. one chevron per select ----
+   The topbar region picker rendered a native <select> arrow plus an
+   <Icon name="down" />, so it drew two. The native arrow is switched off and
+   the icon we control is kept, which also keeps the chevron on the same
+   stroke weight as every other icon in the app. */
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 2px;
+}
+.field select::-ms-expand {
+  display: none;
+}
+
+/* ---- 3. week view: even columns, header and store name pinned ----
+   Every cell was sized by its own content, so the columns stepped in and out
+   down the table. table-layout: fixed hands sizing to the column rules below,
+   which makes the grid read evenly across all 34 stores.
+
+   The scroll box is also capped to the viewport, so the horizontal bar sits on
+   screen at all times. You can drag it from wherever you happen to be reading
+   instead of scrolling to the bottom of 34 rows to reach it. */
+.wk-legacy .scx {
+  max-height: calc(100vh - 300px);
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.wk-legacy table.grid {
+  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+}
+.wk-legacy table.grid th,
+.wk-legacy table.grid td {
+  width: 104px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wk-legacy table.grid th:first-child,
+.wk-legacy table.grid td:first-child {
+  width: 200px;
+}
+
+/* Header rides the top of the scroll box. border-collapse drops borders on
+   sticky cells, so the rule under the header is drawn as an inset shadow. */
+.wk-legacy table.grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: #f7f7f5;
+  box-shadow: inset 0 -1px 0 #e0dfd8, inset 1px 0 0 #e0dfd8;
+}
+.wk-legacy table.grid thead th:first-child {
+  left: 0;
+  z-index: 5;
+}
+
+/* Store name rides the left edge, so a row stays identifiable all the way out
+   to the PTD and review columns. */
+.wk-legacy table.grid tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: 1px 0 0 #e0dfd8;
+}
+.wk-legacy table.grid tbody tr:hover td:first-child {
+  background: #fafaf8;
+}
+
+/* The region banner spans all 19 columns, so pinning it left would drag the
+   whole bar with the scroll. It stays in normal flow. */
+.wk-legacy .grid .rrow td,
+.wk-legacy .grid .rrow:hover td {
+  position: static;
+  width: auto;
+  box-shadow: none;
+}
+
+/* A scrollbar sized to be grabbed, not hunted for. */
+.wk-legacy .scx::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+.wk-legacy .scx::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+.wk-legacy .scx::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 100px;
+  border: 3px solid var(--surface-2);
+}
+.wk-legacy .scx::-webkit-scrollbar-thumb:hover {
+  background: var(--text3);
+}
+.wk-legacy .scx::-webkit-scrollbar-corner {
+  background: var(--surface-2);
+}
+
+/* ---- 4. La La Land lockup in the sidebar ----
+   The brand mark is brown, which sinks into the dark rail, so it is flattened
+   to the same cream the rest of the sidebar type uses. It sits under SHIFT at
+   caption scale: this is the SHIFT app, made for La La Land, not the other way
+   around. */
+.logo-lockup {
+  display: block;
+  height: 13px;
+  width: auto;
+  margin-top: 4px;
+  filter: brightness(0) invert(1);
+  opacity: 0.7;
+  transition: opacity var(--dur) var(--ease);
+}
+.logo:hover .logo-lockup {
+  opacity: 1;
+}
+
+/* ---- 5. cup places ---- */
+.lb-cup {
+  flex-shrink: 0;
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .wk-legacy .scx {
+    max-height: none;
+  }
+  .kd-panel,
+  .day-panel {
+    padding-right: 52px;
+  }
+}
+/* ============================================================
+   v7: dashboard
+
+   Append after the v6 block at the end of app/globals.css.
+   New classes are prefixed db- so nothing collides with the
+   legacy dash- rules, which the exception rows still use.
+   ============================================================ */
+
+/* ---- scope bar ---- */
+.db-scopes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+/* ---- hero rail ----
+   One number carries the screen: the blended SPLH for whatever scope is
+   selected. The attention count sits to its right as a button rather than a
+   headline, because a count is only useful if you can get to the list. */
+.db-rail {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-radius: var(--rx);
+  padding: 22px 24px;
+  margin-bottom: 14px;
+  background: linear-gradient(135deg, var(--ink) 0%, #1d2634 62%, #24314a 100%);
+  color: #fff;
+}
+.db-rail.clear {
+  background: linear-gradient(135deg, #0a3d28 0%, #0e5636 60%, #0b7a4c 100%);
+}
+.db-rail-main {
+  flex: 1;
+  min-width: 240px;
+}
+.db-rail-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  opacity: 0.62;
+}
+.db-rail-num {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+  flex-wrap: wrap;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  margin-top: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.db-rail-unit {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+.db-rail-sub {
+  font-size: 12.5px;
+  opacity: 0.82;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.db-rail-sub b {
+  font-variant-numeric: tabular-nums;
+}
+.db-rail-sub b.up {
+  color: #6ee7a8;
+}
+.db-rail-sub b.down {
+  color: #ff9a91;
+}
+
+.db-rail-cta {
+  flex-shrink: 0;
+  min-width: 176px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: var(--rl);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.db-rail-cta:hover {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+.db-rail-cta-num {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.db-rail-cta-lbl {
+  font-size: 11.5px;
+  opacity: 0.78;
+  margin-top: 5px;
+  line-height: 1.35;
+}
+.db-rail-cta-go {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin-top: 11px;
+}
+
+/* ---- tiles ----
+   Built on .mc so they sit on the same type scale as every other metric card
+   in the app, with a footer that names where the click lands. */
+.db-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.db-tile {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--line-2);
+  border-radius: var(--rl);
+  padding: 14px 16px 11px;
+  box-shadow: var(--sh-1);
+  cursor: pointer;
+  transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+.db-tile:hover {
+  box-shadow: var(--sh-2);
+  transform: translateY(-1px);
+}
+.db-tile.tone-pos {
+  border-top-color: var(--band-green);
+}
+.db-tile.tone-neg {
+  border-top-color: var(--band-red);
+}
+.db-tile.tone-warn {
+  border-top-color: var(--warn);
+}
+.db-tile-l {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
+}
+.db-tile-v {
+  font-size: 27px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.db-tile-u {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text3);
+  margin-left: 5px;
+  letter-spacing: 0;
+}
+.db-tile-s {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 6px;
+  line-height: 1.4;
+  min-height: 31px;
+}
+.db-tile-go {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text3);
+  transition: color var(--dur) var(--ease);
+}
+.db-tile:hover .db-tile-go {
+  color: var(--cobalt);
+}
+
+/* ---- two column body ---- */
+.db-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.db-cols > .tcard {
+  margin-top: 0;
+}
+.db-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 4px 2px;
+  transition: color var(--dur) var(--ease);
+}
+.db-link:hover {
+  color: var(--cobalt);
+}
+
+/* ---- podium, stacked instead of side by side ---- */
+.db-podium {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.db-podium .lb-pod {
+  padding: 11px 13px;
+  gap: 11px;
+}
+.db-podium .lb-pod-meta {
+  margin-bottom: 0;
+}
+
+/* ---- movers ----
+   A diverging bar around a centre line. The bar is half width on each side so
+   up and down read at the same scale without a chart library. */
+.db-movers {
+  padding: 6px 0;
+}
+.db-mover {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px 42px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur) var(--ease);
+}
+.db-mover:hover {
+  background: var(--surface-2);
+}
+.db-mover-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-mover-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 100px;
+  background: var(--surface-3);
+}
+.db-mover-track::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1.5px;
+  background: var(--line-2);
+}
+.db-mover-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 100px;
+  transform-origin: left center;
+  animation: grow 420ms var(--ease) both;
+}
+.db-mover-fill.up {
+  left: 50%;
+  background: var(--band-green);
+}
+.db-mover-fill.down {
+  right: 50%;
+  transform-origin: right center;
+  background: var(--band-red);
+}
+.db-mover-val {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.db-mover-val.up {
+  color: var(--band-green);
+}
+.db-mover-val.down {
+  color: var(--band-red);
+}
+
+/* ---- lists ---- */
+.db-list {
+  padding: 12px 14px;
+}
+.db-list .dash-row {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.dash-row.sev-critical .dash-row-label {
+  color: var(--band-red);
+}
+.dash-row.sev-data .dash-row-label {
+  color: var(--warn);
+}
+.dash-row.sev-warning .dash-row-label {
+  color: var(--text2);
+}
+.sev-chip-critical {
+  background: var(--neg-bg);
+  color: var(--neg);
+  border-color: var(--neg-line);
+}
+.sev-chip-data {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn-line);
+}
+.sev-chip-warning {
+  background: var(--surface-3);
+  color: var(--text2);
+  border-color: var(--line);
+}
+.db-more {
+  font-size: 11px;
+  color: var(--text3);
+  padding: 8px 4px 2px;
+}
+
+/* ---- review watchlist ---- */
+.db-watch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  margin-bottom: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.db-watch:hover {
+  transform: translateX(2px);
+  box-shadow: var(--sh-1);
+}
+.db-watch-main {
+  flex: 1;
+  min-width: 0;
+}
+.db-watch-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-watch-sub {
+  font-size: 10.5px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.db-watch-rating {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.db-watch-rating span {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text3);
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+  .db-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .db-rail {
+    padding: 17px 18px;
+    gap: 14px;
+  }
+  .db-rail-num {
+    font-size: 31px;
+  }
+  .db-rail-cta {
+    min-width: 0;
+    width: 100%;
+  }
+  .db-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .db-tile {
+    padding: 12px 13px 10px;
+  }
+  .db-tile-v {
+    font-size: 21px;
+  }
+  .db-tile-s {
+    min-height: 0;
+  }
+  .db-mover {
+    grid-template-columns: minmax(0, 1fr) 84px 38px;
+    gap: 9px;
+    padding: 8px 12px;
+  }
+  .db-scopes .lb-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+}
