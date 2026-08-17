@@ -151,8 +151,6 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
   const rated = rows.filter(
     (r) => r.reviews?.period?.rating != null && r.reviews.period.count >= MIN_REVIEWS_TO_RANK
   );
-  const unanswered = rated.reduce((a, r) => a + (r.reviews.period.unanswered || 0), 0);
-  const reviewTotal = rated.reduce((a, r) => a + r.reviews.period.count, 0);
   const watchlist = [...rated]
     .filter((r) => r.reviews.period.rating < 4.5)
     .sort((a, b) => a.reviews.period.rating - b.reviews.period.rating)
@@ -161,13 +159,20 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
   // ---- podium ----
   const { byScore } = scoreStores(rows, "period");
   const podium = byScore.slice(0, 3);
+  // Same scale logic as the Leaderboard goal bar, so 100% lines up in both
+  // places: the higher of 120 or the top performer's own efficiency, rounded
+  // up to a clean ten.
+  const podScale = podium.length
+    ? Math.max(120, Math.ceil(Math.max(...podium.map((s) => s.eff)) / 10) * 10)
+    : 120;
 
   // ---- movers ----
+  // Two short columns read faster than one list of diverging bars: a glance
+  // at "who's up" and "who's down" without decoding bar length against a
+  // shared axis.
   const movers = [...comps].sort((a, b) => b.delta - a.delta);
-  const up = movers.filter((t) => t.delta > 0).slice(0, 4);
-  const down = movers.filter((t) => t.delta < 0).slice(-4).reverse();
-  const shown = [...up, ...down];
-  const maxAbs = shown.length ? Math.max(...shown.map((t) => Math.abs(t.delta))) : 1;
+  const up = movers.filter((t) => t.delta > 0).slice(0, 5);
+  const down = movers.filter((t) => t.delta < 0).slice(-5).reverse();
 
   // ---- exceptions ----
   const exceptions = (data.exceptions || []).filter(inScope);
@@ -269,19 +274,6 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
           onClick={() => onNavigate("leaderboard")}
         />
         <Tile
-          label="Reviews with no reply"
-          value={unanswered}
-          unit={"/ " + reviewTotal}
-          note={
-            reviewTotal
-              ? `${Math.round((unanswered / reviewTotal) * 100)}% never got an answer`
-              : "Nothing to reply to yet"
-          }
-          tone={reviewTotal && unanswered / reviewTotal > 0.5 ? "neg" : null}
-          to="Leaderboard"
-          onClick={() => onNavigate("leaderboard")}
-        />
-        <Tile
           label="Hours logged, week to date"
           value={int(curH)}
           note={money(curS) + " in sales behind them"}
@@ -322,6 +314,13 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
                       {" · "}
                       {s.region}
                     </div>
+                    <div className="lb-goal">
+                      <div
+                        className={"lb-goal-fill " + (s.eff >= 100 ? "up" : "down")}
+                        style={{ width: Math.min(100, (s.eff / podScale) * 100) + "%" }}
+                      />
+                      <div className="lb-goal-mark" style={{ left: (100 / podScale) * 100 + "%" }} />
+                    </div>
                   </div>
                   <div className="lb-pod-pct neutral">{Math.round(s.score)}</div>
                 </button>
@@ -345,31 +344,50 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
             action="Store detail"
             onAction={() => onNavigate("storetrend")}
           />
-          {shown.length ? (
-            <div className="db-movers">
-              {shown.map((t) => {
-                const up = t.delta >= 0;
-                return (
-                  <button
-                    key={t.code}
-                    className="db-mover"
-                    onClick={() => onNavigate("storetrend")}
-                    title={`$${t.prior} to $${t.current} SPLH`}
-                  >
-                    <span className="db-mover-name">{t.name}</span>
-                    <span className="db-mover-track">
-                      <span
-                        className={"db-mover-fill " + (up ? "up" : "down")}
-                        style={{ width: (Math.abs(t.delta) / maxAbs) * 50 + "%" }}
-                      />
-                    </span>
-                    <span className={"db-mover-val " + (up ? "up" : "down")}>
-                      {up ? "+" : ""}
-                      {t.delta}
-                    </span>
-                  </button>
-                );
-              })}
+          {up.length || down.length ? (
+            <div className="db-movers-cols">
+              <div className="db-movers-col">
+                <div className="db-movers-col-head up">
+                  <Icon name="up" size={11} />
+                  Improving
+                </div>
+                {up.length ? (
+                  up.map((t) => (
+                    <button
+                      key={t.code}
+                      className="db-mover-row"
+                      onClick={() => onNavigate("storetrend")}
+                      title={`$${t.prior} to $${t.current} SPLH`}
+                    >
+                      <span className="db-mover-row-name">{t.name}</span>
+                      <span className="db-mover-pill up">+{t.delta}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="db-movers-empty">Nobody comparable moved up.</div>
+                )}
+              </div>
+              <div className="db-movers-col">
+                <div className="db-movers-col-head down">
+                  <Icon name="down" size={11} />
+                  Declining
+                </div>
+                {down.length ? (
+                  down.map((t) => (
+                    <button
+                      key={t.code}
+                      className="db-mover-row"
+                      onClick={() => onNavigate("storetrend")}
+                      title={`$${t.prior} to $${t.current} SPLH`}
+                    >
+                      <span className="db-mover-row-name">{t.name}</span>
+                      <span className="db-mover-pill down">{t.delta}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="db-movers-empty">Nobody comparable moved down.</div>
+                )}
+              </div>
             </div>
           ) : (
             <div className="empty" style={{ padding: 28 }}>
@@ -435,10 +453,7 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
                   >
                     <div className="db-watch-main">
                       <div className="db-watch-name">{s.name}</div>
-                      <div className="db-watch-sub">
-                        {rev.count} reviews
-                        {rev.unanswered > 0 && ` · ${rev.unanswered} with no reply`}
-                      </div>
+                      <div className="db-watch-sub">{rev.count} reviews in the window</div>
                     </div>
                     <div
                       className="db-watch-rating"

@@ -3691,3 +3691,271 @@ th.sorted .th-caret {
     scrollbar-width: none;
   }
 }
+/* ============================================================
+   v8: week view column proportions
+
+   Append after the v7 block. This block corrects v6: it gave all
+   19 columns the same 104px, so a column holding "96" was as wide
+   as one holding "$111,652", and it capped the scroll box height,
+   which cut the table with an inner scrollbar.
+
+   Both are undone here. Columns are now sized to the data they
+   carry, as a proportion of the card, so the table fills the width
+   exactly with no horizontal scroll and no dead space.
+   ============================================================ */
+
+/* No inner scroll box. The page is the only thing that scrolls. */
+.wk-legacy .scx {
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+
+/* The frozen header needed a scroll container to stick to. Without one it
+   would pin itself behind the topbar, so it goes back to normal flow. */
+.wk-legacy table.grid thead th {
+  position: static;
+  box-shadow: none;
+}
+
+/* width: 100% with table-layout: fixed makes the widths below behave as
+   ratios: the browser keeps their relative sizes and stretches them to fill
+   the card. min-width keeps the numbers from crushing on a narrow laptop,
+   where the table falls back to scrolling. */
+.wk-legacy table.grid {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1300px;
+}
+
+/* One pixel off each side of every cell, recovered across 19 columns. */
+.wk-legacy table.grid th,
+.wk-legacy table.grid td {
+  padding: 6px;
+  width: auto;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Long headers wrap onto a second line instead of forcing the whole column
+   wide. "WTD (OVER)/UNDER" was the worst offender. */
+.wk-legacy table.grid th {
+  white-space: normal;
+  line-height: 1.25;
+  vertical-align: bottom;
+}
+
+/* ---- column ratios ----
+   Grouped by what the column actually holds: a two or three digit count, a
+   dollar amount with a comma, or a short currency figure. */
+
+/* 1 location name */
+.wk-legacy table.grid th:nth-child(1),
+.wk-legacy table.grid td:nth-child(1) {
+  width: 184px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 2 hours · 4 target · 5 splh */
+.wk-legacy table.grid th:nth-child(2),
+.wk-legacy table.grid td:nth-child(2),
+.wk-legacy table.grid th:nth-child(4),
+.wk-legacy table.grid td:nth-child(4),
+.wk-legacy table.grid th:nth-child(5),
+.wk-legacy table.grid td:nth-child(5) {
+  width: 58px;
+}
+/* 3 sales */
+.wk-legacy table.grid th:nth-child(3),
+.wk-legacy table.grid td:nth-child(3) {
+  width: 78px;
+}
+/* 6 (over)/under */
+.wk-legacy table.grid th:nth-child(6),
+.wk-legacy table.grid td:nth-child(6) {
+  width: 74px;
+}
+/* 7 wtd hours · 9 wtd splh */
+.wk-legacy table.grid th:nth-child(7),
+.wk-legacy table.grid td:nth-child(7),
+.wk-legacy table.grid th:nth-child(9),
+.wk-legacy table.grid td:nth-child(9) {
+  width: 66px;
+}
+/* 8 wtd sales */
+.wk-legacy table.grid th:nth-child(8),
+.wk-legacy table.grid td:nth-child(8) {
+  width: 82px;
+}
+/* 10 wtd (over)/under */
+.wk-legacy table.grid th:nth-child(10),
+.wk-legacy table.grid td:nth-child(10) {
+  width: 78px;
+}
+/* 11 total training */
+.wk-legacy table.grid th:nth-child(11),
+.wk-legacy table.grid td:nth-child(11) {
+  width: 68px;
+}
+/* 12 trainee · 13 trainer */
+.wk-legacy table.grid th:nth-child(12),
+.wk-legacy table.grid td:nth-child(12),
+.wk-legacy table.grid th:nth-child(13),
+.wk-legacy table.grid td:nth-child(13) {
+  width: 58px;
+}
+/* 14 ptd hours */
+.wk-legacy table.grid th:nth-child(14),
+.wk-legacy table.grid td:nth-child(14) {
+  width: 66px;
+}
+/* 15 ptd sales */
+.wk-legacy table.grid th:nth-child(15),
+.wk-legacy table.grid td:nth-child(15) {
+  width: 82px;
+}
+/* 16 ptd splh */
+.wk-legacy table.grid th:nth-child(16),
+.wk-legacy table.grid td:nth-child(16) {
+  width: 62px;
+}
+/* 17 rating · 18 reviews · 19 bonus */
+.wk-legacy table.grid th:nth-child(17),
+.wk-legacy table.grid td:nth-child(17),
+.wk-legacy table.grid th:nth-child(18),
+.wk-legacy table.grid td:nth-child(18),
+.wk-legacy table.grid th:nth-child(19),
+.wk-legacy table.grid td:nth-child(19) {
+  width: 58px;
+}
+
+/* The region banner spans all 19, so no width rule may touch it. */
+.wk-legacy .grid .rrow td,
+.wk-legacy .grid .rrow:hover td {
+  width: auto !important;
+  position: static;
+  box-shadow: none;
+  overflow: visible;
+}
+
+/* ---- cup ----
+   No sleeve now, so the silhouette is taller than it is wide and needs to sit
+   centred on the podium row rather than float above it. */
+.lb-cup {
+  flex-shrink: 0;
+  display: block;
+  align-self: center;
+}
+/* ============================================================
+   v9: two column movers, podium goal bar
+
+   Append after v8. The movers block used to be one list of
+   diverging bars, which asked you to decode bar length against a
+   shared axis. Split into "improving" and "declining" columns it
+   answers the actual question at a glance: who is up, who is down.
+   ============================================================ */
+
+.db-movers-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+.db-movers-col {
+  padding: 12px 14px 14px;
+}
+.db-movers-col + .db-movers-col {
+  border-left: 1px solid var(--line);
+}
+.db-movers-col-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding-bottom: 9px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.db-movers-col-head.up {
+  color: var(--band-green);
+}
+.db-movers-col-head.down {
+  color: var(--band-red);
+}
+
+.db-mover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur) var(--ease);
+}
+.db-mover-row:hover {
+  background: var(--surface-2);
+}
+.db-mover-row-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The delta as a pill rather than a bar. With five rows per column the rank
+   order carries the magnitude, so the number only has to be readable. */
+.db-mover-pill {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 9px;
+  border-radius: 100px;
+  border: 1px solid transparent;
+}
+.db-mover-pill.up {
+  background: var(--band-green-soft);
+  color: var(--band-green);
+  border-color: var(--band-green);
+}
+.db-mover-pill.down {
+  background: var(--band-red-soft);
+  color: var(--band-red);
+  border-color: var(--band-red);
+}
+
+.db-movers-empty {
+  font-size: 11.5px;
+  color: var(--text3);
+  padding: 10px 6px;
+  line-height: 1.5;
+}
+
+/* ---- podium goal bar ----
+   The dashboard podium now carries the same target bar as the Leaderboard, so
+   a store's position against its own target reads the same in both places. */
+.db-podium .lb-pod-meta {
+  margin-bottom: 8px;
+}
+.db-podium .lb-goal {
+  height: 6px;
+}
+
+@media (max-width: 640px) {
+  .db-movers-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .db-movers-col + .db-movers-col {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}

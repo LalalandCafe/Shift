@@ -5,106 +5,111 @@ import { useId } from "react";
 /**
  * The La La Land cup, struck in three finishes, used where a medal used to be.
  *
- * First, second and third are the same silhouette with a different metal, so
- * the podium reads as one object at three levels rather than three unrelated
- * icons. The rank is engraved on the sleeve, which is where the wordmark sits
- * on the real cup, so the number carries the information instead of a badge
- * bolted on beside it.
+ * Traced from the brand line drawing: heart finial, domed lid with a rim, and a
+ * tapered body with no sleeve. First, second and third are the same silhouette
+ * in a different metal, so the podium reads as one object at three levels
+ * rather than three unrelated icons. The rank is engraved on the body.
  *
- * Gradient ids come from useId(), so the same place can be rendered more than
- * once on a page (podium and dashboard) without the fills colliding.
+ * Gradient ids come from useId(), so the same place can appear more than once
+ * on a page (podium and dashboard) without the fills colliding.
  */
 
 const FINISH = {
   gold: {
-    hi: "#fff4c9",
-    mid: "#e3bc4a",
+    hi: "#fff6d4",
+    mid: "#e2ba43",
     lo: "#9a6f0d",
-    rim: "#7d5804",
+    rim: "#7a5503",
     ink: "#6b4a03",
   },
   silver: {
     hi: "#ffffff",
-    mid: "#c6cdd4",
-    lo: "#808a94",
-    rim: "#69737d",
-    ink: "#59626b",
+    mid: "#c4cbd2",
+    lo: "#7d8791",
+    rim: "#66707a",
+    ink: "#576068",
   },
   bronze: {
-    hi: "#ffe3c6",
-    mid: "#cd8f56",
+    hi: "#ffe4c8",
+    mid: "#cb8d54",
     lo: "#8a5527",
-    rim: "#70441d",
-    ink: "#5f3a17",
+    rim: "#6d411b",
+    ink: "#5d3915",
   },
 };
 
-/** Lengthwise sheen: dark edge, light core, dark edge. Reads as metal. */
-function Sheen({ id, f, flip = false }) {
+/** Lengthwise sheen: dark edge, light core, dark edge. Reads as struck metal. */
+function Sheen({ id, f, shift = 38 }) {
   return (
     <linearGradient id={id} x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stopColor={f.lo} />
-      <stop offset="16%" stopColor={f.mid} />
-      <stop offset={flip ? "34%" : "38%"} stopColor={f.hi} />
-      <stop offset="58%" stopColor={f.mid} />
-      <stop offset="82%" stopColor={f.lo} />
+      <stop offset="15%" stopColor={f.mid} />
+      <stop offset={shift + "%"} stopColor={f.hi} />
+      <stop offset="60%" stopColor={f.mid} />
+      <stop offset="84%" stopColor={f.lo} />
       <stop offset="100%" stopColor={f.rim} />
     </linearGradient>
   );
 }
 
-export default function CupMedal({ place = "gold", rank, size = 46, className = "" }) {
+export default function CupMedal({ place = "gold", rank, size = 44, className = "" }) {
   const uid = useId().replace(/:/g, "");
   const f = FINISH[place] || FINISH.gold;
 
-  const body = `cup-${uid}-body`;
-  const sleeve = `cup-${uid}-sleeve`;
-  const lid = `cup-${uid}-lid`;
+  const body = `cup-${uid}-b`;
+  const lid = `cup-${uid}-l`;
 
   return (
     <svg
       className={"lb-cup " + place + (className ? " " + className : "")}
       width={size}
-      height={(size * 60) / 48}
-      viewBox="0 0 48 60"
+      height={(size * 82) / 66}
+      viewBox="0 0 66 82"
       aria-hidden="true"
       focusable="false"
     >
       <defs>
         <Sheen id={body} f={f} />
-        <Sheen id={sleeve} f={f} flip />
-        <Sheen id={lid} f={f} />
+        <Sheen id={lid} f={f} shift={34} />
       </defs>
 
-      {/* lid cap and the flange it sits on */}
-      <rect x="16" y="3" width="16" height="4.6" rx="2.2" fill={`url(#${lid})`} />
-      <rect x="11" y="6.8" width="26" height="6.4" rx="3.2" fill={`url(#${lid})`} />
+      <g stroke={f.rim} strokeWidth="1.1" strokeLinejoin="round">
+        {/* heart finial */}
+        <path
+          d="M33 13.4C29.1 9.9 26.6 8 26.6 5.8A2.7 2.7 0 0 1 33 4.7A2.7 2.7 0 0 1 39.4 5.8C39.4 8 36.9 9.9 33 13.4Z"
+          fill={`url(#${lid})`}
+        />
+        {/* stem between the heart and the lid */}
+        <rect x="29.4" y="12.2" width="7.2" height="5.4" rx="1.2" fill={`url(#${lid})`} />
 
-      {/* upper body, tapering in toward the sleeve */}
-      <path d="M13.2 13.2 H34.8 L33.9 19.4 H14.1 Z" fill={`url(#${body})`} />
+        {/* lid dome */}
+        <path
+          d="M15.4 17.4A2.2 2.2 0 0 1 17.6 15.6H48.4A2.2 2.2 0 0 1 50.6 17.4L52.2 22.2H13.8Z"
+          fill={`url(#${lid})`}
+        />
+        {/* lid rim, with the two side tabs from the drawing */}
+        <rect x="9.2" y="21.4" width="47.6" height="5.6" rx="2.6" fill={`url(#${lid})`} />
 
-      {/* lower body, tapering to the base */}
-      <path
-        d="M13.6 34 H34.4 L31.3 52.6 A3 3 0 0 1 28.3 55.2 H19.7 A3 3 0 0 1 16.7 52.6 Z"
-        fill={`url(#${body})`}
-      />
+        {/* body, tapering to a rounded base */}
+        <path
+          d="M12.8 27.4H53.2L47.4 68.4A6.4 6.4 0 0 1 41.1 73.8H24.9A6.4 6.4 0 0 1 18.6 68.4Z"
+          fill={`url(#${body})`}
+        />
+      </g>
 
-      {/* sleeve, the widest band and the one carrying the rank */}
-      <rect x="9.6" y="19" width="28.8" height="15.6" rx="3.4" fill={`url(#${sleeve})`} />
-
-      {/* specular highlight, one stripe only, left of centre */}
-      <rect x="15.2" y="20.6" width="3.4" height="12.4" rx="1.7" fill="#fff" opacity="0.34" />
-      <rect x="16.4" y="36.2" width="2.6" height="14" rx="1.3" fill="#fff" opacity="0.22" />
+      {/* one specular stripe, left of centre */}
+      <rect x="19.6" y="31" width="4" height="34" rx="2" fill="#fff" opacity="0.3" />
 
       {/* engraved rank */}
       <text
-        x="24"
-        y="27.4"
+        x="33"
+        y="48"
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize="12.5"
+        fontSize="21"
         fontWeight="800"
         fill={f.ink}
+        opacity="0.9"
         style={{ fontFamily: "var(--font)" }}
       >
         {rank}

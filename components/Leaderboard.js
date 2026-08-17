@@ -127,8 +127,6 @@ export default function Leaderboard({ report }) {
   const medRating = rated.length ? median(rated.map((s) => s.rev.rating)) : null;
   const earning = rated.filter((s) => s.rev.rating >= 4.5).length;
   const losing = rated.filter((s) => s.rev.rating < 4.0).length;
-  const totalReviews = rated.reduce((a, s) => a + s.rev.count, 0);
-  const unanswered = rated.reduce((a, s) => a + s.rev.unanswered, 0);
   const scale = Math.max(120, Math.ceil(Math.max(...rows.map((s) => s.eff)) / 10) * 10);
 
   const detail = pinned ? rows.find((s) => s.code === pinned) : null;
@@ -175,17 +173,6 @@ export default function Leaderboard({ report }) {
           </div>
           <div className="mc-s">
             {losing} below 4.0 and losing it entirely
-          </div>
-        </div>
-        <div className="mc">
-          <div className="mc-l">Reviews unanswered</div>
-          <div className="mc-v">
-            {unanswered} <span className="mc-u">/ {totalReviews}</span>
-          </div>
-          <div className="mc-s">
-            {totalReviews > 0
-              ? `${Math.round((unanswered / totalReviews) * 100)}% never got a reply`
-              : "No reviews in this window"}
           </div>
         </div>
       </div>
@@ -295,12 +282,6 @@ export default function Leaderboard({ report }) {
               <div className="kd-v">{detail.rev?.count ?? 0}</div>
             </div>
             <div>
-              <div className="kd-k">Answered</div>
-              <div className="kd-v">
-                {detail.rev?.responseRate != null ? `${detail.rev.responseRate}%` : "--"}
-              </div>
-            </div>
-            <div>
               <div className="kd-k">Bonus</div>
               <div className="kd-v" style={{ fontSize: 15 }}>
                 {detail.rev?.rating != null && detail.rev.count >= MIN_REVIEWS_TO_RANK
@@ -322,8 +303,6 @@ export default function Leaderboard({ report }) {
               : detail.rev.rating >= 4.0
               ? `Guests are rating ${detail.rev.rating.toFixed(2)}. Another ${(4.5 - detail.rev.rating).toFixed(2)} would reach the top bonus line.`
               : `Guests are rating ${detail.rev.rating.toFixed(2)}, below the 4.0 line, so no bonus at all.`}
-            {detail.rev?.unanswered > 0 &&
-              ` ${detail.rev.unanswered} of those reviews still have no reply.`}
           </div>
         </div>
       )}
