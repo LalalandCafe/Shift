@@ -3,21 +3,14 @@
 import { Fragment, useState } from "react";
 import Icon from "./Icon";
 import { sectionize, money, int, paren, clockTime } from "../lib/ui";
-import { bandForRating, bonusTierFor, BONUS_TIER_LABEL, styleOfBand } from "../lib/scale";
+import { bandForRating, styleOfBand } from "../lib/scale";
 
 /**
  * Reviews below this count are shown but greyed out. Two or three reviews say
- * more about who happened to post than about the store, and the bonus is not
+ * more about who happened to post than about the store, and rank is not
  * decided on that kind of sample.
  */
 const MIN_REVIEWS = 5;
-
-/** Short forms, because the table column is narrow. */
-const BONUS_SHORT = {
-  base_plus: "+$100",
-  base_only: "Base",
-  none: "None",
-};
 
 /**
  * Sortable columns. Region grouping is the default and is what the daily
@@ -49,10 +42,14 @@ const SORTS = {
  * here is scoped by .wk-legacy in globals.css, which cancels the new table
  * styling for this view only. Do not "clean it up".
  *
- * The three review columns at the end are the exception, and they are the
+ * The review columns at the end are the exception, and they are the
  * automated replacement for the Tattle Report spreadsheet that used to be
  * pivoted by hand each period. They use the period window, not the week,
- * because that is the window the bonus is paid on.
+ * because that is the window the bonus is paid on. The Bonus column itself
+ * has been removed from this table: which tier a rating earns is
+ * compensation information, not an operating metric, and it stays on the
+ * Leaderboard instead. Rating and review count remain, since those are what
+ * a store manager acts on day to day.
  */
 
 function Th({ label, sortKey, sort, onSort, className = "" }) {
@@ -294,7 +291,6 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                 <Th label="PTD SPLH" sortKey="ptdSplh" className="r" sort={sort} onSort={onSort} />
                 <Th label="Rating" sortKey="rating" className="r sep" sort={sort} onSort={onSort} />
                 <Th label="Reviews" sortKey="reviewCount" className="r" sort={sort} onSort={onSort} />
-                <th className="r">Bonus</th>
               </tr>
             </thead>
             <tbody>
@@ -302,7 +298,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                 <Fragment key={sec.label || "ranked"}>
                   {sec.label && (
                     <tr className="rrow">
-                      <td colSpan={19}>{sec.label}</td>
+                      <td colSpan={18}>{sec.label}</td>
                     </tr>
                   )}
                   {sec.stores.map((s) => {
@@ -353,7 +349,6 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                           <>
                             <td className="num sep cell-dim">-</td>
                             <td className="num cell-dim">-</td>
-                            <td className="num cell-dim">-</td>
                           </>
                         ) : (
                           <>
@@ -377,9 +372,6 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                               }
                             >
                               {rev.count}
-                            </td>
-                            <td className={"num" + (thin ? " cell-dim" : "")}>
-                              {thin ? "-" : BONUS_SHORT[bonusTierFor(rev.rating)]}
                             </td>
                           </>
                         )}
@@ -499,7 +491,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                         No Google or Yelp reviews this period
                       </div>
                     ) : (
-                      <div className="scard-row">
+                      <div className="scard-row" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
                         <div
                           className="scard-cell"
                           style={ratingCellStyle(rev)}
@@ -511,12 +503,6 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                         <div className="scard-cell">
                           <div className="scard-cell-lbl">Reviews</div>
                           <div className="scard-cell-val">{rev.count}</div>
-                        </div>
-                        <div className="scard-cell">
-                          <div className="scard-cell-lbl">Bonus</div>
-                          <div className="scard-cell-val" style={{ fontSize: 11.5 }}>
-                            {thin ? "-" : BONUS_TIER_LABEL[bonusTierFor(rev.rating)]}
-                          </div>
                         </div>
                       </div>
                     )}

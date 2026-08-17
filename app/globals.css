@@ -3819,15 +3819,16 @@ th.sorted .th-caret {
 .wk-legacy table.grid td:nth-child(16) {
   width: 62px;
 }
-/* 17 rating · 18 reviews · 19 bonus */
+/* 17 rating · 18 reviews.
+   Was 17/18/19 with a Bonus column at 19; that column is gone, so the
+   table is 18 columns now. */
 .wk-legacy table.grid th:nth-child(17),
 .wk-legacy table.grid td:nth-child(17),
 .wk-legacy table.grid th:nth-child(18),
-.wk-legacy table.grid td:nth-child(18),
-.wk-legacy table.grid th:nth-child(19),
-.wk-legacy table.grid td:nth-child(19) {
+.wk-legacy table.grid td:nth-child(18) {
   width: 58px;
 }
+
 
 /* The region banner spans all 19, so no width rule may touch it. */
 .wk-legacy .grid .rrow td,
