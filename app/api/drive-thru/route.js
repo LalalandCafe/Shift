@@ -22,9 +22,14 @@ function daysAgoISO(n) {
 }
 
 async function loadTarget() {
+  // green_value is optional on this table: it lets a metric name its own
+  // green line instead of accepting target * 0.85. Drive-thru window time
+  // sets it (2:00 while the target is 2:30), so it must be selected here or
+  // the client silently falls back to the 85% default and every color on
+  // this tab drifts from what operations actually configured.
   const { data, error } = await supabaseAdmin
     .from("metric_targets")
-    .select("metric, label, target_value, red_value, unit, lower_is_better")
+    .select("metric, label, target_value, red_value, green_value, unit, lower_is_better")
     .eq("metric", DT_METRIC)
     .single();
   if (error) throw new Error(`metric_targets: ${error.message}`);
