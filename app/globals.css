@@ -3770,11 +3770,6 @@ th.sorted .th-caret {
 .wk-legacy table.grid td:nth-child(3) {
   width: 78px;
 }
-/* 6 (over)/under */
-.wk-legacy table.grid th:nth-child(6),
-.wk-legacy table.grid td:nth-child(6) {
-  width: 74px;
-}
 /* 7 wtd hours · 9 wtd splh */
 .wk-legacy table.grid th:nth-child(7),
 .wk-legacy table.grid td:nth-child(7),
