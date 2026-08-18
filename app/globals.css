@@ -4055,3 +4055,16 @@ th.sorted .th-caret {
 .wk-legacy table.grid td:nth-child(15) {
   width: 73px;
 }
+/* Los headers largos ((Over)/Under) se cortaban porque el estilo base
+   fuerza nowrap. En esta vista se permite el salto de linea: la tabla
+   ya es ancha y no cabe una columna mas sin sacrificar otra. */
+.wk-legacy table.grid th {
+  white-space: normal;
+  vertical-align: bottom;
+  line-height: 1.25;
+}
+.wk-legacy table.grid th .th-in {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+}
