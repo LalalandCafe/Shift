@@ -3,7 +3,9 @@
 import { useState, useEffect } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from "recharts";
 import Forecast from "./Forecast";
-import KitchenTrend from "./KitchenTrend";
+// TICKET TIMES DISABLED: Toast Expo data is not reliable yet. Restore this import
+// along with the three blocks marked TICKET TIMES DISABLED below.
+// import KitchenTrend from "./KitchenTrend";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -135,7 +137,8 @@ export default function StoreTrend({ isoDate }) {
             ))}
           </select>
         </div>
-        {(tab === "history" || tab === "kitchen") && (
+        {/* TICKET TIMES DISABLED: was (tab === "history" || tab === "kitchen") */}
+        {tab === "history" && (
           <div>
             <label style={{ fontSize: 10, fontWeight: 700, color: "var(--text3)", textTransform: "uppercase", letterSpacing: ".07em", display: "block", marginBottom: 5 }}>
               Weeks
@@ -166,6 +169,7 @@ export default function StoreTrend({ isoDate }) {
         >
           What happened
         </button>
+        {/* TICKET TIMES DISABLED: restore this button to bring the sub tab back.
         <button
           onClick={() => setTab("kitchen")}
           style={{
@@ -177,6 +181,7 @@ export default function StoreTrend({ isoDate }) {
         >
           Ticket times
         </button>
+        */}
         <button
           onClick={() => setTab("plan")}
           style={{
@@ -205,6 +210,7 @@ export default function StoreTrend({ isoDate }) {
     );
   }
 
+  {/* TICKET TIMES DISABLED: restore this block along with the button above.
   if (tab === "kitchen") {
     return (
       <>
@@ -213,6 +219,7 @@ export default function StoreTrend({ isoDate }) {
       </>
     );
   }
+  */}
 
   if (loading && !data) return <>{controls}<div className="empty">Loading trend...</div></>;
   if (err) return <>{controls}<div className="empty">Error: {err}</div></>;
@@ -227,6 +234,11 @@ export default function StoreTrend({ isoDate }) {
     .filter((d) => d.hasData && d.best)
     .sort((a, b) => b.best.splh - a.best.splh)[0];
 
+  // Most recent week on top, oldest at the bottom. The API returns oldest first,
+  // so this is a display-only reversal. slice() keeps the source array untouched.
+  const weeksNewestFirst = data.weekList.slice().reverse();
+
+  // The line chart stays oldest to newest so time still reads left to right.
   const chartData = data.weekList.filter((w) => w.daysWithData >= 4).map((w) => ({
     weekNum: w.weekNum,
     label: "W" + w.weekNum,
@@ -295,7 +307,7 @@ export default function StoreTrend({ isoDate }) {
               </div>
             ))}
 
-            {data.weekList.map((w) => (
+            {weeksNewestFirst.map((w) => (
               <div key={w.weekStart} style={{ display: "contents" }}>
                 <div className="st-rowhead">
                   W{w.weekNum}
@@ -398,7 +410,7 @@ export default function StoreTrend({ isoDate }) {
       <div className="tcard">
         <div className="thead"><span className="ttl">Week totals</span></div>
         <div>
-          {data.weekList.map((w) => (
+          {weeksNewestFirst.map((w) => (
             <div className="st-wk" key={w.weekStart}>
               <span className="st-wk-num">Week {w.weekNum}</span>
               <span
