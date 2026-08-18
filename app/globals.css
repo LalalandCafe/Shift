@@ -4063,3 +4063,12 @@ th.sorted .th-caret {
 .wk-legacy table.grid td:nth-child(6) {
   width: 82px;
 }
+/* El header "(Over)/Under" no tiene espacios, asi que el navegador
+   no tenia donde partirlo. Un flex item nunca encoge bajo su
+   contenido minimo sin min-width:0, sin importar el width del th
+   padre, por eso los intentos anteriores con solo width no servian. */
+.wk-legacy table.grid th .th-in {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
