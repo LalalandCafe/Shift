@@ -50,6 +50,12 @@ const SORTS = {
  * all. The Bonus column itself has been removed from this table: which tier
  * a rating earns is compensation information, not an operating metric, and it
  * stays on the Leaderboard instead.
+ *
+ * The (Over)/Under headers use an explicit <br /> instead of relying on the
+ * browser to find a break point. Neither header has a space before the
+ * slash, so word-wrap CSS either left it uncut (overflowing the column) or
+ * broke it mid-word ("UN-DER"). A hard break after the slash is the one
+ * approach that is never ambiguous.
  */
 
 function Th({ label, sortKey, sort, onSort, className = "" }) {
@@ -59,7 +65,7 @@ function Th({ label, sortKey, sort, onSort, className = "" }) {
     <th
       className={className + " sortable" + (on ? " sorted" : "")}
       onClick={() => onSort(sortKey)}
-      title={"Sort by " + label}
+      title={"Sort by " + (typeof label === "string" ? label : "column")}
     >
       <span className="th-in">
         {label}
@@ -278,11 +284,23 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                 <Th label="Sales" sortKey="sales" className="r" sort={sort} onSort={onSort} />
                 <Th label="Target" sortKey="target" className="r" sort={sort} onSort={onSort} />
                 <Th label="SPLH" sortKey="splh" className="r" sort={sort} onSort={onSort} />
-                <Th label="(Over)/Under" sortKey="over" className="r" sort={sort} onSort={onSort} />
+                <Th
+                  label={<>(Over)/<br />Under</>}
+                  sortKey="over"
+                  className="r"
+                  sort={sort}
+                  onSort={onSort}
+                />
                 <Th label="WTD Hours" sortKey="wtdHours" className="r sep" sort={sort} onSort={onSort} />
                 <Th label="WTD Sales" sortKey="wtdSales" className="r" sort={sort} onSort={onSort} />
                 <Th label="WTD SPLH" sortKey="wtdSplh" className="r" sort={sort} onSort={onSort} />
-                <Th label="WTD (Over)/Under" sortKey="wtdOver" className="r" sort={sort} onSort={onSort} />
+                <Th
+                  label={<>WTD (Over)/<br />Under</>}
+                  sortKey="wtdOver"
+                  className="r"
+                  sort={sort}
+                  onSort={onSort}
+                />
                 <th className="r sep">Total Training</th>
                 <th className="r">Trainee</th>
                 <th className="r">Trainer</th>

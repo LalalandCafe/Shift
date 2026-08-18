@@ -4064,16 +4064,4 @@ th.sorted .th-caret {
   width: 82px;
 }
 
-/* ============================================================
-   Fix final: (Over)/Under y WTD (Over)/Under sin espacio real
-   para partirse. overflow-wrap: normal (de v11) es correcto para
-   el resto de la tabla (evita "HOUR/S", "TARGE/T", etc), pero
-   esas dos columnas necesitan su propia excepcion porque el
-   texto es una sola cadena sin espacio antes del parentesis.
-   ============================================================ */
-.wk-legacy table.grid th:nth-child(6) .th-in,
-.wk-legacy table.grid th:nth-child(10) .th-in {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
+
