@@ -45,11 +45,11 @@ const SORTS = {
  * The review columns at the end are the exception, and they are the
  * automated replacement for the Tattle Report spreadsheet that used to be
  * pivoted by hand each period. They use the period window, not the week,
- * because that is the window the bonus is paid on. The Bonus column itself
- * has been removed from this table: which tier a rating earns is
- * compensation information, not an operating metric, and it stays on the
- * Leaderboard instead. Rating and review count remain, since those are what
- * a store manager acts on day to day.
+ * because that is the window the bonus is paid on. Review count comes first
+ * because the count is what tells you whether the rating is worth reading at
+ * all. The Bonus column itself has been removed from this table: which tier
+ * a rating earns is compensation information, not an operating metric, and it
+ * stays on the Leaderboard instead.
  */
 
 function Th({ label, sortKey, sort, onSort, className = "" }) {
@@ -214,7 +214,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
           <div className="mc-l">Blended SPLH</div>
           <div className="mc-v">${totalSplh}</div>
           <div className="mc-s">
-            {groupFilter === "All" ? "34 stores" : groupFilter}
+            {groupFilter === "All" ? rows.length + " stores" : groupFilter}
             {" \u00b7 "}
             {report.dayName}, {report.date}
           </div>
@@ -289,8 +289,8 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                 <Th label="PTD Hours" sortKey="ptdHours" className="r sep" sort={sort} onSort={onSort} />
                 <Th label="PTD Sales" sortKey="ptdSales" className="r" sort={sort} onSort={onSort} />
                 <Th label="PTD SPLH" sortKey="ptdSplh" className="r" sort={sort} onSort={onSort} />
-                <Th label="Rating" sortKey="rating" className="r sep" sort={sort} onSort={onSort} />
-                <Th label="Reviews" sortKey="reviewCount" className="r" sort={sort} onSort={onSort} />
+                <Th label="Reviews Count" sortKey="reviewCount" className="r sep" sort={sort} onSort={onSort} />
+                <Th label="PTD Rating" sortKey="rating" className="r" sort={sort} onSort={onSort} />
               </tr>
             </thead>
             <tbody>
@@ -353,7 +353,17 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                         ) : (
                           <>
                             <td
-                              className={"num sep" + (thin ? " cell-dim" : "")}
+                              className="num sep"
+                              title={
+                                rev.unanswered
+                                  ? `${rev.unanswered} with no reply`
+                                  : "All replied to"
+                              }
+                            >
+                              {rev.count}
+                            </td>
+                            <td
+                              className={"num" + (thin ? " cell-dim" : "")}
                               style={ratingCellStyle(rev)}
                               title={
                                 thin
@@ -362,16 +372,6 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                               }
                             >
                               {rev.rating.toFixed(2)}
-                            </td>
-                            <td
-                              className="num"
-                              title={
-                                rev.unanswered
-                                  ? `${rev.unanswered} with no reply`
-                                  : "All replied to"
-                              }
-                            >
-                              {rev.count}
                             </td>
                           </>
                         )}
@@ -492,17 +492,17 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                       </div>
                     ) : (
                       <div className="scard-row" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+                        <div className="scard-cell">
+                          <div className="scard-cell-lbl">Reviews Count</div>
+                          <div className="scard-cell-val">{rev.count}</div>
+                        </div>
                         <div
                           className="scard-cell"
                           style={ratingCellStyle(rev)}
                           title={thin ? `Only ${rev.count} reviews` : undefined}
                         >
-                          <div className="scard-cell-lbl">Rating</div>
+                          <div className="scard-cell-lbl">PTD Rating</div>
                           <div className="scard-cell-val">{rev.rating.toFixed(2)}</div>
-                        </div>
-                        <div className="scard-cell">
-                          <div className="scard-cell-lbl">Reviews</div>
-                          <div className="scard-cell-val">{rev.count}</div>
                         </div>
                       </div>
                     )}
