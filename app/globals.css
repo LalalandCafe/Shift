@@ -4068,3 +4068,10 @@ th.sorted .th-caret {
   align-items: flex-end;
   gap: 3px;
 }
+/* La columna del dia es mas angosta que la de WTD, asi que "(Over)/Under"
+   se cortaba ahi aunque en WTD si envolviera. Este ancho minimo le da
+   espacio para partirse en dos lineas igual que las demas. */
+.wk-legacy table.grid th:nth-child(6),
+.wk-legacy table.grid th:nth-child(10) {
+  min-width: 82px;
+}
