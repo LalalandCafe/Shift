@@ -4055,23 +4055,16 @@ th.sorted .th-caret {
 .wk-legacy table.grid td:nth-child(15) {
   width: 73px;
 }
-/* Los headers largos ((Over)/Under) se cortaban porque el estilo base
-   fuerza nowrap. En esta vista se permite el salto de linea: la tabla
-   ya es ancha y no cabe una columna mas sin sacrificar otra. */
-.wk-legacy table.grid th {
-  white-space: normal;
-  vertical-align: bottom;
-  line-height: 1.25;
-}
-.wk-legacy table.grid th .th-in {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 3px;
-}
-/* La columna del dia es mas angosta que la de WTD, asi que "(Over)/Under"
-   se cortaba ahi aunque en WTD si envolviera. Este ancho minimo le da
-   espacio para partirse en dos lineas igual que las demas. */
+/* ============================================================
+   Day (Over)/Under header, same two-line wrap as WTD
+   Column 10 got 96px in v12 so "WTD (OVER)/" fits on line one.
+   Column 6 holds the shorter "(OVER)/UNDER" but was left at the
+   default ratio, so it broke mid-word. 82px is enough for
+   "(OVER)/" on line one and "UNDER" on line two. With
+   table-layout: fixed the widths are ratios, so this pulls a few
+   pixels from the flexible columns rather than widening the table.
+   ============================================================ */
 .wk-legacy table.grid th:nth-child(6),
-.wk-legacy table.grid th:nth-child(10) {
-  min-width: 82px;
+.wk-legacy table.grid td:nth-child(6) {
+  width: 82px;
 }
