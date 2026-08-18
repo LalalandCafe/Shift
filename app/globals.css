@@ -4030,3 +4030,28 @@ th.sorted .th-caret {
 .wk-legacy table.grid td:nth-child(15) {
   width: 76px;
 }
+/* ============================================================
+   v12: WTD (Over)/Under header, clean two-line wrap
+
+   This is the longest header in the table. At 78px it sat right at
+   the edge where "WTD (OVER)/" no longer fits on one line, so the
+   browser broke it in an ugly spot. 96px is enough for "WTD
+   (OVER)/" on line one and "UNDER" on line two, which is the same
+   two-line shape every other multi-word header already has.
+
+   Two columns that had a little slack give up a few pixels each
+   so the table keeps proportions sane; with table-layout: fixed and
+   width: 100%, every declared width is a ratio, not an absolute
+   size, so this is a rebalance, not a widening of the whole table.
+   ============================================================ */
+
+.wk-legacy table.grid th:nth-child(10), /* WTD (Over)/Under */
+.wk-legacy table.grid td:nth-child(10) {
+  width: 96px;
+}
+.wk-legacy table.grid th:nth-child(8),  /* WTD Sales */
+.wk-legacy table.grid td:nth-child(8),
+.wk-legacy table.grid th:nth-child(15), /* PTD Sales */
+.wk-legacy table.grid td:nth-child(15) {
+  width: 73px;
+}
