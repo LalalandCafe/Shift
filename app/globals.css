@@ -3988,3 +3988,45 @@ th.sorted .th-caret {
   font-size: 9.5px;
   padding: 8px 6px 6px;
 }
+/* ============================================================
+   v11: week view header text breaking mid-word
+
+   v10 added overflow-wrap: anywhere so long headers like
+   "(OVER)/UNDER" would not spill over their neighbour. But for a
+   single word with no natural break point (TARGET, RATING,
+   REVIEWS), "anywhere" means the browser slices the word itself:
+   "TARGE-T", "RATIN-G". That is worse than the overflow it fixed.
+
+   The correct rule is normal wrapping, which only breaks at a
+   space or a slash, both of which the two-word headers already
+   have. Single-word headers get a little more room instead, so
+   they fit on one line without needing to break at all.
+   ============================================================ */
+
+.wk-legacy table.grid th {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* Single-word headers that were breaking mid-word. A few extra
+   pixels each, taken evenly so the table still fits its card. */
+.wk-legacy table.grid th:nth-child(4),  /* Target */
+.wk-legacy table.grid td:nth-child(4) {
+  width: 66px;
+}
+.wk-legacy table.grid th:nth-child(17), /* Rating */
+.wk-legacy table.grid td:nth-child(17) {
+  width: 66px;
+}
+.wk-legacy table.grid th:nth-child(18), /* Reviews */
+.wk-legacy table.grid td:nth-child(18) {
+  width: 70px;
+}
+
+/* Recovered by trimming columns that had headroom to spare. */
+.wk-legacy table.grid th:nth-child(8),  /* WTD Sales */
+.wk-legacy table.grid td:nth-child(8),
+.wk-legacy table.grid th:nth-child(15), /* PTD Sales */
+.wk-legacy table.grid td:nth-child(15) {
+  width: 76px;
+}
