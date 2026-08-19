@@ -3,15 +3,13 @@
 import { useState } from "react";
 import Icon from "./Icon";
 import CupMedal from "./CupMedal";
-import { GROUPS, money, int, median } from "../lib/ui";
+import { GROUPS, median } from "../lib/ui";
+import { bandForRating, inkOfBand, reviewLegend, RATING_TARGET } from "../lib/scale";
 import {
-  bandForRating,
-  bonusTierFor,
-  BONUS_TIER_LABEL,
-  inkOfBand,
-  reviewLegend,
-} from "../lib/scale";
-import { scoreStores, efficiencyOf, MIN_REVIEWS_TO_RANK } from "../lib/leaderboard";
+  scoreStores,
+  rankableRating,
+  MIN_REVIEWS_TO_RANK,
+} from "../lib/leaderboard";
 
 /**
  * The ranking math lives in lib/leaderboard.js because the Dashboard shows the
@@ -31,13 +29,47 @@ const SCOPES = [
     })),
 ];
 
-const SORTS = [
-  { key: "score", label: "Score" },
-  { key: "rating", label: "Reviews" },
-];
+/**
+ * The three boards.
+ *
+ * Each one ranks on exactly the number it is named after, and the number it
+ * ranks on is the number printed on the right of every row. The old screen
+ * ranked on score no matter which tab was open, so switching to Reviews
+ * reordered the rows but left the score ranks printed beside them, and the
+ * list read as though the numbering were random. It was not: it was answering
+ * a question nobody had asked.
+ *
+ * bar is what the progress track shows, always the ranked metric against the
+ * store's own line, so the track means the same thing on all three boards.
+ */
+const BOARDS = {
+  score: {
+    key: "score",
+    label: "Score",
+    blurb: "Half labor efficiency, half guest reviews",
+    rankBy: (s) => s.score,
+    bar: (s) => ({ value: s.eff, target: 100 }),
+  },
+  rating: {
+    key: "rating",
+    label: "Reviews",
+    blurb: `Google and Yelp average, ${RATING_TARGET.toFixed(2)} is the line`,
+    rankBy: (s) => rankableRating(s),
+    bar: (s) => ({ value: rankableRating(s), target: RATING_TARGET }),
+  },
+  splh: {
+    key: "splh",
+    label: "SPLH",
+    blurb: "Sales per labor hour, nothing else",
+    rankBy: (s) => s.splh,
+    bar: (s) => ({ value: s.splh, target: s.target }),
+  },
+};
 
-// Period first. It is the window the bonus is paid on and the only one with
-// enough reviews per store to be stable.
+const BOARD_ORDER = ["score", "rating", "splh"];
+
+// Period first. It is the wider window and the only one with enough reviews
+// per store to be stable.
 const WINDOWS = [
   { key: "period", label: "Period" },
   { key: "week", label: "This week" },
@@ -45,14 +77,15 @@ const WINDOWS = [
 
 const PLACES = ["gold", "silver", "bronze"];
 
-/** Progress toward the store's own target, with the target marked on the track. */
-function GoalBar({ eff, scale }) {
-  const fill = Math.min(100, (eff / scale) * 100);
-  const mark = (100 / scale) * 100;
+/** Progress toward the store's own line, with that line marked on the track. */
+function GoalBar({ value, target, scale }) {
+  if (value == null || !target || !scale) return <div className="lb-goal" />;
+  const fill = Math.min(100, (value / scale) * 100);
+  const mark = Math.min(100, (target / scale) * 100);
   return (
     <div className="lb-goal">
       <div
-        className={"lb-goal-fill " + (eff >= 100 ? "up" : "down")}
+        className={"lb-goal-fill " + (value >= target ? "up" : "down")}
         style={{ width: fill + "%" }}
       />
       <div className="lb-goal-mark" style={{ left: mark + "%" }} />
@@ -61,8 +94,8 @@ function GoalBar({ eff, scale }) {
 }
 
 /**
- * Star average colored by the Operating Partner Program cutoffs. The
- * thresholds live in lib/scale.js, never here.
+ * Star average colored by the review cutoffs. The thresholds live in
+ * lib/scale.js, never here.
  */
 function Rating({ rev, showCount = true }) {
   if (!rev || rev.rating === null || rev.rating === undefined) {
@@ -83,7 +116,7 @@ function Rating({ rev, showCount = true }) {
 
 export default function Leaderboard({ report }) {
   const [scope, setScope] = useState("All");
-  const [sort, setSort] = useState("score");
+  const [boardKey, setBoardKey] = useState("score");
   const [windowKey, setWindowKey] = useState("period");
   const [pinned, setPinned] = useState(null);
   const [showAll, setShowAll] = useState(false);
@@ -91,13 +124,14 @@ export default function Leaderboard({ report }) {
   if (!report) return <div className="empty">Pick a date to build the leaderboard.</div>;
 
   const scopeDef = SCOPES.find((s) => s.key === scope) || SCOPES[0];
-
-  const all = (report.rows || [])
-    .map((s) => ({ ...s, eff: efficiencyOf(s) }))
-    .filter((s) => s.eff !== null);
+  const board = BOARDS[boardKey];
 
   const base = (report.rows || []).filter(scopeDef.match);
-  const { rows, byScore, rank } = scoreStores(base, windowKey);
+  const { rows } = scoreStores(base, windowKey);
+
+  // Chip counts are the whole chain, not the current scope, so the numbers on
+  // the chips do not move when you click one of them.
+  const chipRows = scoreStores(report.rows || [], windowKey).rows;
 
   if (!rows.length) {
     return (
@@ -108,51 +142,108 @@ export default function Leaderboard({ report }) {
     );
   }
 
-  const podium = byScore.slice(0, 3);
+  /**
+   * One ordering, used for both the podium and the list, and the ranks are
+   * read off that same ordering. Rank 1 is always the top of the podium and
+   * the list picks up at 4 with no gap, on every board.
+   *
+   * Name is the tie break so two stores on the same number do not swap places
+   * between renders.
+   */
   const ordered = [...rows].sort((a, b) => {
-    if (sort === "name") return a.name.localeCompare(b.name);
-    if (sort === "eff") return b.eff - a.eff;
-    if (sort === "rating") return (b.rev?.rating ?? -1) - (a.rev?.rating ?? -1);
-    return (b.score ?? -1) - (a.score ?? -1);
+    const d = (board.rankBy(b) ?? -Infinity) - (board.rankBy(a) ?? -Infinity);
+    if (d) return d;
+    return a.name.localeCompare(b.name);
   });
 
-  // On the default sort the podium already covers the top three.
-  const listSource = sort === "score" ? ordered.slice(3) : ordered;
+  const rank = {};
+  ordered.forEach((s, i) => (rank[s.code] = i + 1));
+
+  const podium = ordered.slice(0, 3);
+  const listSource = ordered.slice(3);
   const list = showAll ? listSource : listSource.slice(0, 10);
 
-  const atTarget = rows.filter((s) => s.eff >= 100).length;
-  const rated = rows.filter(
-    (s) => s.rev && s.rev.rating !== null && s.rev.count >= MIN_REVIEWS_TO_RANK
-  );
+  // Header numbers. Both are counts of stores clearing their own line, which
+  // is what a GM is graded on. They are deliberately not blended.
+  const atSplh = rows.filter((s) => s.eff >= 100).length;
+  const rated = rows.filter((s) => rankableRating(s) !== null);
+  const atRating = rated.filter((s) => s.rev.rating >= RATING_TARGET).length;
   const medRating = rated.length ? median(rated.map((s) => s.rev.rating)) : null;
-  const earning = rated.filter((s) => s.rev.rating >= 4.5).length;
-  const losing = rated.filter((s) => s.rev.rating < 4.0).length;
-  const scale = Math.max(120, Math.ceil(Math.max(...rows.map((s) => s.eff)) / 10) * 10);
+
+  const effScale = Math.max(120, Math.ceil(Math.max(...rows.map((s) => s.eff)) / 10) * 10);
+  const splhScale = Math.ceil(Math.max(...rows.map((s) => s.splh || 0)) / 10) * 10 || 100;
+  const scaleFor = boardKey === "splh" ? splhScale : boardKey === "rating" ? 5 : effScale;
 
   const detail = pinned ? rows.find((s) => s.code === pinned) : null;
   const windowLabel = windowKey === "period" ? `period ${report.period}` : "this week";
+
+  /**
+   * The number this board ranks on, printed large on the right of each row.
+   * Returns text and color rather than an element, because the podium and the
+   * list wrap it in different classes and a nested span would inherit both.
+   */
+  function boardValue(store) {
+    if (boardKey === "splh") return { text: "$" + store.splh, color: undefined };
+    if (boardKey === "rating") {
+      const r = rankableRating(store);
+      return {
+        text: r === null ? "--" : r.toFixed(2),
+        color: r === null ? "var(--text3)" : inkOfBand(bandForRating(r)),
+      };
+    }
+    return { text: String(Math.round(store.score)), color: undefined };
+  }
+
+  /**
+   * The slot to the left of the big number. Held open on every board even when
+   * it is empty, so the row grid does not reflow when you switch tabs.
+   */
+  function BoardAside({ store }) {
+    if (boardKey === "score") return <Rating rev={store.rev} />;
+    if (boardKey === "rating") {
+      return (
+        <span className="lb-rating none">
+          <span className="lb-rating-n">{store.rev?.count ?? 0}</span>
+        </span>
+      );
+    }
+    return <span className="lb-rating none" aria-hidden="true" />;
+  }
+
+  function metaOf(store) {
+    if (boardKey === "splh") return `target $${store.target} · ${store.region}`;
+    if (boardKey === "rating") return `${store.rev?.count ?? 0} reviews · ${store.region}`;
+    return `${Math.round(store.eff)}% eff · $${store.splh} SPLH`;
+  }
 
   return (
     <div className="view">
       <div className="ctx">
         <div className="ctx-block">
           <div>
-            <b>Week {report.weekNum} leaderboard</b>
+            <b>Week {report.weekNum} {board.label.toLowerCase()} leaderboard</b>
             <span> · through {report.dayName}, {report.date}</span>
-            <div style={{ fontSize: 10.5, color: "var(--ink-text2)" }}>
-              Half labor efficiency, half guest reviews
-            </div>
+            <div style={{ fontSize: 10.5, color: "var(--ink-text2)" }}>{board.blurb}</div>
           </div>
         </div>
       </div>
 
       <div className="mc-grid">
         <div className="mc">
-          <div className="mc-l">At or above target</div>
+          <div className="mc-l">At or above SPLH</div>
           <div className="mc-v">
-            {atTarget} <span className="mc-u">/ {rows.length}</span>
+            {atSplh} <span className="mc-u">/ {rows.length}</span>
           </div>
-          <div className="mc-s">Labor efficiency, week to date</div>
+          <div className="mc-s">Hitting their own SPLH target, week to date</div>
+        </div>
+        <div className="mc">
+          <div className="mc-l">At or above ratings</div>
+          <div className="mc-v">
+            {atRating} <span className="mc-u">/ {rated.length}</span>
+          </div>
+          <div className="mc-s">
+            {RATING_TARGET.toFixed(2)} or better, {windowLabel}
+          </div>
         </div>
         <div className="mc">
           <div className="mc-l">Typical rating</div>
@@ -166,21 +257,12 @@ export default function Leaderboard({ report }) {
             Median of {rated.length} stores, {windowLabel}
           </div>
         </div>
-        <div className="mc">
-          <div className="mc-l">Earning the bonus</div>
-          <div className="mc-v">
-            {earning} <span className="mc-u">/ {rated.length}</span>
-          </div>
-          <div className="mc-s">
-            {losing} below 4.0 and losing it entirely
-          </div>
-        </div>
       </div>
 
       <div className="lb-controls">
         <div className="lb-chips">
           {SCOPES.map((sc) => {
-            const n = all.filter(sc.match).length;
+            const n = chipRows.filter(sc.match).length;
             if (!n) return null;
             return (
               <button
@@ -211,13 +293,16 @@ export default function Leaderboard({ report }) {
             ))}
           </div>
           <div className="seg">
-            {SORTS.map((s) => (
+            {BOARD_ORDER.map((k) => (
               <button
-                key={s.key}
-                className={"seg-btn" + (sort === s.key ? " active" : "")}
-                onClick={() => setSort(s.key)}
+                key={k}
+                className={"seg-btn" + (boardKey === k ? " active" : "")}
+                onClick={() => {
+                  setBoardKey(k);
+                  setShowAll(false);
+                }}
               >
-                {s.label}
+                {BOARDS[k].label}
               </button>
             ))}
           </div>
@@ -225,24 +310,27 @@ export default function Leaderboard({ report }) {
       </div>
 
       <div className="lb-podium stagger">
-        {podium.map((s, i) => (
-          <button
-            key={s.code}
-            className={"lb-pod " + PLACES[i] + (pinned === s.code ? " pinned" : "")}
-            style={{ "--i": i }}
-            onClick={() => setPinned(pinned === s.code ? null : s.code)}
-          >
-            <CupMedal place={PLACES[i]} rank={i + 1} size={40} />
-            <div className="lb-pod-body">
-              <div className="lb-pod-name">{s.name}</div>
-              <div className="lb-pod-meta">
-                {Math.round(s.eff)}% eff · <Rating rev={s.rev} /> · {s.region}
+        {podium.map((s, i) => {
+          const b = board.bar(s);
+          return (
+            <button
+              key={s.code}
+              className={"lb-pod " + PLACES[i] + (pinned === s.code ? " pinned" : "")}
+              style={{ "--i": i }}
+              onClick={() => setPinned(pinned === s.code ? null : s.code)}
+            >
+              <CupMedal place={PLACES[i]} rank={i + 1} size={40} />
+              <div className="lb-pod-body">
+                <div className="lb-pod-name">{s.name}</div>
+                <div className="lb-pod-meta">{metaOf(s)}</div>
+                <GoalBar value={b.value} target={b.target} scale={scaleFor} />
               </div>
-              <GoalBar eff={s.eff} scale={scale} />
-            </div>
-            <div className="lb-pod-pct neutral">{Math.round(s.score)}</div>
-          </button>
-        ))}
+              <div className="lb-pod-pct neutral" style={{ color: boardValue(s).color }}>
+                {boardValue(s).text}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {detail && (
@@ -251,7 +339,7 @@ export default function Leaderboard({ report }) {
             <Icon name="close" size={14} />
           </button>
           <div className="kd-eyebrow">
-            Rank {rank[detail.code]} of {rows.length} · {detail.region}
+            {board.label} rank {rank[detail.code]} of {rows.length} · {detail.region}
           </div>
           <div className="kd-title">{detail.name}</div>
           <div className="kd-summary">
@@ -265,11 +353,11 @@ export default function Leaderboard({ report }) {
             </div>
             <div>
               <div className="kd-k">WTD SPLH</div>
-              <div className="kd-v">${detail.wtd?.splh ?? "-"}</div>
+              <div className="kd-v">${detail.splh ?? "-"}</div>
             </div>
             <div>
               <div className="kd-k">Target</div>
-              <div className="kd-v">${detail.day?.target}</div>
+              <div className="kd-v">${detail.target}</div>
             </div>
             <div>
               <div className="kd-k">Rating</div>
@@ -281,28 +369,18 @@ export default function Leaderboard({ report }) {
               <div className="kd-k">Reviews</div>
               <div className="kd-v">{detail.rev?.count ?? 0}</div>
             </div>
-            <div>
-              <div className="kd-k">Bonus</div>
-              <div className="kd-v" style={{ fontSize: 15 }}>
-                {detail.rev?.rating != null && detail.rev.count >= MIN_REVIEWS_TO_RANK
-                  ? BONUS_TIER_LABEL[bonusTierFor(detail.rev.rating)]
-                  : "--"}
-              </div>
-            </div>
           </div>
           <div className="kd-note">
             {detail.eff >= 100
               ? `Beating the labor target by ${Math.round(detail.eff - 100)} points. `
               : `Short of the labor target by ${Math.round(100 - detail.eff)} points. `}
             {detail.rev?.rating == null
-              ? "No Google or Yelp reviews landed in this window, so the rank is on labor alone."
+              ? "No Google or Yelp reviews landed in this window, so the score is on labor alone."
               : detail.rev.count < MIN_REVIEWS_TO_RANK
               ? `Only ${detail.rev.count} reviews landed in this window, too few to rank on, so the score is labor alone.`
-              : detail.rev.rating >= 4.5
-              ? `Guests are rating ${detail.rev.rating.toFixed(2)} across ${detail.rev.count} reviews, which clears the top bonus line.`
-              : detail.rev.rating >= 4.0
-              ? `Guests are rating ${detail.rev.rating.toFixed(2)}. Another ${(4.5 - detail.rev.rating).toFixed(2)} would reach the top bonus line.`
-              : `Guests are rating ${detail.rev.rating.toFixed(2)}, below the 4.0 line, so no bonus at all.`}
+              : detail.rev.rating >= RATING_TARGET
+              ? `Guests are rating ${detail.rev.rating.toFixed(2)} across ${detail.rev.count} reviews, at or above the ${RATING_TARGET.toFixed(2)} line.`
+              : `Guests are rating ${detail.rev.rating.toFixed(2)} across ${detail.rev.count} reviews, ${(RATING_TARGET - detail.rev.rating).toFixed(2)} under the ${RATING_TARGET.toFixed(2)} line.`}
           </div>
         </div>
       )}
@@ -310,34 +388,41 @@ export default function Leaderboard({ report }) {
       <div className="tcard">
         <div className="thead">
           <div>
-            <div className="ttl">{sort === "score" ? "Rest of the field" : scopeDef.label}</div>
+            <div className="ttl">Rest of the field</div>
             <div className="tsub">
-              The line on each bar is the store's own labor target. Click a row for the detail.
+              {boardKey === "splh"
+                ? "The line on each bar is the store's own SPLH target. Click a row for the detail."
+                : boardKey === "rating"
+                ? `The line on each bar is ${RATING_TARGET.toFixed(2)}. Click a row for the detail.`
+                : "The line on each bar is the store's own labor target. Click a row for the detail."}
             </div>
           </div>
           <span className="chip chip-mute">{rows.length} stores</span>
         </div>
 
         <div className="lb-list stagger">
-          {list.map((s, i) => (
-            <button
-              key={s.code}
-              className={"lb-row" + (pinned === s.code ? " pinned" : "")}
-              style={{ "--i": i }}
-              onClick={() => setPinned(pinned === s.code ? null : s.code)}
-            >
-              <span className={"lb-rank" + (rank[s.code] <= 3 ? " top" : "")}>{rank[s.code]}</span>
-              <span className="lb-name">
-                {s.name}
-                <span className="lb-meta">
-                  {Math.round(s.eff)}% eff · ${s.wtd?.splh} SPLH
+          {list.map((s, i) => {
+            const b = board.bar(s);
+            return (
+              <button
+                key={s.code}
+                className={"lb-row" + (pinned === s.code ? " pinned" : "")}
+                style={{ "--i": i }}
+                onClick={() => setPinned(pinned === s.code ? null : s.code)}
+              >
+                <span className="lb-rank">{rank[s.code]}</span>
+                <span className="lb-name">
+                  {s.name}
+                  <span className="lb-meta">{metaOf(s)}</span>
                 </span>
-              </span>
-              <GoalBar eff={s.eff} scale={scale} />
-              <Rating rev={s.rev} />
-              <span className="lb-pct">{Math.round(s.score)}</span>
-            </button>
-          ))}
+                <GoalBar value={b.value} target={b.target} scale={scaleFor} />
+                <BoardAside store={s} />
+                <span className="lb-pct" style={{ color: boardValue(s).color }}>
+                  {boardValue(s).text}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {listSource.length > 10 && (
@@ -349,25 +434,45 @@ export default function Leaderboard({ report }) {
           </div>
         )}
 
-        <div className="lb-legend">
-          {reviewLegend().map((l) => (
-            <span key={l.band} className="lb-legend-item">
-              <i style={{ background: l.fill }} />
-              {l.text}
-            </span>
-          ))}
-        </div>
+        {boardKey !== "splh" && (
+          <div className="lb-legend">
+            {reviewLegend().map((l) => (
+              <span key={l.band} className="lb-legend-item">
+                <i style={{ background: l.fill }} />
+                {l.text}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="footnote">
-        Score is half labor efficiency and half guest reviews. Each half is ranked against the
-        other stores currently in view and then blended, because a percentage and a star rating
-        cannot be averaged directly. Efficiency is week to date SPLH divided by the store's own
-        target, so targets of $75 and $90 compare fairly. Review color follows the Operating
-        Partner Program: 4.5 and up earns the full bonus, 4.0 to 4.49 earns base only, and below
-        4.0 earns none. Stores with fewer than five reviews in the window are ranked on labor
-        alone, because two or three reviews say more about who happened to post than about
-        the store.
+        {boardKey === "splh" ? (
+          <>
+            Ranked on sales per labor hour, week to date, and nothing else. This is the raw
+            dollar figure, not a percentage of target, so a store carrying a $90 target has
+            further to fall but also more room at the top. The line on each bar is that store's
+            own target, which is why a store can sit low on this board and still be clearing its
+            number.
+          </>
+        ) : boardKey === "rating" ? (
+          <>
+            Ranked on the Google and Yelp average for {windowLabel}, highest first. Stores with
+            fewer than {MIN_REVIEWS_TO_RANK} reviews in the window are shown at the bottom
+            rather than ranked, because two or three reviews say more about who happened to post
+            than about the store. Color follows the review scale: 4.5 and up, 4.0 to 4.49, 3.5
+            to 3.99, and under 3.5.
+          </>
+        ) : (
+          <>
+            Score is half labor efficiency and half guest reviews. Each half is ranked against
+            the other stores currently in view and then blended, because a percentage and a star
+            rating cannot be averaged directly. Efficiency is week to date SPLH divided by the
+            store's own target, so targets of $75 and $90 compare fairly. Stores with fewer than{" "}
+            {MIN_REVIEWS_TO_RANK} reviews in the window are scored on labor alone. If you want
+            the two halves separately, the Reviews and SPLH tabs each rank on that one number.
+          </>
+        )}
       </div>
     </div>
   );

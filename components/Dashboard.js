@@ -5,7 +5,7 @@ import Icon from "./Icon";
 import CupMedal from "./CupMedal";
 import EfficiencyQuadrant from "./EfficiencyQuadrant";
 import { GROUPS, money, int } from "../lib/ui";
-import { bandForRating, bonusTierFor, inkOfBand } from "../lib/scale";
+import { bandForRating, inkOfBand, REVIEW_TIERS, RATING_TARGET } from "../lib/scale";
 import { scoreStores, weightedRating, MIN_REVIEWS_TO_RANK } from "../lib/leaderboard";
 
 /**
@@ -17,6 +17,11 @@ import { scoreStores, weightedRating, MIN_REVIEWS_TO_RANK } from "../lib/leaderb
  * the shape access control will take later: today the picker is open to
  * everyone, and locking a user to their own markets means narrowing this list
  * rather than rebuilding the screen.
+ *
+ * No block on this screen names a bonus or a dollar amount tied to one. This
+ * view is behind reporter mode, but reporter codes get shared, and a store
+ * comparison that shows what somebody else is paid stops being a comparison of
+ * numbers. The review cutoffs are still here, stated as ratings.
  */
 
 const SCOPES = [
@@ -34,6 +39,11 @@ const SCOPES = [
 
 const PLACES = ["gold", "silver", "bronze"];
 const SEV_LABEL = { data: "Data issue", critical: "Critical", warning: "Watch" };
+
+// The top review line, read from scale.js rather than typed. It used to appear
+// as a bare 4.5 in four separate places in this file, which is four places to
+// miss if operations ever moves it.
+const TOP_LINE = REVIEW_TIERS.basePlus;
 
 /** A number that means something, and a place to go do something about it. */
 function Tile({ label, value, unit, note, tone, onClick, to }) {
@@ -152,7 +162,7 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
     (r) => r.reviews?.period?.rating != null && r.reviews.period.count >= MIN_REVIEWS_TO_RANK
   );
   const watchlist = [...rated]
-    .filter((r) => r.reviews.period.rating < 4.5)
+    .filter((r) => r.reviews.period.rating < TOP_LINE)
     .sort((a, b) => a.reviews.period.rating - b.reviews.period.rating)
     .slice(0, 5);
 
@@ -253,7 +263,7 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
 
       <div className="db-tiles">
         <Tile
-          label="At or above target"
+          label="At or above SPLH"
           value={atTarget}
           unit={"/ " + rows.length}
           note="Week to date SPLH vs each store's own target"
@@ -269,7 +279,15 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
               ? `${int(chain.count)} Google and Yelp reviews, weighted by count`
               : "No reviews in this period yet"
           }
-          tone={chain.rating === null ? null : chain.rating >= 4.5 ? "pos" : chain.rating >= 4 ? "warn" : "neg"}
+          tone={
+            chain.rating === null
+              ? null
+              : chain.rating >= TOP_LINE
+              ? "pos"
+              : chain.rating >= RATING_TARGET
+              ? "warn"
+              : "neg"
+          }
           to="Leaderboard"
           onClick={() => onNavigate("leaderboard")}
         />
@@ -437,7 +455,7 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
         <div className="tcard">
           <SectionHead
             title="Reviews to work on"
-            sub={`Below the $100 bonus line in period ${data.period}`}
+            sub={`Under ${TOP_LINE.toFixed(2)} in period ${data.period}`}
             action="Leaderboard"
             onAction={() => onNavigate("leaderboard")}
           />
@@ -461,9 +479,9 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
                     >
                       {rev.rating.toFixed(2)}
                       <span>
-                        {rev.rating >= 4
-                          ? `+${(4.5 - rev.rating).toFixed(2)} to the bonus`
-                          : "no bonus"}
+                        {rev.rating >= RATING_TARGET
+                          ? `+${(TOP_LINE - rev.rating).toFixed(2)} to ${TOP_LINE.toFixed(2)}`
+                          : `under ${RATING_TARGET.toFixed(2)}`}
                       </span>
                     </div>
                   </button>
@@ -473,8 +491,8 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
           ) : (
             <div className="empty" style={{ padding: 28 }}>
               {rated.length
-                ? `Every rated store in ${scopeDef.label} is at 4.50 or better.`
-                : "No store has five or more reviews in this period yet."}
+                ? `Every rated store in ${scopeDef.label} is at ${TOP_LINE.toFixed(2)} or better.`
+                : `No store has ${MIN_REVIEWS_TO_RANK} or more reviews in this period yet.`}
             </div>
           )}
         </div>

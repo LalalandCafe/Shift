@@ -229,10 +229,10 @@ export default function StoreTrend({ isoDate }) {
   const heroClass = v.type === "clean" ? "good" : v.type === "nodata" ? "none" : "bad";
   const flagged = new Set(v.days || []);
 
-  const totalOver = data.byWeekday.reduce((s, d) => s + (d.overUnder < 0 ? -d.overUnder : 0), 0);
-  const bestDay = data.byWeekday
-    .filter((d) => d.hasData && d.best)
-    .sort((a, b) => b.best.splh - a.best.splh)[0];
+  // The three summary tiles that used to sit here have been removed. A manager
+  // opening this screen wants to know which days went wrong, and the grid below
+  // answers that directly. Restating the same four week totals in a different
+  // shape just above it made people compare the two and ask which one was real.
 
   // Most recent week on top, oldest at the bottom. The API returns oldest first,
   // so this is a display-only reversal. slice() keeps the source array untouched.
@@ -262,36 +262,6 @@ export default function StoreTrend({ isoDate }) {
       </div>
 
       {selDay && <DayPanel day={selDay} onClose={() => setSelDay(null)} />}
-
-      <div className="mc-grid">
-        <div className="mc">
-          <div className="mc-l">SPLH over {data.weeks} weeks</div>
-          <div className="mc-v" style={{ fontSize: 32 }}>${data.overall.splh}</div>
-          <div className="mc-s">
-            {Math.round(data.overall.hours).toLocaleString("en-US")} hours &middot; target ${target}
-          </div>
-        </div>
-        <div className="mc">
-          <div className="mc-l">Hours over budget</div>
-          <div className="mc-v" style={{ fontSize: 32, color: totalOver > 0 ? "#9c0006" : "#1a6630" }}>
-            {totalOver > 0 ? Math.round(totalOver) : 0}
-          </div>
-          <div className="mc-s">
-            {totalOver > 0
-              ? `${((totalOver / data.overall.hours) * 100).toFixed(1)}% of hours worked`
-              : "within budget"}
-          </div>
-        </div>
-        <div className="mc">
-          <div className="mc-l">Your best day</div>
-          <div className="mc-v" style={{ fontSize: 32, color: "#1a6630" }}>
-            {bestDay ? "$" + bestDay.best.splh : "—"}
-          </div>
-          <div className="mc-s">
-            {bestDay ? `${bestDay.dayName}, week ${bestDay.best.weekNum}` : "no data yet"}
-          </div>
-        </div>
-      </div>
 
       <div className="tcard">
         <div className="thead">

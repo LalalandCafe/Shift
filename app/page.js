@@ -213,7 +213,11 @@ export default function ShiftApp() {
               <div className="ptitle">{cfg.label}</div>
               {report && (
                 <div className="psub">
-                  Week {report.weekNum} · Period {report.period} · 34 stores
+                  {/* Counted off the payload, not typed in. This read "34
+                      stores" for as long as it took somebody to notice the
+                      chain had opened a thirty fifth. */}
+                  Week {report.weekNum} · Period {report.period} ·{" "}
+                  {(report.rows || []).length} stores
                 </div>
               )}
             </div>
