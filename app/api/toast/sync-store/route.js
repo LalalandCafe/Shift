@@ -8,17 +8,64 @@ export const maxDuration = 60;
 // cumplido en el KDS. Se excluye del promedio y se cuenta aparte.
 const STUCK_THRESHOLD_MIN = 30;
 
+// Si una tienda no tiene timezone en la tabla stores, asumimos Central.
+// La mayoria son de Texas, y una tienda sin timezone es un bug de datos
+// que se arregla en stores, no aqui.
+const DEFAULT_TZ = "America/Chicago";
+
+// Toast manda fechas como 2026-08-19T13:45:12.000+0000. El offset sin
+// dos puntos no es ISO 8601 estricto y Date.parse lo trata distinto segun
+// el runtime. Lo normalizamos antes de parsear en vez de confiar en Node.
+function parseToastDate(value) {
+  if (!value) return null;
+  const iso = String(value).replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+  const ms = Date.parse(iso);
+  return isFinite(ms) ? new Date(ms) : null;
+}
+
+// La hora se calcula en la zona horaria de LA TIENDA. Si se bucketeara en
+// UTC o en Central fijo, la curva de Santa Monica saldria corrida 2 horas,
+// y una curva corrida es peor que no tener curva porque el GM se la cree.
+function makeHourFormatter(timezone) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    hourCycle: "h23",
+  });
+}
+
+function localHour(formatter, date) {
+  if (!date) return null;
+  const h = Number(formatter.format(date));
+  return Number.isInteger(h) && h >= 0 && h <= 23 ? h : null;
+}
+
 // Cuenta checks cerrados (no orders). Un check = una transaccion real de
 // cliente pagando, misma unidad que usa gross sales. Si se contara por
 // order, una mesa que se divide la cuenta en varios checks se subcontaria.
-async function computeSalesAndTransactions(businessDate, restaurantGuid, token) {
+//
+// El desglose por hora sale del MISMO recorrido y con los MISMOS filtros
+// de void/deleted/deferred. Si el hourly filtrara distinto que el daily,
+// las dos vistas se pelearian y nadie sabria cual creer.
+async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, token, timezone) {
   const headers = {
     Authorization: "Bearer " + token,
     "Toast-Restaurant-External-ID": restaurantGuid,
   };
 
+  const fmt = makeHourFormatter(timezone);
+
   let grossSales = 0;
   let transactionCount = 0;
+  const hourlySales = new Array(24).fill(0);
+  const hourlyTxns = new Array(24).fill(0);
+
+  // Ventas que no se pudieron ubicar en una hora porque el check y la
+  // order venian sin ninguna fecha usable. Se reporta en la respuesta en
+  // vez de esconderse: si esto crece, el query de reconciliacion lo marca.
+  let unattributedSales = 0;
+  let unattributedTxns = 0;
+
   const PAGE_SIZE = 100;
   let page = 1;
 
@@ -36,14 +83,34 @@ async function computeSalesAndTransactions(businessDate, restaurantGuid, token) 
 
     orders.forEach((order) => {
       if (!order || order.voided || order.deleted || order.excessFood) return;
+
+      const orderDate =
+        parseToastDate(order.openedDate) ||
+        parseToastDate(order.paidDate) ||
+        parseToastDate(order.closedDate);
+
       (order.checks || []).forEach((check) => {
         if (check.voided || check.deleted) return;
+
+        // El check manda sobre la order: en una mesa que abre a las 6pm y
+        // paga a las 8pm, cada check tiene su propio momento.
+        const when = parseToastDate(check.openedDate) || orderDate;
+        const hour = localHour(fmt, when);
+
         transactionCount += 1;
+        if (hour === null) unattributedTxns += 1;
+        else hourlyTxns[hour] += 1;
+
+        let checkSales = 0;
         (check.selections || []).forEach((sel) => {
           if (sel.voided) return;
           if (sel.deferred) return;
-          grossSales += (sel.preDiscountPrice || 0);
+          checkSales += (sel.preDiscountPrice || 0);
         });
+
+        grossSales += checkSales;
+        if (hour === null) unattributedSales += checkSales;
+        else hourlySales[hour] += checkSales;
       });
     });
 
@@ -54,6 +121,10 @@ async function computeSalesAndTransactions(businessDate, restaurantGuid, token) 
   return {
     grossSales: Math.round(grossSales * 100) / 100,
     transactionCount,
+    hourlySales: hourlySales.map((v) => Math.round(v * 100) / 100),
+    hourlyTxns,
+    unattributedSales: Math.round(unattributedSales * 100) / 100,
+    unattributedTxns,
   };
 }
 
@@ -149,6 +220,18 @@ export async function POST(request) {
 
     const started = Date.now();
 
+    // La zona horaria se lee aqui y no se pide en el body a proposito: asi
+    // los dos crons que ya llaman a este endpoint no cambian, y la tienda
+    // es la unica fuente de verdad de su propia zona.
+    let timezone = DEFAULT_TZ;
+    const { data: tzRows, error: tzErr } = await supabaseAdmin
+      .from("stores")
+      .select("timezone")
+      .eq("code", Number(storeCode))
+      .limit(1);
+    if (tzErr) throw new Error("Leer timezone fallo: " + tzErr.message);
+    if (tzRows && tzRows.length && tzRows[0].timezone) timezone = tzRows[0].timezone;
+
     // Esta ventana se usa para DOS cosas: pedirle los turnos a Toast y
     // decidir que filas borrar. Tienen que ser identicas, si no se borran
     // turnos legitimos de la jornada anterior.
@@ -163,7 +246,7 @@ export async function POST(request) {
     const [translated, salesResult, kitchenResult] = await Promise.all([
       getTimeEntries({ restaurantGuid, startDate, endDate })
         .then((raw) => translateTimeEntries(raw, restaurantGuid)),
-      computeSalesAndTransactions(businessDate, restaurantGuid, token),
+      computeSalesTransactionsAndHours(businessDate, restaurantGuid, token, timezone),
       skipKitchen
         ? Promise.resolve(null)
         : computeKitchenMetrics(businessDate, restaurantGuid, token)
@@ -171,7 +254,14 @@ export async function POST(request) {
             .catch((e) => ({ ok: false, error: e.message })),
     ]);
 
-    const { grossSales, transactionCount } = salesResult;
+    const {
+      grossSales,
+      transactionCount,
+      hourlySales,
+      hourlyTxns,
+      unattributedSales,
+      unattributedTxns,
+    } = salesResult;
 
     const laborRows = translated.map((t) => ({
       toast_entry_id: t.guid,
@@ -247,6 +337,32 @@ export async function POST(request) {
       transactionError = e.message;
     }
 
+    // El desglose por hora sigue el mismo patron: tabla propia, try/catch
+    // propio. Se escriben SIEMPRE las 24 filas, incluso en cero, para que
+    // el upsert sea idempotente y no queden horas huerfanas de un sync
+    // anterior cuando una venta se cancela despues.
+    let hourlyError = null;
+    let hourlyRowsWritten = 0;
+    try {
+      const syncedAt = new Date().toISOString();
+      const hourlyRows = hourlySales.map((sales, hour) => ({
+        store_code: storeCode,
+        business_date: isoDate,
+        hour,
+        gross_sales: sales,
+        transaction_count: hourlyTxns[hour],
+        synced_at: syncedAt,
+      }));
+
+      const { error: hErr } = await supabaseAdmin
+        .from("hourly_sales")
+        .upsert(hourlyRows, { onConflict: "store_code,business_date,hour" });
+      if (hErr) hourlyError = hErr.message;
+      else hourlyRowsWritten = hourlyRows.length;
+    } catch (e) {
+      hourlyError = e.message;
+    }
+
     // Kitchen es opcional: si falla o se salta, no tumba el sync.
     let kitchen = null;
     let stationCount = 0;
@@ -300,12 +416,17 @@ export async function POST(request) {
       ok: true,
       storeCode,
       date: isoDate,
+      timezone,
       elapsedSeconds: Math.round((Date.now() - started) / 1000),
       laborEntriesSynced: laborRows.length,
       staleRemoved: deletedStale,
       grossSales,
       transactionCount,
       transactionError,
+      hourlyRowsWritten,
+      hourlyError,
+      unattributedSales,
+      unattributedTxns,
       kitchen,
       stationCount,
       kitchenSkipped: !!skipKitchen,

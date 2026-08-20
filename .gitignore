@@ -8,3 +8,4 @@ node_modules
 *.bak
 *.bak
 scripts/tattle-change-password.js
+.env*
