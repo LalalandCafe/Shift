@@ -21,152 +21,26 @@ function prettyDate(iso) {
   });
 }
 
-// Oro de marca para el volumen, porque una hora ocupada no es buena ni mala,
-// solo es ocupada. El rojo se reserva para lo unico que si es un problema:
-// pasarse del cupo fisico de la tienda.
-const GOLD = "212, 160, 23";
-const RED = "#9c0006";
+// Paleta de SHIFT, pero aqui el color NO significa bueno o malo, significa
+// que tan duro pega la hora. Verde claro respira, rosa aprieta, rojo
+// atropella. El peso visual sube junto con la carga, que es lo que el ojo
+// espera sin que nadie le explique nada.
+const BAND = {
+  quiet:   { fill: "#c6efce", label: "Quiet" },
+  busy:    { fill: "#ffc7ce", label: "Busy" },
+  slammed: { fill: "#9c0006", label: "Slammed" },
+};
+const GREEN = "#1a6630";
 const INK = "#2b2d31";
 
-function nextHourLabel(hour) {
-  const h = (hour + 1) % 24;
-  const suffix = h < 12 ? "am" : "pm";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return h12 + suffix;
-}
+const CHART_H = 118;
 
-// Paso del eje Y. Sin esto una tienda chica sale con lineas cada 1 y una
-// grande con 24 lineas encimadas.
-function axisStep(max) {
-  if (max <= 6) return 1;
-  if (max <= 12) return 2;
-  if (max <= 30) return 5;
-  return 10;
-}
+function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
+  const [picked, setPicked] = useState(null);
 
-/* ------------------------------------------------------------------ */
-/* Mapa de calor de la semana                                          */
-/* ------------------------------------------------------------------ */
-
-function BusiestHours({ hourly, selected, onPick }) {
-  const { busiest, openFrom, openTo, maxStaffCapacity } = hourly;
-  const days = hourly.days.filter((d) => d.hasCurve);
-  if (!days.length || !busiest.peakStaff) return null;
-
-  const hours = [];
-  for (let h = openFrom; h <= openTo; h++) hours.push(h);
-
-  const byHourPeak = busiest.byHour.reduce((a, x) => Math.max(a, x.staff), 0);
-
-  return (
-    <div className="tcard" style={{ marginBottom: 16 }}>
-      <div className="thead">
-        <span className="ttl">Busiest hours</span>
-        {maxStaffCapacity && (
-          <span style={{ fontSize: 11.5, color: "var(--text3)" }}>
-            capacity {maxStaffCapacity}
-          </span>
-        )}
-      </div>
-
-      <div style={{ padding: "14px 14px 6px" }}>
-        {busiest.window && (
-          <div style={{ fontSize: 14.5, fontWeight: 600, color: INK, lineHeight: 1.45, marginBottom: 4 }}>
-            Your week peaks {busiest.window.dayName} {busiest.window.fromLabel} to{" "}
-            {busiest.window.toLabel} with {busiest.window.staff} on the floor.
-          </div>
-        )}
-        {busiest.cells.length > 1 && (
-          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 14 }}>
-            After that: {busiest.cells.slice(1).map((c) => `${c.shortDay} ${c.label} (${c.staff})`).join(", ")}.
-          </div>
-        )}
-
-        <div style={{ overflowX: "auto", paddingBottom: 4 }}>
-          <div style={{ minWidth: hours.length * 26 + 40 }}>
-            <div style={{ display: "flex", gap: 3, marginBottom: 4, paddingLeft: 40 }}>
-              {hours.map((h) => (
-                <div key={h} style={{ flex: 1, textAlign: "center", fontSize: 8.5, color: "var(--text3)" }}>
-                  {h % 3 === 0 ? (h % 12 === 0 ? 12 : h % 12) : ""}
-                </div>
-              ))}
-            </div>
-
-            {days.map((d) => (
-              <div key={d.date} style={{ display: "flex", gap: 3, marginBottom: 3, alignItems: "center" }}>
-                <div style={{ width: 37, flexShrink: 0, fontSize: 10.5, fontWeight: 700, color: "var(--text2)" }}>
-                  {d.shortDay}
-                </div>
-                {hours.map((h) => {
-                  const cell = d.hours[h];
-                  const staff = cell ? cell.staff : 0;
-                  const isSel = selected && selected.date === d.date && selected.hour === h;
-                  const alpha = staff > 0 ? 0.12 + (staff / busiest.peakStaff) * 0.88 : 0;
-                  return (
-                    <button
-                      key={h}
-                      onClick={() => onPick(d.date, h)}
-                      title={`${d.shortDay} ${cell ? cell.label : ""} · ${staff} on the floor`}
-                      aria-label={`${d.dayName} ${cell ? cell.label : ""}, ${staff} on the floor`}
-                      style={{
-                        flex: 1, height: 22, minWidth: 20, padding: 0, cursor: "pointer",
-                        borderRadius: 4, fontFamily: "inherit",
-                        fontSize: 9, fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                        color: staff > 0 && alpha > 0.55 ? "#fff" : "var(--text2)",
-                        background: cell && cell.overCapacity ? RED : staff > 0 ? `rgba(${GOLD}, ${alpha})` : "var(--border)",
-                        border: isSel ? `2px solid ${INK}` : "1.5px solid transparent",
-                      }}
-                    >
-                      {staff > 0 ? staff : ""}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: "var(--text2)", marginBottom: 7 }}>
-            Across the whole week
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 34 }}>
-            {hours.map((h) => {
-              const x = busiest.byHour[h];
-              const height = byHourPeak > 0 ? Math.max(2, (x.staff / byHourPeak) * 34) : 2;
-              return (
-                <div
-                  key={h}
-                  title={`${x.label} · ${x.staff} hours across the week`}
-                  style={{ flex: 1, height, background: `rgba(${GOLD}, 0.55)`, borderRadius: "2px 2px 0 0" }}
-                />
-              );
-            })}
-          </div>
-          <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 8, lineHeight: 1.55 }}>
-            Day in and day out the floor is fullest around{" "}
-            <strong style={{ color: "var(--text2)" }}>
-              {busiest.byHour.reduce((a, x) => (x.staff > a.staff ? x : a), busiest.byHour[0]).label}
-            </strong>
-            . Tap any square to open that day.
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Curva de un dia                                                     */
-/* ------------------------------------------------------------------ */
-
-const CHART_H = 132;
-const GUTTER = 26;
-
-function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo, selectedHour, onPick }) {
   if (!day.hasCurve) {
     return (
-      <div style={{ padding: "16px 14px 20px", fontSize: 12, color: "var(--text3)" }}>
+      <div style={{ padding: "16px 14px 20px", fontSize: 12.5, color: "var(--text3)" }}>
         No hourly history for this weekday yet. It shows up here once the sync has
         covered at least one {day.dayName}.
       </div>
@@ -174,143 +48,112 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo, selectedHour, on
   }
 
   const hours = day.hours.filter((h) => h.hour >= openFrom && h.hour <= openTo);
-  const peak = hours.reduce((a, h) => Math.max(a, h.staff), 0);
-  const top = Math.max(peak, maxStaffCapacity || 0, 1);
-  const step = axisStep(top);
-  const total = hours.reduce((a, h) => a + h.staff, 0);
-
-  const ticks = [];
-  for (let v = step; v <= top; v += step) ticks.push(v);
-
-  const sel = selectedHour !== null && selectedHour !== undefined
-    ? day.hours[selectedHour]
-    : null;
+  const top = Math.max(day.peakStaff, 1);
+  const sel = picked === null ? null : day.hours[picked];
 
   return (
-    <div style={{ padding: "12px 14px 18px" }}>
-      {/* Lector fijo. Reemplaza al tooltip: no tapa nada y funciona igual
-          con dedo que con mouse. */}
-      <div
-        style={{
-          minHeight: 34, marginBottom: 10, paddingBottom: 9,
-          borderBottom: "1px solid var(--border)",
-          display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap",
-        }}
-        aria-live="polite"
-      >
+    <div style={{ padding: "14px 14px 18px" }}>
+      {/* Una sola frase, y dice que hacer. Si el gerente solo lee esto y
+          cierra la fila, ya se llevo lo importante. */}
+      <div style={{ minHeight: 40, marginBottom: 12 }} aria-live="polite">
         {sel ? (
           <>
-            <span style={{ fontSize: 14.5, fontWeight: 700, color: sel.overCapacity ? RED : INK }}>
-              {sel.label} to {nextHourLabel(sel.hour)}
-            </span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: sel.overCapacity ? RED : "var(--text2)" }}>
-              {sel.staff} on the floor
-            </span>
-            <span style={{ fontSize: 12, color: "var(--text3)" }}>
-              ${sel.expectedSales.toLocaleString("en-US")} expected
-              {sel.expectedTransactions > 0 && ` · about ${sel.expectedTransactions} orders`}
-            </span>
-            {sel.overCapacity && (
-              <span style={{ fontSize: 12, color: RED, fontWeight: 600 }}>
-                over your {maxStaffCapacity} person capacity
-              </span>
-            )}
+            <div style={{ fontSize: 15.5, fontWeight: 700, color: INK }}>
+              {sel.label} to {sel.endLabel} · {sel.staff} {sel.staff === 1 ? "person" : "people"}
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>
+              {BAND[sel.band] ? BAND[sel.band].label.toLowerCase() : "closed"} hour ·
+              about ${sel.expectedSales.toLocaleString("en-US")}
+              {sel.expectedTransactions > 0 && ` and ${sel.expectedTransactions} orders`}
+              {sel.overCapacity && maxStaffCapacity ? ` · past your ${maxStaffCapacity} person capacity` : ""}
+            </div>
           </>
-        ) : day.peakWindow ? (
-          <span style={{ fontSize: 13, color: "var(--text2)" }}>
-            Heaviest stretch is{" "}
-            <strong>{day.peakWindow.fromLabel} to {day.peakWindow.toLabel}</strong>, about{" "}
-            {day.peakWindow.staff} hours of the {day.allowedHours}. Tap a bar for detail.
-          </span>
-        ) : null}
-      </div>
-
-      <div style={{ position: "relative", height: CHART_H, marginBottom: 4 }}>
-        {ticks.map((v) => (
-          <div
-            key={v}
-            aria-hidden="true"
-            style={{
-              position: "absolute", left: 0, right: 0, bottom: (v / top) * CHART_H,
-              borderTop: "1px solid var(--border)", pointerEvents: "none",
-            }}
-          >
-            <span style={{ position: "absolute", left: 0, bottom: 1, fontSize: 8.5, color: "var(--text3)" }}>
-              {v}
-            </span>
-          </div>
-        ))}
-
-        {maxStaffCapacity && maxStaffCapacity <= top && (
-          <div
-            aria-hidden="true"
-            style={{
-              position: "absolute", left: 0, right: 0,
-              bottom: (maxStaffCapacity / top) * CHART_H,
-              borderTop: `1.5px dashed ${RED}`, opacity: 0.5, pointerEvents: "none",
-            }}
-          />
+        ) : (
+          <>
+            <div style={{ fontSize: 15.5, fontWeight: 700, color: INK }}>
+              {day.peakWindow
+                ? `Your rush is ${day.peakWindow.fromLabel} to ${day.peakWindow.toLabel}.`
+                : `${day.allowedHours} hours to spread across the day.`}
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>
+              {day.peakWindow && `Put ${day.peakWindow.staff} of your ${day.allowedHours} hours there. `}
+              {day.calmsAtLabel && `It calms down after ${day.calmsAtLabel}. `}
+              Tap a bar for any hour.
+            </div>
+          </>
         )}
-
-        <div style={{ position: "absolute", left: GUTTER, right: 0, top: 0, bottom: 0, display: "flex", alignItems: "flex-end", gap: 3 }}>
-          {hours.map((h) => {
-            const isSel = selectedHour === h.hour;
-            const isPeak = h.staff === peak && peak > 0;
-            const height = Math.max(2, (h.staff / top) * CHART_H);
-            const alpha = isSel ? 1 : isPeak ? 0.92 : 0.62;
-            return (
-              <button
-                key={h.hour}
-                onClick={() => onPick(day.date, isSel ? null : h.hour)}
-                aria-pressed={isSel}
-                aria-label={`${h.label}, ${h.staff} on the floor, $${h.expectedSales} expected`}
-                style={{
-                  flex: 1, height: "100%", padding: 0, border: "none", background: "none",
-                  cursor: "pointer", display: "flex", flexDirection: "column", justifyContent: "flex-end",
-                  alignItems: "center", fontFamily: "inherit",
-                }}
-              >
-                <span style={{ fontSize: 9.5, fontWeight: 700, marginBottom: 2, fontVariantNumeric: "tabular-nums", color: h.overCapacity ? RED : isSel ? INK : "var(--text3)" }}>
-                  {h.staff > 0 ? h.staff : ""}
-                </span>
-                <span
-                  style={{
-                    width: "100%", height,
-                    background: h.overCapacity ? RED : `rgba(${GOLD}, ${alpha})`,
-                    borderRadius: "3px 3px 0 0",
-                    outline: isSel ? `2px solid ${INK}` : "none",
-                    outlineOffset: -2,
-                  }}
-                />
-              </button>
-            );
-          })}
-        </div>
       </div>
 
-      <div style={{ display: "flex", gap: 3, marginBottom: 12, paddingLeft: GUTTER }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: CHART_H }}>
+        {hours.map((h) => {
+          const isSel = picked === h.hour;
+          const band = BAND[h.band] || BAND.quiet;
+          const height = Math.max(3, (h.staff / top) * CHART_H);
+          return (
+            <button
+              key={h.hour}
+              onClick={() => setPicked(isSel ? null : h.hour)}
+              aria-pressed={isSel}
+              aria-label={`${h.label}, ${h.staff} people, ${band.label}`}
+              style={{
+                flex: 1, height: "100%", padding: 0, border: "none", background: "none",
+                cursor: "pointer", fontFamily: "inherit",
+                display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center",
+              }}
+            >
+              <span style={{ fontSize: 11, fontWeight: 700, color: INK, marginBottom: 3, fontVariantNumeric: "tabular-nums" }}>
+                {h.staff > 0 ? h.staff : ""}
+              </span>
+              <span
+                style={{
+                  width: "100%", height,
+                  background: band.fill,
+                  borderRadius: "4px 4px 0 0",
+                  border: isSel ? `2px solid ${INK}` : "2px solid transparent",
+                  boxSizing: "border-box",
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
         {hours.map((h) => (
-          <div key={h.hour} style={{ flex: 1, textAlign: "center", fontSize: 8.5, color: "var(--text3)", letterSpacing: "-0.02em" }}>
+          <div key={h.hour} style={{ flex: 1, textAlign: "center", fontSize: 9.5, color: "var(--text3)" }}>
             {h.hour % 2 === 0 ? h.label : ""}
           </div>
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 11.5, color: "var(--text3)", lineHeight: 1.55 }}>
-        <span>
-          Adds up to <strong style={{ color: "var(--text2)" }}>{total} hours</strong>, the same
-          number in the Hours column.
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 14 }}>
+        {["quiet", "busy", "slammed"].map((k) => (
+          <span key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text2)" }}>
+            <span style={{ width: 13, height: 13, borderRadius: 3, background: BAND[k].fill, flexShrink: 0 }} />
+            {BAND[k].label}
+          </span>
+        ))}
+        <span style={{ fontSize: 11.5, color: "var(--text3)", marginLeft: "auto" }}>
+          Adds up to <strong style={{ color: GREEN }}>{day.allowedHours} hours</strong>
         </span>
-        {maxStaffCapacity && <span>Dashed line is your {maxStaffCapacity} person capacity.</span>}
-        {day.hourlyDays < day.samples && (
-          <span>Shape built from {day.hourlyDays} of {day.samples} matching days.</span>
-        )}
       </div>
+
+      {(day.overCapacityHours.length > 0 || day.hourlyDays < day.samples) && (
+        <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 10, lineHeight: 1.55 }}>
+          {day.overCapacityHours.length > 0 && (
+            <div>
+              <strong style={{ color: "#9c0006" }}>Over capacity</strong> at{" "}
+              {day.overCapacityHours.join(", ")}. Move volume to a neighboring hour or plan for the wait.
+            </div>
+          )}
+          {day.hourlyDays < day.samples && (
+            <div>Built from {day.hourlyDays} of {day.samples} matching days.</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
 
 export default function Forecast({ storeCode, storeName }) {
   const [weekStart, setWeekStart] = useState(() => {
@@ -325,9 +168,10 @@ export default function Forecast({ storeCode, storeName }) {
   const [deleting, setDeleting] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  const [hourly, setHourly] = useState(null);
   const [openDay, setOpenDay] = useState(null);
-  const [selected, setSelected] = useState(null); // { date, hour }
+  const [hourly, setHourly] = useState(null);
+  const [hourlyLoading, setHourlyLoading] = useState(false);
+  const [hourlyErr, setHourlyErr] = useState(null);
 
   function loadData() {
     setLoading(true);
@@ -351,36 +195,34 @@ export default function Forecast({ storeCode, storeName }) {
       .catch((e) => { setErr(String(e)); setLoading(false); });
   }
 
-  // La curva se pide en paralelo con el pronostico, no al abrir un dia: el
-  // mapa de calor vive arriba y se ve antes de que nadie expanda nada. Si
-  // falla, el planeador sigue funcionando sin el.
-  function loadHourly() {
-    setHourly(null);
-    return fetch(`/api/forecast/hourly?store=${storeCode}&weekStart=${weekStart}`)
-      .then((r) => r.json())
-      .then((d) => { if (d.ok) setHourly(d); })
-      .catch(() => {});
-  }
-
   useEffect(() => {
     if (!storeCode) return;
+    // La curva pertenece a una tienda y una semana. Al cambiar cualquiera
+    // de las dos se tira, si no el gerente veria la grafica de la semana
+    // anterior debajo de los numeros de la nueva.
     setOpenDay(null);
-    setSelected(null);
+    setHourly(null);
+    setHourlyErr(null);
     loadData();
-    loadHourly();
   }, [storeCode, weekStart]);
 
-  // Un click en el mapa de calor abre el dia y marca la hora. Los dos
-  // niveles quedan conectados en vez de ser dos widgets sueltos.
-  function pickCell(date, hour) {
-    setOpenDay(date);
-    setSelected(hour === null ? null : { date, hour });
-  }
-
+  // Se pide una sola vez, al abrir el primer dia. Quien nunca expande una
+  // fila no paga la consulta.
   function toggleDay(date) {
     const next = openDay === date ? null : date;
     setOpenDay(next);
-    if (!next) setSelected(null);
+    if (!next || hourly || hourlyLoading) return;
+
+    setHourlyLoading(true);
+    setHourlyErr(null);
+    fetch(`/api/forecast/hourly?store=${storeCode}&weekStart=${weekStart}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) setHourlyErr(d.error);
+        else setHourly(d);
+        setHourlyLoading(false);
+      })
+      .catch((e) => { setHourlyErr(String(e)); setHourlyLoading(false); });
   }
 
   function setDay(date, value) {
@@ -546,10 +388,6 @@ export default function Forecast({ storeCode, storeName }) {
             </div>
           </div>
 
-          {hourly && (
-            <BusiestHours hourly={hourly} selected={selected} onPick={pickCell} />
-          )}
-
           <div className="tcard">
             <div className="thead">
               <span className="ttl">Day by day</span>
@@ -684,19 +522,23 @@ export default function Forecast({ storeCode, storeName }) {
 
                   {isOpen && (
                     <div style={{ borderBottom: "1px solid var(--border)", background: "var(--bg2, #fafafa)" }}>
-                      {!hourly && (
-                        <div style={{ padding: "16px 14px", fontSize: 12, color: "var(--text3)" }}>
+                      {hourlyLoading && (
+                        <div style={{ padding: "16px 14px", fontSize: 12.5, color: "var(--text3)" }}>
                           Loading hour by hour...
                         </div>
                       )}
-                      {hourly && curve && (
+                      {hourlyErr && (
+                        <div style={{ padding: "16px 14px", fontSize: 12.5, color: "#9c0006" }}>
+                          Could not load the hourly curve: {hourlyErr}
+                        </div>
+                      )}
+                      {!hourlyLoading && !hourlyErr && curve && (
                         <HourlyCurve
+                          key={d.date}
                           day={curve}
                           maxStaffCapacity={hourly.maxStaffCapacity}
                           openFrom={hourly.openFrom}
                           openTo={hourly.openTo}
-                          selectedHour={selected && selected.date === d.date ? selected.hour : null}
-                          onPick={pickCell}
                         />
                       )}
                     </div>
@@ -751,11 +593,10 @@ export default function Forecast({ storeCode, storeName }) {
           </div>
 
           <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 10, lineHeight: 1.6, maxWidth: 700 }}>
-            <strong style={{ color: "var(--text2)" }}>Hour by hour.</strong> The split follows the share of sales
-            each hour earned on those same matching weekdays, so the bars always add up to the hours in that day's
-            row. Darker squares in the heatmap are heavier hours. Bars and squares turn red where the suggestion
-            runs past your capacity, which is a signal to move volume to a neighboring hour or accept the wait,
-            not a number to quietly cut.
+            <strong style={{ color: "var(--text2)" }}>Hour by hour.</strong> Open a day with the arrow to see when
+            its hours should land. The split follows the share of sales each hour earned on those same matching
+            weekdays, so the bars always add up to the hours in that day's row. Colors show how hard the hour
+            hits, not whether it went well: green breathes, pink gets tight, red is the rush.
           </div>
         </>
       )}
