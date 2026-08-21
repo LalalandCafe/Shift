@@ -21,19 +21,19 @@ function prettyDate(iso) {
   });
 }
 
-// Paleta de SHIFT, pero aqui el color NO significa bueno o malo, significa
-// que tan duro pega la hora. Verde claro respira, rosa aprieta, rojo
-// atropella. El peso visual sube junto con la carga, que es lo que el ojo
-// espera sin que nadie le explique nada.
-const BAND = {
-  quiet:   { fill: "#c6efce", label: "Quiet" },
-  busy:    { fill: "#ffc7ce", label: "Busy" },
-  slammed: { fill: "#9c0006", label: "Slammed" },
-};
+// Una sola barra amarilla para todas las horas. El color ya no codifica
+// nada, asi que la ALTURA carga toda la informacion, que es la lectura mas
+// honesta de una grafica de barras. El rojo queda libre para lo unico que
+// de verdad es una alerta: pasarse del cupo de la tienda.
+const BAR = "#fff7d2";
+const BAR_EDGE = "rgba(212, 160, 23, 0.45)";
+const RED = "#9c0006";
 const GREEN = "#1a6630";
 const INK = "#2b2d31";
 
 const CHART_H = 118;
+const GUTTER = 62;   // ancho de la columna de etiquetas de la tabla
+const COL_MIN = 50;  // ancho minimo por hora, para que quepa $1,208
 
 function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
   const [picked, setPicked] = useState(null);
@@ -50,6 +50,13 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
   const hours = day.hours.filter((h) => h.hour >= openFrom && h.hour <= openTo);
   const top = Math.max(day.peakStaff, 1);
   const sel = picked === null ? null : day.hours[picked];
+  const gridMin = GUTTER + hours.length * COL_MIN;
+
+  const cell = { flex: 1, minWidth: COL_MIN, textAlign: "center" };
+  const rowLabel = {
+    width: GUTTER, flexShrink: 0, fontSize: 10, fontWeight: 700,
+    color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.03em",
+  };
 
   return (
     <div style={{ padding: "14px 14px 18px" }}>
@@ -62,10 +69,11 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
               {sel.label} to {sel.endLabel} · {sel.staff} {sel.staff === 1 ? "person" : "people"}
             </div>
             <div style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>
-              {BAND[sel.band] ? BAND[sel.band].label.toLowerCase() : "closed"} hour ·
               about ${sel.expectedSales.toLocaleString("en-US")}
               {sel.expectedTransactions > 0 && ` and ${sel.expectedTransactions} orders`}
-              {sel.overCapacity && maxStaffCapacity ? ` · past your ${maxStaffCapacity} person capacity` : ""}
+              {sel.overCapacity && maxStaffCapacity
+                ? ` · past your ${maxStaffCapacity} person capacity`
+                : ""}
             </div>
           </>
         ) : (
@@ -84,73 +92,98 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: CHART_H }}>
-        {hours.map((h) => {
-          const isSel = picked === h.hour;
-          const band = BAND[h.band] || BAND.quiet;
-          const height = Math.max(3, (h.staff / top) * CHART_H);
-          return (
-            <button
-              key={h.hour}
-              onClick={() => setPicked(isSel ? null : h.hour)}
-              aria-pressed={isSel}
-              aria-label={`${h.label}, ${h.staff} people, ${band.label}`}
-              style={{
-                flex: 1, height: "100%", padding: 0, border: "none", background: "none",
-                cursor: "pointer", fontFamily: "inherit",
-                display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center",
-              }}
-            >
-              <span style={{ fontSize: 11, fontWeight: 700, color: INK, marginBottom: 3, fontVariantNumeric: "tabular-nums" }}>
-                {h.staff > 0 ? h.staff : ""}
-              </span>
-              <span
-                style={{
-                  width: "100%", height,
-                  background: band.fill,
-                  borderRadius: "4px 4px 0 0",
-                  border: isSel ? `2px solid ${INK}` : "2px solid transparent",
-                  boxSizing: "border-box",
-                }}
-              />
-            </button>
-          );
-        })}
-      </div>
+      {/* Un solo contenedor con scroll para grafica y tabla, para que las
+          columnas nunca se desalineen entre si en pantallas angostas. */}
+      <div style={{ overflowX: "auto", paddingBottom: 4 }}>
+        <div style={{ minWidth: gridMin }}>
 
-      <div style={{ display: "flex", gap: 4, marginTop: 5 }}>
-        {hours.map((h) => (
-          <div key={h.hour} style={{ flex: 1, textAlign: "center", fontSize: 9.5, color: "var(--text3)" }}>
-            {h.hour % 2 === 0 ? h.label : ""}
+          <div style={{ display: "flex", alignItems: "flex-end", height: CHART_H }}>
+            <div style={{ width: GUTTER, flexShrink: 0 }} />
+            {hours.map((h) => {
+              const isSel = picked === h.hour;
+              const height = Math.max(3, (h.staff / top) * CHART_H);
+              return (
+                <div key={h.hour} style={{ ...cell, height: "100%", padding: "0 2px", boxSizing: "border-box" }}>
+                  <button
+                    onClick={() => setPicked(isSel ? null : h.hour)}
+                    aria-pressed={isSel}
+                    aria-label={`${h.label}, ${h.staff} people, $${h.expectedSales} expected`}
+                    style={{
+                      width: "100%", height: "100%", padding: 0, border: "none", background: "none",
+                      cursor: "pointer", fontFamily: "inherit",
+                      display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: "100%", height,
+                        background: BAR,
+                        borderRadius: "4px 4px 0 0",
+                        border: isSel
+                          ? `2px solid ${INK}`
+                          : h.overCapacity
+                            ? `2px solid ${RED}`
+                            : `1.5px solid ${BAR_EDGE}`,
+                        borderBottom: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  </button>
+                </div>
+              );
+            })}
           </div>
-        ))}
-      </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 14 }}>
-        {["quiet", "busy", "slammed"].map((k) => (
-          <span key={k} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--text2)" }}>
-            <span style={{ width: 13, height: 13, borderRadius: 3, background: BAND[k].fill, flexShrink: 0 }} />
-            {BAND[k].label}
-          </span>
-        ))}
-        <span style={{ fontSize: 11.5, color: "var(--text3)", marginLeft: "auto" }}>
-          Adds up to <strong style={{ color: GREEN }}>{day.allowedHours} hours</strong>
-        </span>
-      </div>
+          <div style={{ display: "flex", borderTop: "1.5px solid var(--border2)", paddingTop: 6 }}>
+            <div style={rowLabel} />
+            {hours.map((h) => (
+              <div key={h.hour} style={{ ...cell, fontSize: 10, fontWeight: 700, color: "var(--text2)" }}>
+                {h.label}
+              </div>
+            ))}
+          </div>
 
-      {(day.overCapacityHours.length > 0 || day.hourlyDays < day.samples) && (
-        <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 10, lineHeight: 1.55 }}>
-          {day.overCapacityHours.length > 0 && (
-            <div>
-              <strong style={{ color: "#9c0006" }}>Over capacity</strong> at{" "}
-              {day.overCapacityHours.join(", ")}. Move volume to a neighboring hour or plan for the wait.
-            </div>
-          )}
-          {day.hourlyDays < day.samples && (
-            <div>Built from {day.hourlyDays} of {day.samples} matching days.</div>
-          )}
+          <div style={{ display: "flex", marginTop: 7 }}>
+            <div style={rowLabel}>Sales</div>
+            {hours.map((h) => (
+              <div key={h.hour} style={{ ...cell, fontSize: 10.5, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>
+                {h.expectedSales > 0 ? "$" + h.expectedSales.toLocaleString("en-US") : "—"}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", marginTop: 5 }}>
+            <div style={rowLabel}>Staff</div>
+            {hours.map((h) => (
+              <div
+                key={h.hour}
+                style={{
+                  ...cell, fontSize: 13, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                  color: h.overCapacity ? RED : picked === h.hour ? INK : "var(--text)",
+                }}
+              >
+                {h.staff > 0 ? h.staff : "—"}
+              </div>
+            ))}
+          </div>
+
         </div>
-      )}
+      </div>
+
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 14, fontSize: 11.5, color: "var(--text3)", lineHeight: 1.55 }}>
+        <span>
+          Adds up to <strong style={{ color: GREEN }}>{day.allowedHours} hours</strong>, the same
+          number in the Hours column.
+        </span>
+        {day.overCapacityHours.length > 0 && (
+          <span>
+            <strong style={{ color: RED }}>Over capacity</strong> at {day.overCapacityHours.join(", ")}.
+          </span>
+        )}
+        {day.hourlyDays < day.samples && (
+          <span>Built from {day.hourlyDays} of {day.samples} matching days.</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -594,9 +627,9 @@ export default function Forecast({ storeCode, storeName }) {
 
           <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 10, lineHeight: 1.6, maxWidth: 700 }}>
             <strong style={{ color: "var(--text2)" }}>Hour by hour.</strong> Open a day with the arrow to see when
-            its hours should land. The split follows the share of sales each hour earned on those same matching
-            weekdays, so the bars always add up to the hours in that day's row. Colors show how hard the hour
-            hits, not whether it went well: green breathes, pink gets tight, red is the rush.
+            its hours should land. Sales by hour is that hour's share of the day's expected sales, taken from the
+            same matching weekdays. Staff is those dollars divided by the day's target, so the row always adds up
+            to the hours in that day's line. Tap a bar to pin one hour.
           </div>
         </>
       )}
