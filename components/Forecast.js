@@ -21,6 +21,96 @@ function prettyDate(iso) {
   });
 }
 
+// Curva de un dia. Barras en oro de marca porque el volumen por hora no es
+// bueno ni malo, solo es volumen. El rojo se reserva para lo unico que si
+// es un problema: pasarse del cupo fisico de la tienda.
+const BAR = "#d4a017";
+const BAR_OVER = "#9c0006";
+const CHART_H = 116;
+
+function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
+  if (!day.hasCurve) {
+    return (
+      <div style={{ padding: "16px 14px 20px", fontSize: 12, color: "var(--text3)" }}>
+        No hourly history for this weekday yet. It shows up here once the sync has
+        covered at least one {day.dayName}.
+      </div>
+    );
+  }
+
+  const hours = day.hours.filter((h) => h.hour >= openFrom && h.hour <= openTo);
+  const peak = hours.reduce((a, h) => Math.max(a, h.staff), 0);
+  const scaleTop = Math.max(peak, maxStaffCapacity || 0, 1);
+  const total = hours.reduce((a, h) => a + h.staff, 0);
+  const capTop = maxStaffCapacity ? (maxStaffCapacity / scaleTop) * CHART_H : null;
+
+  return (
+    <div style={{ padding: "6px 14px 18px" }}>
+      <div style={{ position: "relative", display: "flex", alignItems: "flex-end", gap: 3, height: CHART_H, marginBottom: 4 }}>
+        {maxStaffCapacity && capTop !== null && (
+          <div
+            aria-hidden="true"
+            style={{
+              position: "absolute", left: 0, right: 0, bottom: capTop,
+              borderTop: "1.5px dashed var(--border2)", pointerEvents: "none",
+            }}
+          />
+        )}
+
+        {hours.map((h) => {
+          const height = Math.max(2, (h.staff / scaleTop) * CHART_H);
+          return (
+            <div
+              key={h.hour}
+              title={`${h.label} · ${h.staff} on the floor · $${h.expectedSales.toLocaleString("en-US")} expected`}
+              style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", height: "100%" }}
+            >
+              <div style={{ fontSize: 9.5, fontWeight: 700, color: h.overCapacity ? BAR_OVER : "var(--text2)", marginBottom: 2, fontVariantNumeric: "tabular-nums" }}>
+                {h.staff > 0 ? h.staff : ""}
+              </div>
+              <div
+                style={{
+                  width: "100%", height,
+                  background: h.overCapacity ? BAR_OVER : BAR,
+                  borderRadius: "3px 3px 0 0",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap: 3, marginBottom: 12 }}>
+        {hours.map((h) => (
+          <div key={h.hour} style={{ flex: 1, textAlign: "center", fontSize: 8.5, color: "var(--text3)", letterSpacing: "-0.02em" }}>
+            {h.hour % 2 === 0 ? h.label : ""}
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 11.5, color: "var(--text3)", lineHeight: 1.55 }}>
+        <span>
+          Adds up to <strong style={{ color: "var(--text2)" }}>{total} hours</strong>, the same
+          number in the Hours column.
+        </span>
+        {day.peakHour !== null && (
+          <span>
+            Busiest at <strong style={{ color: "var(--text2)" }}>{day.hours[day.peakHour].label}</strong> with {day.peakStaff} on the floor.
+          </span>
+        )}
+        {maxStaffCapacity && (
+          <span>Dashed line is your {maxStaffCapacity} person capacity.</span>
+        )}
+        {day.hourlyDays < day.samples && (
+          <span>
+            Shape built from {day.hourlyDays} of {day.samples} matching days.
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Forecast({ storeCode, storeName }) {
   const [weekStart, setWeekStart] = useState(() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -33,6 +123,12 @@ export default function Forecast({ storeCode, storeName }) {
   const [saveState, setSaveState] = useState("idle");
   const [deleting, setDeleting] = useState(null);
   const [confirmClear, setConfirmClear] = useState(false);
+
+  // La curva por hora se pide aparte y solo cuando alguien abre un dia.
+  const [openDay, setOpenDay] = useState(null);
+  const [hourly, setHourly] = useState(null);
+  const [hourlyLoading, setHourlyLoading] = useState(false);
+  const [hourlyErr, setHourlyErr] = useState(null);
 
   function loadData() {
     setLoading(true);
@@ -58,8 +154,31 @@ export default function Forecast({ storeCode, storeName }) {
 
   useEffect(() => {
     if (!storeCode) return;
+    // La curva pertenece a una tienda y una semana. Al cambiar cualquiera
+    // de las dos se tira, si no el usuario veria la grafica de la semana
+    // anterior debajo de los numeros de la nueva.
+    setOpenDay(null);
+    setHourly(null);
+    setHourlyErr(null);
     loadData();
   }, [storeCode, weekStart]);
+
+  function toggleDay(date) {
+    const next = openDay === date ? null : date;
+    setOpenDay(next);
+    if (!next || hourly || hourlyLoading) return;
+
+    setHourlyLoading(true);
+    setHourlyErr(null);
+    fetch(`/api/forecast/hourly?store=${storeCode}&weekStart=${weekStart}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) setHourlyErr(d.error);
+        else setHourly(d);
+        setHourlyLoading(false);
+      })
+      .catch((e) => { setHourlyErr(String(e)); setHourlyLoading(false); });
+  }
 
   function setDay(date, value) {
     setPlan((prev) => ({ ...prev, [date]: value }));
@@ -175,6 +294,8 @@ export default function Forecast({ storeCode, storeName }) {
   const t = data.totals;
   const liveVar = Math.round(livePlanned - t.allowedHours);
   const anySaved = data.days.some((d) => d.plannedHours !== null);
+  const hourlyByDate = {};
+  if (hourly) hourly.days.forEach((d) => { hourlyByDate[d.date] = d; });
 
   return (
     <>
@@ -274,62 +395,108 @@ export default function Forecast({ storeCode, storeName }) {
               const n = Number(val);
               const diff = val !== "" && isFinite(n) ? Math.round(n - d.allowedHours) : null;
               const isSaved = d.plannedHours !== null;
+              const isOpen = openDay === d.date;
+              const curve = hourlyByDate[d.date];
+
               return (
-                <div className="fc-row" key={d.date}>
-                  <div>
-                    <div className="fc-day">{d.shortDay}</div>
-                    <div style={{ fontSize: 9.5, color: "var(--text3)" }}>{prettyDate(d.date)}</div>
+                <div key={d.date}>
+                  <div className="fc-row">
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {d.hasForecast && (
+                        <button
+                          onClick={() => toggleDay(d.date)}
+                          aria-expanded={isOpen}
+                          aria-label={isOpen ? `Hide hour by hour for ${d.dayName}` : `Show hour by hour for ${d.dayName}`}
+                          style={{
+                            width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                            border: "1.5px solid var(--border2)", background: isOpen ? "var(--border2)" : "#fff",
+                            color: "var(--text2)", cursor: "pointer", fontFamily: "inherit",
+                            fontSize: 9, lineHeight: 1, padding: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}
+                        >
+                          {isOpen ? "▾" : "▸"}
+                        </button>
+                      )}
+                      <div>
+                        <div className="fc-day">{d.shortDay}</div>
+                        <div style={{ fontSize: 9.5, color: "var(--text3)" }}>{prettyDate(d.date)}</div>
+                      </div>
+                    </div>
+                    <div>
+                      {d.hasForecast ? (
+                        <>
+                          <div className="fc-sales">
+                            <span className={"fc-conf " + d.confidence} title={d.confidenceLabel} />
+                            ${d.expectedSales.toLocaleString("en-US")}
+                          </div>
+                          <div className="fc-range">
+                            ${d.minSales.toLocaleString("en-US")} – ${d.maxSales.toLocaleString("en-US")} · target ${d.target}
+                          </div>
+                        </>
+                      ) : (
+                        <div style={{ fontSize: 12, color: "var(--text3)" }}>No history</div>
+                      )}
+                    </div>
+                    <div className="fc-allowed">
+                      {d.hasForecast ? d.allowedHours : "—"}
+                    </div>
+                    <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                      <input
+                        className="fc-input"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={val}
+                        placeholder="—"
+                        onChange={(e) => setDay(d.date, e.target.value)}
+                      />
+                      {isSaved && (
+                        <button
+                          onClick={() => deleteDay(d.date)}
+                          disabled={deleting === d.date}
+                          title="Remove this day from the saved plan"
+                          style={{
+                            width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                            border: "1.5px solid var(--border2)", background: "#fff",
+                            color: "#9c0006", cursor: "pointer", fontFamily: "inherit",
+                            fontSize: 13, lineHeight: 1, padding: 0,
+                          }}
+                        >
+                          {deleting === d.date ? "·" : "×"}
+                        </button>
+                      )}
+                    </div>
+                    <div
+                      className="fc-var fc-var-col"
+                      style={{ color: diff === null ? "var(--text3)" : diff > 0 ? "#9c0006" : diff < 0 ? "#1a6630" : "var(--text2)" }}
+                    >
+                      {diff === null ? "—" : diff > 0 ? "+" + diff : diff}
+                    </div>
                   </div>
-                  <div>
-                    {d.hasForecast ? (
-                      <>
-                        <div className="fc-sales">
-                          <span className={"fc-conf " + d.confidence} title={d.confidenceLabel} />
-                          ${d.expectedSales.toLocaleString("en-US")}
+
+                  {isOpen && (
+                    <div style={{ borderBottom: "1px solid var(--border)", background: "var(--bg2, #fafafa)" }}>
+                      {hourlyLoading && (
+                        <div style={{ padding: "16px 14px", fontSize: 12, color: "var(--text3)" }}>
+                          Loading hour by hour...
                         </div>
-                        <div className="fc-range">
-                          ${d.minSales.toLocaleString("en-US")} – ${d.maxSales.toLocaleString("en-US")} · target ${d.target}
+                      )}
+                      {hourlyErr && (
+                        <div style={{ padding: "16px 14px", fontSize: 12, color: "#9c0006" }}>
+                          Could not load the hourly curve: {hourlyErr}
                         </div>
-                      </>
-                    ) : (
-                      <div style={{ fontSize: 12, color: "var(--text3)" }}>No history</div>
-                    )}
-                  </div>
-                  <div className="fc-allowed">
-                    {d.hasForecast ? d.allowedHours : "—"}
-                  </div>
-                  <div style={{ textAlign: "right", display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
-                    <input
-                      className="fc-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={val}
-                      placeholder="—"
-                      onChange={(e) => setDay(d.date, e.target.value)}
-                    />
-                    {isSaved && (
-                      <button
-                        onClick={() => deleteDay(d.date)}
-                        disabled={deleting === d.date}
-                        title="Remove this day from the saved plan"
-                        style={{
-                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
-                          border: "1.5px solid var(--border2)", background: "#fff",
-                          color: "#9c0006", cursor: "pointer", fontFamily: "inherit",
-                          fontSize: 13, lineHeight: 1, padding: 0,
-                        }}
-                      >
-                        {deleting === d.date ? "·" : "×"}
-                      </button>
-                    )}
-                  </div>
-                  <div
-                    className="fc-var fc-var-col"
-                    style={{ color: diff === null ? "var(--text3)" : diff > 0 ? "#9c0006" : diff < 0 ? "#1a6630" : "var(--text2)" }}
-                  >
-                    {diff === null ? "—" : diff > 0 ? "+" + diff : diff}
-                  </div>
+                      )}
+                      {!hourlyLoading && !hourlyErr && curve && (
+                        <HourlyCurve
+                          day={curve}
+                          maxStaffCapacity={hourly.maxStaffCapacity}
+                          openFrom={hourly.openFrom}
+                          openTo={hourly.openTo}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -377,6 +544,14 @@ export default function Forecast({ storeCode, storeName }) {
             factored in, so use the range as your guardrails rather than the single number.
             The × next to a saved day removes it from the plan entirely, which is different from just clearing
             the box.
+          </div>
+
+          <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 10, lineHeight: 1.6, maxWidth: 700 }}>
+            <strong style={{ color: "var(--text2)" }}>Hour by hour.</strong> Open a day with the arrow to see how
+            its hours spread across the shift. The split follows the share of sales each hour earned on those same
+            matching weekdays, so the bars always add up to the hours in that day's row. Bars turn red where the
+            suggestion runs past your capacity, which is a signal to move volume to a neighboring hour or accept
+            the wait, not a number to quietly cut.
           </div>
         </>
       )}
