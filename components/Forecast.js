@@ -31,9 +31,37 @@ const RED = "#9c0006";
 const GREEN = "#1a6630";
 const INK = "#2b2d31";
 
-const CHART_H = 118;
-const GUTTER = 62;   // ancho de la columna de etiquetas de la tabla
+const CHART_H = 150;
+const GUTTER = 58;   // ancho del eje y de las etiquetas de fila
 const COL_MIN = 50;  // ancho minimo por hora, para que quepa $1,208
+
+// Cortes redondos para el eje. Se apunta a 5 divisiones: menos deja el eje
+// pobre, mas lo satura. El tope se estira al siguiente corte para que la
+// barra mas alta no toque el techo.
+function niceStep(rough) {
+  const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+  const n = rough / mag;
+  let s;
+  if (n <= 1) s = 1;
+  else if (n <= 2) s = 2;
+  else if (n <= 2.5) s = 2.5;
+  else if (n <= 5) s = 5;
+  else s = 10;
+  return s * mag;
+}
+
+function buildAxis(max) {
+  if (!(max > 0)) return { top: 1, ticks: [] };
+  const step = niceStep(max / 5);
+  const top = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = step; v <= top + 1e-9; v += step) ticks.push(v);
+  return { top, ticks };
+}
+
+function money(v) {
+  return "$" + Math.round(v).toLocaleString("en-US");
+}
 
 function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
   const [picked, setPicked] = useState(null);
@@ -48,9 +76,14 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
   }
 
   const hours = day.hours.filter((h) => h.hour >= openFrom && h.hour <= openTo);
-  const top = Math.max(day.peakStaff, 1);
   const sel = picked === null ? null : day.hours[picked];
   const gridMin = GUTTER + hours.length * COL_MIN;
+
+  // Las barras miden VENTA, no personal. El personal viene de dividir la
+  // venta entre el target y redondear a entero, asi que si las barras se
+  // escalaran con el, las alturas no cuadrarian contra un eje en dolares.
+  const maxSales = hours.reduce((a, h) => Math.max(a, h.expectedSales), 0);
+  const axis = buildAxis(maxSales);
 
   const cell = { flex: 1, minWidth: COL_MIN, textAlign: "center" };
   const rowLabel = {
@@ -69,7 +102,7 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
               {sel.label} to {sel.endLabel} · {sel.staff} {sel.staff === 1 ? "person" : "people"}
             </div>
             <div style={{ fontSize: 12.5, color: "var(--text3)", marginTop: 2 }}>
-              about ${sel.expectedSales.toLocaleString("en-US")}
+              about {money(sel.expectedSales)}
               {sel.expectedTransactions > 0 && ` and ${sel.expectedTransactions} orders`}
               {sel.overCapacity && maxStaffCapacity
                 ? ` · past your ${maxStaffCapacity} person capacity`
@@ -92,46 +125,71 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
         )}
       </div>
 
-      {/* Un solo contenedor con scroll para grafica y tabla, para que las
-          columnas nunca se desalineen entre si en pantallas angostas. */}
+      {/* Un solo contenedor con scroll para eje, grafica y tabla, para que
+          las columnas nunca se desalineen entre si en pantallas angostas. */}
       <div style={{ overflowX: "auto", paddingBottom: 4 }}>
         <div style={{ minWidth: gridMin }}>
 
-          <div style={{ display: "flex", alignItems: "flex-end", height: CHART_H }}>
-            <div style={{ width: GUTTER, flexShrink: 0 }} />
-            {hours.map((h) => {
-              const isSel = picked === h.hour;
-              const height = Math.max(3, (h.staff / top) * CHART_H);
-              return (
-                <div key={h.hour} style={{ ...cell, height: "100%", padding: "0 2px", boxSizing: "border-box" }}>
-                  <button
-                    onClick={() => setPicked(isSel ? null : h.hour)}
-                    aria-pressed={isSel}
-                    aria-label={`${h.label}, ${h.staff} people, $${h.expectedSales} expected`}
-                    style={{
-                      width: "100%", height: "100%", padding: 0, border: "none", background: "none",
-                      cursor: "pointer", fontFamily: "inherit",
-                      display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center",
-                    }}
-                  >
-                    <span
+          <div style={{ position: "relative", height: CHART_H }}>
+            {axis.ticks.map((v) => (
+              <div
+                key={v}
+                aria-hidden="true"
+                style={{
+                  position: "absolute", left: 0, right: 0,
+                  bottom: (v / axis.top) * CHART_H,
+                  borderTop: "1px solid var(--border)", pointerEvents: "none",
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute", left: 0, bottom: 2, width: GUTTER - 8,
+                    textAlign: "right", fontSize: 9.5, color: "var(--text3)",
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {money(v)}
+                </span>
+              </div>
+            ))}
+
+            <div style={{ position: "absolute", left: GUTTER, right: 0, top: 0, bottom: 0, display: "flex", alignItems: "flex-end" }}>
+              {hours.map((h) => {
+                const isSel = picked === h.hour;
+                const height = h.expectedSales > 0
+                  ? Math.max(3, (h.expectedSales / axis.top) * CHART_H)
+                  : 0;
+                return (
+                  <div key={h.hour} style={{ flex: 1, minWidth: COL_MIN, height: "100%", padding: "0 3px", boxSizing: "border-box" }}>
+                    <button
+                      onClick={() => setPicked(isSel ? null : h.hour)}
+                      aria-pressed={isSel}
+                      aria-label={`${h.label}, ${h.staff} people, ${money(h.expectedSales)} expected`}
                       style={{
-                        width: "100%", height,
-                        background: BAR,
-                        borderRadius: "4px 4px 0 0",
-                        border: isSel
-                          ? `2px solid ${INK}`
-                          : h.overCapacity
-                            ? `2px solid ${RED}`
-                            : `1.5px solid ${BAR_EDGE}`,
-                        borderBottom: "none",
-                        boxSizing: "border-box",
+                        width: "100%", height: "100%", padding: 0, border: "none", background: "none",
+                        cursor: "pointer", fontFamily: "inherit",
+                        display: "flex", flexDirection: "column", justifyContent: "flex-end",
                       }}
-                    />
-                  </button>
-                </div>
-              );
-            })}
+                    >
+                      <span
+                        style={{
+                          width: "100%", height,
+                          background: BAR,
+                          borderRadius: "4px 4px 0 0",
+                          border: isSel
+                            ? `2px solid ${INK}`
+                            : h.overCapacity
+                              ? `2px solid ${RED}`
+                              : `1.5px solid ${BAR_EDGE}`,
+                          borderBottom: "none",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           <div style={{ display: "flex", borderTop: "1.5px solid var(--border2)", paddingTop: 6 }}>
@@ -147,7 +205,7 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
             <div style={rowLabel}>Sales</div>
             {hours.map((h) => (
               <div key={h.hour} style={{ ...cell, fontSize: 10.5, color: "var(--text2)", fontVariantNumeric: "tabular-nums" }}>
-                {h.expectedSales > 0 ? "$" + h.expectedSales.toLocaleString("en-US") : "—"}
+                {h.expectedSales > 0 ? money(h.expectedSales) : "—"}
               </div>
             ))}
           </div>
