@@ -223,7 +223,7 @@ export default function Leaderboard({ report }) {
           <div>
             <b>Week {report.weekNum} {board.label.toLowerCase()} leaderboard</b>
             <span> · through {report.dayName}, {report.date}</span>
-            <div style={{ fontSize: 10.5, color: "var(--ink-text2)" }}>{board.blurb}</div>
+            <div style={{ fontSize: 10.5, color: "var(--text2)" }}>{board.blurb}</div>
           </div>
         </div>
       </div>

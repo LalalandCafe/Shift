@@ -76,6 +76,9 @@
   --ink-3: #755b45;
   --ink-line: rgba(255, 247, 210, 0.15);
   --ink-text: #fff7d2;
+  /* Only legible on the dark tile. Nothing on a white card may use this:
+     it lands at 2:1 there. If you need muted type on a card, that is
+     --text3. */
   --ink-text2: #c9b49b;
 
   /* ---- light surfaces ----
@@ -90,8 +93,12 @@
   --line-2: #d8cdb6;
 
   --text: #2b221a;
-  --text2: #6b5a4a;
-  --text3: #8a7867;
+  /* Both moved a step darker. The 9.5px uppercase labels and the 10.5px
+     sub-lines carry real information, and at 4.2:1 they were being read as
+     decoration and skipped. text3 clears 5:1 on white now, text2 clears 7.7,
+     and they stay a value apart so the hierarchy still reads. */
+  --text2: #5f5041;
+  --text3: #7e6c5b;
 
   /* ---- accent and selection ----
      Two different jobs, two different colors, on purpose.
@@ -949,7 +956,7 @@ select {
   letter-spacing: 0;
 }
 .mc-s {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text3);
   margin-top: 5px;
   line-height: 1.4;
@@ -1447,7 +1454,7 @@ table.stores tr:hover td {
   opacity: 0.8;
 }
 .footnote {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text3);
   line-height: 1.6;
   margin-top: 14px;
@@ -1522,7 +1529,7 @@ table.stores tr:hover td {
   text-overflow: ellipsis;
 }
 .lrow-sub {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text3);
   margin-top: 1px;
 }
@@ -1921,7 +1928,7 @@ table.stores tr:hover td {
   font-weight: 600;
 }
 .dash-row-detail {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text3);
   margin-top: 2px;
 }
@@ -2558,7 +2565,7 @@ table.stores tr:hover td {
   text-overflow: ellipsis;
 }
 .lb-pod-meta {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text3);
   margin: 2px 0 9px;
   white-space: nowrap;
@@ -2729,7 +2736,7 @@ table.stores tr:hover td {
   font-weight: 700;
 }
 .lb-meta {
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text3);
   margin-top: 1px;
@@ -2989,7 +2996,7 @@ table.stores tr:hover td {
   letter-spacing: 0;
 }
 .db-tile-s {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text3);
   margin-top: 6px;
   line-height: 1.4;
@@ -3269,7 +3276,7 @@ table.stores tr:hover td {
   text-overflow: ellipsis;
 }
 .db-watch-sub {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--text3);
   margin-top: 2px;
 }
@@ -3462,19 +3469,31 @@ table.stores tr:hover td {
 
 /* The region banner spans all 18 columns, so no width rule may touch
    it and pinning it left would drag the whole bar with the scroll. */
+/* The region row is the only thing telling you that you have crossed from
+   DFW into HTX in a 35 row table, and as a pale tint it was doing that job
+   badly. It gets a heavy rule above it, a darker label and real space, so
+   the break is visible from the corner of your eye while you are reading a
+   column of numbers rather than the first column. */
 .wk-legacy .grid .rrow td,
 .wk-legacy .grid .rrow:hover td {
   position: static;
   width: auto !important;
   overflow: visible;
   box-shadow: none;
-  padding: 10px 10px 5px;
-  font-size: 10.5px;
+  padding: 13px 10px 7px;
+  font-size: 11px;
   font-weight: 800;
-  color: var(--text2);
+  color: var(--text);
   background: var(--wk-band) !important;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.12em;
   border: 1px solid var(--wk-line);
+  border-top: 2.5px solid var(--brown-600);
+  border-bottom: 1px solid var(--line-2);
+}
+/* The first region has the table header above it, so it does not need a
+   divider from the row before, there is none. */
+.wk-legacy .grid tbody tr.rrow:first-child td {
+  border-top: 1px solid var(--wk-line);
 }
 
 .wk-legacy .cell-ok {
@@ -3617,14 +3636,15 @@ table.stores tr:hover td {
 .wk-legacy .scard-region-head {
   font-size: 11.5px;
   font-weight: 800;
-  color: var(--text2);
+  color: var(--text);
   background: var(--wk-band);
-  padding: 7px 12px;
+  padding: 8px 12px;
   border: none;
-  border-radius: 8px;
-  margin: 16px 0 10px;
-  letter-spacing: 0;
-  text-transform: none;
+  border-top: 2.5px solid var(--brown-600);
+  border-radius: 0 0 8px 8px;
+  margin: 22px 0 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* ============================================================
