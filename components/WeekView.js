@@ -147,8 +147,8 @@ export default function WeekView({ report, loading, error, groupFilter, search }
       <div style={{ marginBottom: 17 }}>
         <div
           style={{
-            background: "var(--ink)",
-            color: "var(--cream-300)",
+            background: "var(--surface-3)",
+            color: "var(--text)",
             padding: "8px 16px",
             borderRadius: 10,
             fontSize: 13,

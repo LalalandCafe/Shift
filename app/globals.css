@@ -1,30 +1,36 @@
 /* ============================================================
    SHIFT design system
-   La La Land palette, second cut.
+   La La Land palette, third cut. Quiet chrome.
 
-   Three changes, all from the same note:
-     1. The brown was nearly black. The shell is cut from #8B6A51
-        now, so the darkest surface in the app is a warm brown you
-        can name, not a charcoal with a hint of warmth.
-     2. The canvas leaned rose. It is cut from the cream instead of
-        from the paper, so it reads yellow-warm.
-     3. The yellow was decoration. It is the selection color now:
-        active nav, segmented buttons, chips, day pills, the top
-        three rank badges and the dashboard call to action. Anything
-        that means "this one" is #F8E27E with brown type on it.
+   The second cut was pretty and that was the problem. A dashboard
+   whose job is to make you read numbers should not have anything
+   in it that competes with the numbers. Every full bleed gradient
+   slab is gone. What replaced them:
+
+     - Sidebar, cards and panels are white on a near white canvas,
+       separated by a one pixel warm hairline. Nothing floats.
+     - A coloured 4px rule down the left edge carries the state a
+       gradient used to carry. Same information, a hundredth of the
+       ink.
+     - Hierarchy moves from colour to weight. Headlines and figures
+       are 800, labels 700, names 700. The numbers are the loudest
+       thing on every screen, which is the point.
+     - The segmented control is cut like the iOS one: recessed
+       track, chosen segment lifted out in white.
+     - Cards no longer lift or slide on hover. They change one
+       hairline.
+
+   Colour now means exactly one of three things: a band (green or
+   red, how a number scored), a state (warn, positive), or a
+   selection (cream fill with a gold hairline). Nothing is coloured
+   for decoration.
 
    Palette
-     cream  #FFF7D2   accent fills, sidebar type, brand blocks
-     gold   #F8E27E   selection, the color that means "this one"
-     coffee #8B6A51   brand brown, base of the shell ramp
-     paper  #FBF7F2   the one cool-neutral tone, small roles only
-     white  #FFFFFF   card surface
-
-   Paper is the rosiest thing in the palette, which is what the note
-   was about, so it stays out of the canvas and out of the cards. It
-   keeps the two places a neutral is correct: the email preview
-   frame, which has to show the email honestly, and the week view
-   row hover.
+     cream  #FFF7D2   selection fills, accent surfaces
+     gold   #F8E27E   the left rule and the selection hairline
+     coffee #8B6A51   brand brown, base of the type and line ramps
+     paper  #FBF7F2   week view row hover
+     white  #FFFFFF   every card
 
    The one thing deliberately NOT rebranded is the --band-* pair.
    Those greens and reds are the Excel colors the daily email
@@ -50,6 +56,9 @@
 
   /* gold ramp */
   --gold-700: #c9a83f;
+  /* The one gold dark enough to be a mark rather than a fill. 3.5:1 on
+     white, which is what a 4px state rule has to clear to mean anything. */
+  --gold-ink: #a88424;
   --gold-600: #e0c45a;
   --gold-500: #f8e27e;
   --gold-400: #fff0b0;
@@ -68,17 +77,17 @@
   /* ---- light surfaces ----
      Cut from the cream, not the paper. Same tonal steps as before,
      rotated off the pink. */
-  --canvas: #f8f2e0;
+  --canvas: #fbfaf5;
   --surface: #ffffff;
-  --surface-2: #fdf9ed;
-  --surface-3: #f3ebd4;
+  --surface-2: #faf7ef;
+  --surface-3: #f4f0e4;
   --surface-alt: #fbf7f2;
-  --line: #ece2c9;
-  --line-2: #dacca9;
+  --line: #e8e0cf;
+  --line-2: #d8cdb6;
 
-  --text: #3e2f23;
-  --text2: #6e5949;
-  --text3: #8c7867;
+  --text: #2b221a;
+  --text2: #6b5a4a;
+  --text3: #8a7867;
 
   /* ---- accent and selection ----
      Two different jobs, two different colors, on purpose.
@@ -102,7 +111,7 @@
 
   --select: #f8e27e;
   --select-ink: #3e2f23;
-  --select-line: #e0c45a;
+  --select-line: #c9a83f;
 
   --pos: #34714a;
   --pos-bg: #e9f2e4;
@@ -138,23 +147,23 @@
   /* ---- week view, spreadsheet skin ----
      The legacy grey grid, re-cut in cream and brown. One place to
      change it instead of eleven hardcoded hex values. */
-  --wk-head: #f8f2de;
-  --wk-line: #e6dcc0;
+  --wk-head: #f7f3e6;
+  --wk-line: #e5ddca;
   --wk-hover: #fbf7f2;
-  --wk-band: #533f2e;
-  --wk-chip: #f3ebd4;
+  --wk-band: #f4f0e4;
+  --wk-chip: #f4f0e4;
 
-  --r: 8px;
-  --rl: 12px;
-  --rx: 16px;
+  --r: 10px;
+  --rl: 14px;
+  --rx: 18px;
 
   --dur: 160ms;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   /* Shadows carry a brown cast so cards do not look grey on cream. */
-  --sh-1: 0 1px 2px rgba(83, 63, 46, 0.07);
-  --sh-2: 0 4px 16px rgba(83, 63, 46, 0.13);
-  --sh-3: 0 18px 48px rgba(83, 63, 46, 0.28);
+  --sh-1: 0 1px 2px rgba(43, 34, 26, 0.04);
+  --sh-2: 0 4px 14px rgba(43, 34, 26, 0.08);
+  --sh-3: 0 20px 50px rgba(43, 34, 26, 0.18);
   --ring: 0 0 0 3px rgba(124, 93, 69, 0.22);
 
   --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
@@ -323,8 +332,9 @@ select {
 .sidebar {
   width: 226px;
   flex-shrink: 0;
-  background: var(--ink);
-  color: var(--ink-text);
+  background: var(--surface);
+  color: var(--text2);
+  border-right: 1px solid var(--line);
   padding: 16px 12px 12px;
   display: flex;
   flex-direction: column;
@@ -379,7 +389,7 @@ select {
 }
 
 .topbar {
-  background: rgba(248, 242, 224, 0.9);
+  background: rgba(255, 255, 255, 0.88);
   backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--line);
   padding: 12px 24px;
@@ -415,7 +425,7 @@ select {
   transition: background var(--dur) var(--ease);
 }
 .logo:hover {
-  background: var(--ink-2);
+  background: var(--surface-2);
 }
 .logo-words {
   min-width: 0;
@@ -437,10 +447,10 @@ select {
   letter-spacing: -0.02em;
 }
 .logo-text {
-  font-size: 14.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--cream);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--text);
 }
 .logo-sub {
   font-size: 9.5px;
@@ -452,15 +462,14 @@ select {
 /* The brand mark is brown, which sinks into the dark rail, so it is
    flattened to cream. It sits under SHIFT at caption scale: this is
    the SHIFT app made for La La Land, not the other way around.
-   TODO: ship /logo/lalaland-cream.png and drop the filter. Inverting
-   a PNG at runtime costs a repaint and kills any antialiasing the
-   asset had. */
+   The rail is white now, so the brown brand PNG goes in as it is. The
+   invert-and-tint filter that used to sit here is gone: it cost a
+   repaint on every hover and destroyed the asset antialiasing. */
 .logo-lockup {
   display: block;
   height: 13px;
   width: auto;
   margin-top: 4px;
-  filter: brightness(0) invert(1) sepia(0.4) saturate(2.6) hue-rotate(2deg);
   opacity: 0.72;
   transition: opacity var(--dur) var(--ease);
 }
@@ -489,8 +498,8 @@ select {
 .nsec {
   font-size: 9px;
   font-weight: 700;
-  color: #a88e72;
-  letter-spacing: 0.11em;
+  color: var(--text3);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 16px 10px 6px;
 }
@@ -501,38 +510,38 @@ select {
   gap: 10px;
   padding: 8px 10px;
   border-radius: var(--r);
-  font-size: 12.5px;
-  color: var(--ink-text2);
+  font-size: 13px;
+  color: var(--text2);
   cursor: pointer;
   border: none;
   background: transparent;
   width: 100%;
   text-align: left;
-  font-weight: 500;
+  font-weight: 600;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .nbtn:hover {
-  background: var(--ink-2);
-  color: var(--ink-text);
+  background: var(--surface-2);
+  color: var(--text);
 }
 .nbtn.active {
-  background: var(--ink-3);
-  color: var(--gold-400);
-  font-weight: 600;
+  background: var(--accent-bg);
+  color: var(--text);
+  font-weight: 700;
 }
 .nbtn.active::before {
   content: "";
   position: absolute;
   left: -12px;
-  top: 7px;
-  bottom: 7px;
+  top: 6px;
+  bottom: 6px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--gold);
+  background: var(--gold-ink);
   animation: fade var(--dur) var(--ease) both;
 }
 .nbtn .ic {
-  opacity: 0.72;
+  opacity: 0.6;
   transition: opacity var(--dur) var(--ease);
 }
 .nbtn:hover .ic,
@@ -543,23 +552,24 @@ select {
 .nfoot {
   margin-top: 4px;
   padding: 10px;
-  border-top: 1px solid var(--ink-line);
+  border-top: 1px solid var(--line);
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 11px;
-  color: var(--ink-text2);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text3);
 }
 .ndot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #86694c;
+  background: var(--line-2);
   flex-shrink: 0;
 }
 .ndot.on {
-  background: #57b581;
-  box-shadow: 0 0 0 3px rgba(87, 181, 129, 0.18);
+  background: var(--pos);
+  box-shadow: 0 0 0 3px rgba(52, 113, 74, 0.16);
 }
 
 /* ---- topbar ---- */
@@ -570,14 +580,14 @@ select {
   min-width: 0;
 }
 .ptitle {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .psub {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text3);
-  font-weight: 500;
+  font-weight: 600;
   margin-top: 1px;
 }
 .tbr {
@@ -596,8 +606,8 @@ select {
 .mobile-logo {
   display: none;
   border: none;
-  background: var(--ink);
-  padding: 3px;
+  background: transparent;
+  padding: 0;
   cursor: pointer;
   border-radius: 9px;
   transition: transform var(--dur) var(--ease);
@@ -725,19 +735,25 @@ select {
 }
 
 /* segmented control */
+/* Cut like an iOS segmented control: a recessed track with the chosen
+   segment lifted out of it in white. It says "selected" with position
+   and a hairline of shadow instead of a slab of color, which is the
+   whole point of this pass. */
 .seg {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--line-2);
+  gap: 2px;
+  border: 1px solid var(--line);
   border-radius: var(--r);
-  background: var(--surface);
-  overflow: hidden;
+  background: var(--surface-3);
+  padding: 2px;
 }
 .seg-btn {
   border: none;
   background: transparent;
   padding: 0 12px;
-  height: 32px;
+  height: 28px;
+  border-radius: 7px;
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text2);
@@ -745,10 +761,10 @@ select {
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
 .seg-btn + .seg-btn {
-  border-left: 1px solid var(--line);
+  border-left: none;
 }
 .seg-btn:hover:not(:disabled) {
-  background: var(--surface-2);
+  background: rgba(255, 255, 255, 0.6);
   color: var(--text);
 }
 .seg-btn:disabled {
@@ -756,18 +772,19 @@ select {
   cursor: default;
 }
 .seg-btn.active {
-  background: var(--select);
-  color: var(--select-ink);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(43, 34, 26, 0.1);
 }
 .seg-label {
   padding: 0 14px;
-  height: 32px;
+  height: 28px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border-left: 1px solid var(--line);
-  border-right: 1px solid var(--line);
-  background: var(--surface-2);
+  border-radius: 7px;
+  background: var(--surface);
 }
 .seg-label b {
   font-size: 12.5px;
@@ -794,18 +811,18 @@ select {
   background: var(--band-red);
 }
 .seg-btn.seg-green.active {
-  background: var(--band-green);
-  border-color: var(--band-green);
-  color: #fff;
+  background: var(--surface);
+  color: var(--band-green);
 }
 .seg-btn.seg-red.active {
-  background: var(--band-red);
-  border-color: var(--band-red);
-  color: #fff;
+  background: var(--surface);
+  color: var(--band-red);
 }
-.seg-btn.seg-green.active .seg-dot,
+.seg-btn.seg-green.active .seg-dot {
+  background: var(--band-green);
+}
 .seg-btn.seg-red.active .seg-dot {
-  background: #fff;
+  background: var(--band-red);
 }
 
 /* ============================ chips ============================ */
@@ -903,8 +920,7 @@ select {
   transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 .mc:hover {
-  box-shadow: var(--sh-2);
-  transform: translateY(-1px);
+  border-color: var(--line-2);
 }
 .mc-l {
   font-size: 9.5px;
@@ -916,7 +932,7 @@ select {
 }
 .mc-v {
   font-size: 25px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
@@ -956,18 +972,20 @@ select {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 9px 15px;
+  padding: 10px 16px;
   border-radius: var(--rl);
-  background: var(--gold);
-  color: var(--brown-900);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--gold-ink);
+  color: var(--text);
 }
 .ctx-block b {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 800;
 }
 .ctx-block span {
-  font-size: 11px;
-  color: var(--brown-700);
+  font-size: 11.5px;
+  color: var(--text2);
 }
 
 /* ============================ day pills ============================ */
@@ -995,10 +1013,10 @@ select {
 }
 .dpill.active,
 .dpill.has.active {
-  background: var(--select);
-  color: var(--select-ink);
+  background: var(--accent-bg);
+  color: var(--text);
   border-color: var(--select-line);
-  font-weight: 600;
+  font-weight: 700;
 }
 .dpill.has {
   border-color: var(--pos-line);
@@ -1028,12 +1046,12 @@ select {
   border-bottom: 1px solid var(--line);
 }
 .ttl {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 800;
   letter-spacing: -0.01em;
 }
 .tsub {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text3);
   font-weight: 500;
   margin-top: 1px;
@@ -1084,6 +1102,7 @@ table.grid .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+  font-weight: 600;
 }
 table.grid tbody tr {
   transition: background var(--dur) var(--ease);
@@ -1169,8 +1188,8 @@ th.sorted .th-caret {
   gap: 5px;
 }
 .lc-name {
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
@@ -1492,8 +1511,8 @@ table.stores tr:hover td {
   min-width: 0;
 }
 .lrow-name {
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1504,8 +1523,8 @@ table.stores tr:hover td {
   margin-top: 1px;
 }
 .lrow-val {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 14.5px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -1555,8 +1574,8 @@ table.stores tr:hover td {
   animation: rise 200ms var(--ease) both;
 }
 .modal-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   letter-spacing: -0.01em;
 }
 .modal-sub {
@@ -1606,8 +1625,8 @@ table.stores tr:hover td {
   animation: fade 200ms var(--ease) both;
 }
 .empty-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 14.5px;
+  font-weight: 800;
   color: var(--text);
 }
 .skel {
@@ -1719,8 +1738,8 @@ table.stores tr:hover td {
   border-bottom: 1px solid var(--line);
 }
 .store-card-name {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 15.5px;
+  font-weight: 800;
 }
 .store-card-code {
   font-size: 10.5px;
@@ -1783,8 +1802,8 @@ table.stores tr:hover td {
   margin-bottom: 3px;
 }
 .scard-cell-val {
-  font-size: 14.5px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .scard-cell.splh-ok {
@@ -1825,12 +1844,15 @@ table.stores tr:hover td {
   flex-wrap: wrap;
 }
 .dash-hero.clear {
-  background: var(--pos-bg);
-  border: 1px solid var(--pos-line);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 var(--pos);
 }
 .dash-hero.alert {
-  background: linear-gradient(140deg, var(--brown-800) 0%, var(--brown-600) 100%);
-  color: var(--cream);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 var(--warn);
+  color: var(--text);
 }
 /* emoji slot in Dashboard.js, hidden until that file is refactored */
 .dash-hero-icon {
@@ -1838,13 +1860,13 @@ table.stores tr:hover td {
 }
 .dash-hero-num {
   font-size: 29px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.15;
   letter-spacing: -0.03em;
 }
 .dash-hero-sub {
   font-size: 12.5px;
-  opacity: 0.85;
+  color: var(--text2);
   margin-top: 7px;
   max-width: 440px;
   line-height: 1.55;
@@ -1874,8 +1896,7 @@ table.stores tr:hover td {
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .dash-row:hover {
-  transform: translateX(2px);
-  box-shadow: var(--sh-1);
+  background: var(--surface-2);
 }
 .dash-row.sev-critical {
   border-left-color: var(--band-red);
@@ -1887,8 +1908,8 @@ table.stores tr:hover td {
   border-left-color: var(--line-2);
 }
 .dash-row-name {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 13.5px;
+  font-weight: 800;
 }
 .dash-row-label {
   font-size: 11.5px;
@@ -1927,40 +1948,45 @@ table.stores tr:hover td {
 
 /* ============================ store trend ============================ */
 
+/* The verdict used to be a full bleed gradient. On a screen whose job
+   is to make you read a heatmap of numbers, a slab that size wins the
+   eye every time. It is a white card with a coloured rule now: the
+   verdict still reads at a glance, from the rule and from the weight
+   of the headline, without outshouting the grid below it. */
 .st-verdict {
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--rx);
-  padding: 24px 28px;
+  padding: 22px 26px;
   margin-bottom: 20px;
+  color: var(--text);
 }
 .st-verdict.good {
-  background: linear-gradient(140deg, #24523a 0%, #3d7a52 100%);
-  color: #f2fbf3;
+  box-shadow: inset 4px 0 0 var(--band-green);
 }
 .st-verdict.bad {
-  background: linear-gradient(140deg, var(--brown-800) 0%, #6b2b22 100%);
-  color: var(--cream);
+  box-shadow: inset 4px 0 0 var(--band-red);
 }
 .st-verdict.none {
-  background: var(--surface-3);
-  color: var(--text2);
+  box-shadow: inset 4px 0 0 var(--line-2);
 }
 .st-verdict-eyebrow {
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  opacity: 0.65;
+  color: var(--text3);
   margin-bottom: 8px;
 }
 .st-verdict-head {
-  font-size: 24px;
-  font-weight: 700;
+  font-size: 25px;
+  font-weight: 800;
   letter-spacing: -0.025em;
   line-height: 1.2;
 }
 .st-verdict-detail {
   font-size: 13px;
-  opacity: 0.85;
+  color: var(--text2);
   margin-top: 9px;
   max-width: 600px;
   line-height: 1.6;
@@ -2067,8 +2093,8 @@ table.stores tr:hover td {
   min-width: 62px;
 }
 .st-wk-splh {
-  font-size: 19px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
 }
@@ -2094,43 +2120,42 @@ table.stores tr:hover td {
 /* ============================ forecast ============================ */
 
 .fc-hero {
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--rx);
   padding: 22px 26px;
   margin-bottom: 18px;
+  color: var(--text);
 }
 .fc-hero.over {
-  background: linear-gradient(140deg, var(--brown-800) 0%, #6b2b22 100%);
-  color: var(--cream);
+  box-shadow: inset 4px 0 0 var(--band-red);
 }
 .fc-hero.ok {
-  background: linear-gradient(140deg, #24523a 0%, #3d7a52 100%);
-  color: #f2fbf3;
+  box-shadow: inset 4px 0 0 var(--band-green);
 }
 .fc-hero.under {
-  background: linear-gradient(140deg, var(--brown-800) 0%, var(--brown-600) 100%);
-  color: var(--cream);
+  box-shadow: inset 4px 0 0 var(--gold-ink);
 }
 .fc-hero.empty {
-  background: var(--surface-3);
-  color: var(--text);
+  box-shadow: inset 4px 0 0 var(--line-2);
 }
 .fc-eyebrow {
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  opacity: 0.65;
+  color: var(--text3);
   margin-bottom: 7px;
 }
 .fc-head {
-  font-size: 23px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   letter-spacing: -0.025em;
   line-height: 1.22;
 }
 .fc-detail {
   font-size: 13px;
-  opacity: 0.85;
+  color: var(--text2);
   margin-top: 8px;
   max-width: 620px;
   line-height: 1.6;
@@ -2252,8 +2277,10 @@ table.stores tr:hover td {
 .day-panel,
 .kd-panel {
   position: relative;
-  background: var(--ink);
-  color: var(--cream);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 var(--gold-ink);
+  color: var(--text);
   border-radius: var(--rl);
   padding: 18px 20px;
   padding-right: 58px;
@@ -2276,14 +2303,15 @@ table.stores tr:hover td {
   place-items: center;
   border: none;
   border-radius: 8px;
-  background: var(--ink-3);
-  color: var(--cream);
+  background: var(--surface-3);
+  color: var(--text2);
   cursor: pointer;
   transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
 }
 .kd-close:hover,
 .day-panel-close:hover {
-  background: var(--brown-600);
+  background: var(--line-2);
+  color: var(--text);
 }
 .kd-close:active,
 .day-panel-close:active {
@@ -2309,12 +2337,12 @@ table.stores tr:hover td {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.6;
+  color: var(--text3);
 }
 .day-panel-v,
 .kd-v {
-  font-size: 19px;
-  font-weight: 700;
+  font-size: 21px;
+  font-weight: 800;
   margin-top: 3px;
   font-variant-numeric: tabular-nums;
 }
@@ -2323,11 +2351,11 @@ table.stores tr:hover td {
   font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  opacity: 0.6;
+  color: var(--text3);
 }
 .kd-title {
-  font-size: 19px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 800;
   margin-top: 4px;
   letter-spacing: -0.02em;
 }
@@ -2336,10 +2364,10 @@ table.stores tr:hover td {
   font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  opacity: 0.55;
+  color: var(--text3);
   margin-bottom: 9px;
   padding-top: 14px;
-  border-top: 1px solid var(--ink-line);
+  border-top: 1px solid var(--line);
 }
 .kd-st {
   display: flex;
@@ -2358,13 +2386,13 @@ table.stores tr:hover td {
 }
 .kd-st-sub {
   font-size: 10px;
-  opacity: 0.6;
+  color: var(--text3);
   margin-top: 1px;
 }
 .kd-bar-track {
   flex: 1.4;
   height: 6px;
-  background: rgba(255, 247, 210, 0.16);
+  background: var(--surface-3);
   border-radius: 100px;
   overflow: hidden;
   min-width: 52px;
@@ -2385,7 +2413,7 @@ table.stores tr:hover td {
 }
 .kd-note {
   font-size: 11.5px;
-  opacity: 0.75;
+  color: var(--text2);
   margin-top: 15px;
   line-height: 1.55;
   max-width: 560px;
@@ -2425,9 +2453,10 @@ table.stores tr:hover td {
   color: var(--text);
 }
 .lb-chip.active {
-  background: var(--select);
+  background: var(--accent-bg);
   border-color: var(--select-line);
-  color: var(--select-ink);
+  color: var(--text);
+  font-weight: 700;
 }
 .lb-chip-n {
   font-size: 10px;
@@ -2470,8 +2499,7 @@ table.stores tr:hover td {
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .lb-pod:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--sh-2);
+  border-color: var(--line-2);
 }
 .lb-pod.pinned {
   border-color: var(--accent);
@@ -2494,8 +2522,8 @@ table.stores tr:hover td {
   min-width: 0;
 }
 .lb-pod-name {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 14.5px;
+  font-weight: 800;
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
@@ -2510,8 +2538,8 @@ table.stores tr:hover td {
   text-overflow: ellipsis;
 }
 .lb-pod-pct {
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 27px;
+  font-weight: 800;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -2661,15 +2689,16 @@ table.stores tr:hover td {
   background: var(--surface-3);
 }
 .lb-rank.top {
-  background: var(--select);
-  color: var(--select-ink);
+  background: var(--accent-bg);
+  color: var(--text);
+  border: 1px solid var(--select-line);
 }
 .lb-name {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
 }
 .lb-meta {
   font-size: 10.5px;
@@ -2683,8 +2712,8 @@ table.stores tr:hover td {
 /* Score is a 0 to 100 percentile blend, not a pass or fail against a
    target, so it does not take the green or red treatment. */
 .lb-pct {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 800;
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--text);
@@ -2761,6 +2790,10 @@ table.stores tr:hover td {
    is selected. The attention count sits to its right as a button
    rather than a headline, because a count is only useful if you can
    get to the list. */
+/* One number carries this screen, so the card it sits in should carry
+   nothing. White, one hairline, and a coloured rule down the left that
+   says at a glance whether anything needs attention. The gradient this
+   replaced was the single loudest thing in the app. */
 .db-rail {
   display: flex;
   align-items: stretch;
@@ -2769,12 +2802,13 @@ table.stores tr:hover td {
   border-radius: var(--rx);
   padding: 22px 24px;
   margin-bottom: 14px;
-  background: linear-gradient(135deg, var(--brown-900) 0%, var(--brown-700) 58%, var(--brown-600) 100%);
-  color: var(--cream);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 var(--gold-ink);
+  color: var(--text);
 }
 .db-rail.clear {
-  background: linear-gradient(135deg, #1e4530 0%, #2f6444 58%, #3d7a52 100%);
-  color: #f2fbf3;
+  box-shadow: inset 4px 0 0 var(--pos);
 }
 .db-rail-main {
   flex: 1;
@@ -2785,16 +2819,16 @@ table.stores tr:hover td {
   font-weight: 700;
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  opacity: 0.62;
+  color: var(--text3);
 }
 .db-rail-num {
   display: flex;
   align-items: baseline;
   gap: 11px;
   flex-wrap: wrap;
-  font-size: 40px;
-  font-weight: 700;
-  letter-spacing: -0.035em;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
   line-height: 1.05;
   margin-top: 9px;
   font-variant-numeric: tabular-nums;
@@ -2804,11 +2838,11 @@ table.stores tr:hover td {
   font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  opacity: 0.55;
+  color: var(--text3);
 }
 .db-rail-sub {
   font-size: 12.5px;
-  opacity: 0.82;
+  color: var(--text2);
   margin-top: 10px;
   line-height: 1.5;
 }
@@ -2828,28 +2862,27 @@ table.stores tr:hover td {
   text-align: left;
   padding: 14px 16px;
   border-radius: var(--rl);
-  border: 1px solid var(--gold-600);
-  background: var(--select);
-  color: var(--select-ink);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
   cursor: pointer;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
     transform var(--dur) var(--ease);
 }
 .db-rail-cta:hover {
-  background: var(--gold-400);
-  border-color: var(--gold-500);
-  transform: translateY(-1px);
+  background: var(--accent-bg);
+  border-color: var(--select-line);
 }
 .db-rail-cta-num {
-  font-size: 30px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 800;
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
 .db-rail-cta-lbl {
   font-size: 11.5px;
-  opacity: 0.78;
+  color: var(--text2);
   margin-top: 5px;
   line-height: 1.35;
 }
@@ -2861,7 +2894,7 @@ table.stores tr:hover td {
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  opacity: 0.6;
+  color: var(--text3);
   margin-top: 11px;
 }
 
@@ -2889,8 +2922,7 @@ table.stores tr:hover td {
     border-color var(--dur) var(--ease);
 }
 .db-tile:hover {
-  box-shadow: var(--sh-2);
-  transform: translateY(-1px);
+  border-color: var(--line-2);
 }
 .db-tile.tone-pos {
   border-top-color: var(--band-green);
@@ -2911,7 +2943,7 @@ table.stores tr:hover td {
 }
 .db-tile-v {
   font-size: 27px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
@@ -3048,8 +3080,8 @@ table.stores tr:hover td {
   background: var(--surface-2);
 }
 .db-mover-row-name {
-  font-size: 12.5px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -3190,15 +3222,14 @@ table.stores tr:hover td {
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .db-watch:hover {
-  transform: translateX(2px);
-  box-shadow: var(--sh-1);
+  background: var(--surface-2);
 }
 .db-watch-main {
   flex: 1;
   min-width: 0;
 }
 .db-watch-name {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
@@ -3404,13 +3435,13 @@ table.stores tr:hover td {
   width: auto !important;
   overflow: visible;
   box-shadow: none;
-  padding: 9px 10px 4px;
+  padding: 10px 10px 5px;
   font-size: 10.5px;
-  font-weight: 700;
-  color: var(--cream);
+  font-weight: 800;
+  color: var(--text2);
   background: var(--wk-band) !important;
-  letter-spacing: 0.05em;
-  border: 1px solid rgba(255, 247, 210, 0.15);
+  letter-spacing: 0.09em;
+  border: 1px solid var(--wk-line);
 }
 
 .wk-legacy .cell-ok {
@@ -3551,9 +3582,9 @@ table.stores tr:hover td {
   color: var(--band-red);
 }
 .wk-legacy .scard-region-head {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 800;
-  color: var(--cream);
+  color: var(--text2);
   background: var(--wk-band);
   padding: 7px 12px;
   border: none;
@@ -3641,9 +3672,10 @@ table.stores tr:hover td {
     transition: all var(--dur) var(--ease);
   }
   .mnav-btn.active {
-    background: var(--select);
-    color: var(--select-ink);
+    background: var(--accent-bg);
+    color: var(--text);
     border-color: var(--select-line);
+    font-weight: 700;
   }
 
   /* ---- cards ---- */

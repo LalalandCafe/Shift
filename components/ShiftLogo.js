@@ -1,196 +1,3940 @@
-'use client';
+/* ============================================================
+   SHIFT design system
+   La La Land palette, third cut. Quiet chrome.
 
-/**
- * Palette note.
- *
- * This mark used to be blue and amber, two colors from opposite ends of the
- * wheel, which is why it read on any background. La La Land is monochrome
- * brown, so that trick is gone: any two brand tones dark enough for the paper
- * topbar are too dark for the coffee sidebar, and vice versa.
- *
- * The fix is not to compromise on the colors, it is to stop asking the mark to
- * sit on two grounds. Cream and gold, always on coffee. The sidebar is already
- * coffee, and .mobile-logo in globals.css puts a coffee chip behind the mark in
- * the topbar. If you ever place variant="mark" on a light surface, wrap it the
- * same way or use variant="mono", which inherits currentColor.
- */
-const CREAM = '#FFF7D2';
-const GOLD = '#F8E27E';
-const EYE = '#533F2E';
+   The second cut was pretty and that was the problem. A dashboard
+   whose job is to make you read numbers should not have anything
+   in it that competes with the numbers. Every full bleed gradient
+   slab is gone. What replaced them:
 
-const ICON_BG = '#533F2E';
+     - Sidebar, cards and panels are white on a near white canvas,
+       separated by a one pixel warm hairline. Nothing floats.
+     - A coloured 4px rule down the left edge carries the state a
+       gradient used to carry. Same information, a hundredth of the
+       ink.
+     - Hierarchy moves from colour to weight. Headlines and figures
+       are 800, labels 700, names 700. The numbers are the loudest
+       thing on every screen, which is the point.
+     - The segmented control is cut like the iOS one: recessed
+       track, chosen segment lifted out in white.
+     - Cards no longer lift or slide on hover. They change one
+       hairline.
 
-const LEFT = 'M31 8C20 8 12 16 12 26L8 33l4 2v4c0 4 3 6 6 7l5 3v8h8z';
-const RIGHT = 'M33 8c11 0 19 8 19 18l4 7-4 2v4c0 4-3 6-6 7l-5 3v8h-8z';
+   Colour now means exactly one of three things: a band (green or
+   red, how a number scored), a state (warn, positive), or a
+   selection (cream fill with a gold hairline). Nothing is coloured
+   for decoration.
 
-// Fillet, modelled on the Janus bust: a straight braided band across both
-// skulls, a double strip down the seam and a knot on top. Drawn OVER the faces
-// in the opposite color of the half it crosses, gold across the cream face and
-// cream across the gold one, so it reads as one piece worn by both heads and
-// never needs an outline. The notches are painted in the face color underneath,
-// which is what gives the band its braided texture for free.
-const BAND_Y = 18.5;
-const BAND_H = 5;
-const BAND_X = 13.2;
-const NOTCHES = 5;
+   Palette
+     cream  #FFF7D2   selection fills, accent surfaces
+     gold   #F8E27E   the left rule and the selection hairline
+     coffee #8B6A51   brand brown, base of the type and line ramps
+     paper  #FBF7F2   week view row hover
+     white  #FFFFFF   every card
 
-function notchRects(x0, x1, color) {
-  const step = (x1 - x0) / NOTCHES;
-  return Array.from({ length: NOTCHES - 1 }, (_, i) => (
-    <rect
-      key={i}
-      x={(x0 + step * (i + 1) - 0.45).toFixed(2)}
-      y={BAND_Y - 0.2}
-      width="0.9"
-      height={BAND_H + 0.4}
-      fill={color}
-    />
-  ));
+   The one thing deliberately NOT rebranded is the --band-* pair.
+   Those greens and reds are the Excel colors the daily email
+   already uses. Changing them would make the app and the email
+   disagree about what a good number looks like.
+   ============================================================ */
+
+:root {
+  /* ---- brand ---- */
+  --cream: #fff7d2;
+  --gold: #f8e27e;
+  --coffee: #8b6a51;
+  --paper: #fbf7f2;
+  --white: #ffffff;
+
+  /* brown ramp, all derived from #8B6A51 */
+  --brown-900: #3e2f23;
+  --brown-800: #533f2e;
+  --brown-700: #6e5440;
+  --brown-600: #8b6a51;
+  --brown-500: #a5866e;
+  --brown-400: #bfa48e;
+
+  /* gold ramp */
+  --gold-700: #c9a83f;
+  /* The one gold dark enough to be a mark rather than a fill. 3.5:1 on
+     white, which is what a 4px state rule has to clear to mean anything. */
+  --gold-ink: #a88424;
+  --gold-600: #e0c45a;
+  --gold-500: #f8e27e;
+  --gold-400: #fff0b0;
+  --gold-300: #fff7d2;
+
+  /* ---- shell ----
+     Two full steps lighter than the first cut. Cream type on it
+     clears 9:1, so nothing was given up for the warmth. */
+  --ink: #533f2e;
+  --ink-2: #634c39;
+  --ink-3: #755b45;
+  --ink-line: rgba(255, 247, 210, 0.15);
+  --ink-text: #fff7d2;
+  --ink-text2: #c9b49b;
+
+  /* ---- light surfaces ----
+     Cut from the cream, not the paper. Same tonal steps as before,
+     rotated off the pink. */
+  --canvas: #fbfaf5;
+  --surface: #ffffff;
+  --surface-2: #faf7ef;
+  --surface-3: #f4f0e4;
+  --surface-alt: #fbf7f2;
+  --line: #e8e0cf;
+  --line-2: #d8cdb6;
+
+  --text: #2b221a;
+  --text2: #6b5a4a;
+  --text3: #8a7867;
+
+  /* ---- accent and selection ----
+     Two different jobs, two different colors, on purpose.
+
+     --accent is the brown: links, sorted headers, focus borders,
+     hairlines that need to read as interactive. It carries type, so
+     it has to survive at 10px on white.
+
+     --select is the gold: it fills a control to say "this one is the
+     one you picked". It never carries small type itself, it carries
+     --select-ink on top of it at 9.9:1.
+
+     Focus is deliberately NOT gold. A focus ring has to be visible
+     to somebody who cannot see yellow well, and it has to stay
+     distinguishable from selection, because a control can be focused
+     without being selected. */
+  --accent: #7c5d45;
+  --accent-strong: #6e5440;
+  --accent-bg: #fff7d2;
+  --accent-line: #efd98f;
+
+  --select: #f8e27e;
+  --select-ink: #3e2f23;
+  --select-line: #c9a83f;
+
+  --pos: #34714a;
+  --pos-bg: #e9f2e4;
+  --pos-line: #b5cfac;
+
+  --neg: #a83023;
+  --neg-bg: #fbeae5;
+  --neg-line: #efb8ab;
+
+  /* Pushed to terracotta rather than amber. With gold carrying
+     selection everywhere, an amber warn state would have been the
+     same swatch at a glance. */
+  --warn: #9c4c12;
+  --warn-bg: #fbe7d3;
+  --warn-line: #f0be8e;
+
+  /* ---- performance bands ----
+     The four fills that express how a store is doing against a
+     target. Read by lib/scale.js, which is the only thing allowed
+     to decide which band a number falls into. Values are lifted
+     from the WeekView table so every report reads like the daily
+     email that goes out to the field.
+
+     Distinct from --warn on purpose: --warn means "something needs
+     your attention" (missing data, partial week, a flag), while the
+     bands mean "this is how the number scored". Amber never appears
+     as a band. The chain reads red or green. */
+  --band-green: #1a6630;
+  --band-green-soft: #c6efce;
+  --band-red: #9c0006;
+  --band-red-soft: #ffc7ce;
+
+  /* ---- week view, spreadsheet skin ----
+     The legacy grey grid, re-cut in cream and brown. One place to
+     change it instead of eleven hardcoded hex values. */
+  --wk-head: #f7f3e6;
+  --wk-line: #e5ddca;
+  --wk-hover: #fbf7f2;
+  --wk-band: #f4f0e4;
+  --wk-chip: #f4f0e4;
+
+  --r: 10px;
+  --rl: 14px;
+  --rx: 18px;
+
+  --dur: 160ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* Shadows carry a brown cast so cards do not look grey on cream. */
+  --sh-1: 0 1px 2px rgba(43, 34, 26, 0.04);
+  --sh-2: 0 4px 14px rgba(43, 34, 26, 0.08);
+  --sh-3: 0 20px 50px rgba(43, 34, 26, 0.18);
+  --ring: 0 0 0 3px rgba(124, 93, 69, 0.22);
+
+  --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
+
+  /* ---- legacy aliases ----
+     Kept so any component still writing var(--cobalt), var(--navy) or
+     var(--cream-300) inline keeps rendering. The --coffee-* and
+     --cream-* names are from the first cut and now point at the new
+     ramps, so nothing that referenced them has to be touched. */
+  --bg: var(--surface);
+  --bg2: var(--canvas);
+  --bg3: var(--surface-3);
+  --border: var(--line);
+  --border2: var(--line-2);
+  --navy: var(--ink);
+  --cobalt: var(--accent);
+  --cobalt-bg: var(--accent-bg);
+  --cobalt-line: var(--accent-line);
+  --cream-300: #fffbec;
+  --cream-400: var(--cream);
+  --cream-500: var(--gold);
+  --coffee-400: var(--brown-500);
+  --coffee-500: var(--brown-600);
+  --coffee-600: var(--brown-700);
+  --coffee-700: var(--brown-800);
+  --coffee-800: var(--brown-800);
+  --coffee-900: var(--brown-900);
+  --taupe: var(--brown-500);
+  --green: var(--pos);
+  --green-bg: var(--pos-bg);
+  --green-b: var(--pos-line);
+  --red: var(--neg);
+  --red-bg: var(--neg-bg);
+  --red-b: var(--neg-line);
+  --blue: var(--accent);
+  --blue-bg: var(--accent-bg);
+  --blue-b: var(--accent-line);
+  --amber: var(--warn);
+  --amber-bg: var(--warn-bg);
+  --amber-b: var(--warn-line);
+  --cell-green-bg: var(--pos-bg);
+  --cell-green-t: var(--pos);
+  --cell-red-bg: var(--neg-bg);
+  --cell-red-t: var(--neg);
+  --text1: var(--text);
 }
 
-const WORDMARK_FONT =
-  'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif';
-
-function Crown({ on, left = GOLD, right = CREAM, faceLeft = CREAM, faceRight = GOLD }) {
-  return (
-    <g className={'shift-crown' + (on ? ' on' : '')}>
-      <rect x={BAND_X} y={BAND_Y} width={31.7 - BAND_X} height={BAND_H} fill={left} />
-      <rect x="32.3" y={BAND_Y} width={64 - BAND_X - 32.3} height={BAND_H} fill={right} />
-      {notchRects(BAND_X, 31.7, faceLeft)}
-      {notchRects(32.3, 64 - BAND_X, faceRight)}
-      <rect x="28.7" y="3.4" width="3" height="21.6" fill={left} />
-      <rect x="32.3" y="3.4" width="3" height="21.6" fill={right} />
-      <rect x="23.6" y="0" width="8.1" height="3.4" rx="1.5" fill={left} />
-      <rect x="32.3" y="0" width="8.1" height="3.4" rx="1.5" fill={right} />
-    </g>
-  );
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-function Faces({ left = CREAM, right = GOLD, eye = EYE, showEyes = true }) {
-  return (
-    <>
-      <path d={LEFT} fill={left} />
-      <path d={RIGHT} fill={right} />
-      {showEyes && (
-        <>
-          <circle cx="17" cy="27" r="2.4" fill={eye} />
-          <circle cx="47" cy="27" r="2.4" fill={eye} />
-        </>
-      )}
-    </>
-  );
+body {
+  font-family: var(--font);
+  background: var(--canvas);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/**
- * SHIFT logo.
- *
- * variant:
- *   'lockup'  mark + wordmark, horizontal (default)
- *   'stacked' mark above wordmark, centered
- *   'mark'    Janus mark only, in brand colors, expects a dark ground
- *   'mono'    Janus mark only, single color (inherits currentColor)
- *   'icon'    rounded square app icon, coffee background
- *
- * crown:
- *   omitted   no crown, original tight viewBox
- *   true      crown visible
- *   false     crown hidden but still mounted, so it can animate in and out
- *
- * size = rendered height in px. Width scales automatically.
- */
-export default function ShiftLogo({
-  variant = 'lockup',
-  size = 32,
-  crown,
-  className = '',
-  title = 'SHIFT',
-  ...rest
-}) {
-  const hasCrown = crown !== undefined;
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
 
-  const common = {
-    className,
-    role: 'img',
-    'aria-label': title,
-    xmlns: 'http://www.w3.org/2000/svg',
-    ...rest,
-  };
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 5px;
+}
 
-  // With a crown the viewBox opens upward so the faces keep their exact
-  // geometry, and the head never shifts when the crown toggles.
-  const box = hasCrown ? '0 -3 64 67' : '0 0 64 64';
-  const ratio = hasCrown ? 64 / 67 : 1;
+.ic {
+  flex-shrink: 0;
+  display: block;
+}
 
-  if (variant === 'mark' || variant === 'mono') {
-    const mono = variant === 'mono';
-    return (
-      <svg viewBox={box} width={size * ratio} height={size} {...common}>
-        {mono ? (
-          <>
-            <path d={LEFT} fill="currentColor" />
-            <path d={RIGHT} fill="currentColor" opacity="0.55" />
-          </>
-        ) : (
-          <Faces />
-        )}
-        {hasCrown && (
-          <Crown
-            on={crown}
-            left={mono ? 'currentColor' : GOLD}
-            right={mono ? 'currentColor' : CREAM}
-            faceLeft={mono ? 'transparent' : CREAM}
-            faceRight={mono ? 'transparent' : GOLD}
-          />
-        )}
-      </svg>
-    );
+/* ============================ motion ============================ */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.view {
+  animation: rise 220ms var(--ease) both;
+}
+.stagger > * {
+  animation: rise 260ms var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 16ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ============================ shell ============================ */
+
+.app {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 226px;
+  flex-shrink: 0;
+  background: var(--surface);
+  color: var(--text2);
+  border-right: 1px solid var(--line);
+  padding: 16px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  transition: width 200ms var(--ease), padding 200ms var(--ease);
+}
+.sidebar-spacer {
+  flex: 1;
+  min-height: 12px;
+}
+
+.sidebar.collapsed {
+  width: 68px;
+  padding-left: 10px;
+  padding-right: 10px;
+  align-items: stretch;
+}
+.sidebar.collapsed .logo {
+  justify-content: center;
+  padding: 4px 0 2px;
+}
+.sidebar.collapsed .logo-words,
+.sidebar.collapsed .nbtn-label,
+.sidebar.collapsed .nsec {
+  display: none;
+}
+.sidebar.collapsed .nbtn {
+  justify-content: center;
+  padding: 10px 0;
+}
+.sidebar.collapsed .nbtn.active::before {
+  left: -10px;
+}
+.sidebar.collapsed .nfoot {
+  justify-content: center;
+  padding: 12px 0;
+}
+/* Keeps breathing room between groups once the labels are gone. */
+.sidebar.collapsed .nsec + .nbtn {
+  margin-top: 10px;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.content {
+  padding: 24px;
+  flex: 1;
+  max-width: 1440px;
+  width: 100%;
+}
+
+/* ---- brand ---- */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 2px;
+  margin-bottom: 16px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--r);
+  transition: background var(--dur) var(--ease);
+}
+.logo:hover {
+  background: var(--surface-2);
+}
+.logo-words {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.logo-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(150deg, var(--gold-400), var(--gold-600));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--brown-900);
+  letter-spacing: -0.02em;
+}
+.logo-text {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+.logo-sub {
+  font-size: 9.5px;
+  color: var(--ink-text2);
+  font-weight: 500;
+  letter-spacing: 0.03em;
+}
+
+/* The brand mark is brown, which sinks into the dark rail, so it is
+   flattened to cream. It sits under SHIFT at caption scale: this is
+   the SHIFT app made for La La Land, not the other way around.
+   The rail is white now, so the brown brand PNG goes in as it is. The
+   invert-and-tint filter that used to sit here is gone: it cost a
+   repaint on every hover and destroyed the asset antialiasing. */
+.logo-lockup {
+  display: block;
+  height: 13px;
+  width: auto;
+  margin-top: 4px;
+  opacity: 0.72;
+  transition: opacity var(--dur) var(--ease);
+}
+.logo:hover .logo-lockup {
+  opacity: 1;
+}
+
+/* Crown reacts to the nav state. Mounted at all times so it can
+   animate both ways: lifts off and fades when the menu closes,
+   drops back on when it opens. */
+.shift-crown {
+  transform-origin: 32px 12px;
+  transition: opacity 220ms var(--ease), transform 260ms var(--ease);
+  opacity: 0;
+  transform: translateY(-6px) scaleY(0.7);
+}
+.shift-crown.on {
+  opacity: 1;
+  transform: none;
+}
+.logo:hover .shift-crown.on {
+  transform: translateY(-1.5px);
+}
+
+/* ---- nav ---- */
+.nsec {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 16px 10px 6px;
+}
+.nbtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r);
+  font-size: 13px;
+  color: var(--text2);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-weight: 600;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.nbtn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.nbtn.active {
+  background: var(--accent-bg);
+  color: var(--text);
+  font-weight: 700;
+}
+.nbtn.active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--gold-ink);
+  animation: fade var(--dur) var(--ease) both;
+}
+.nbtn .ic {
+  opacity: 0.6;
+  transition: opacity var(--dur) var(--ease);
+}
+.nbtn:hover .ic,
+.nbtn.active .ic {
+  opacity: 1;
+}
+
+.nfoot {
+  margin-top: 4px;
+  padding: 10px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text3);
+}
+.ndot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-2);
+  flex-shrink: 0;
+}
+.ndot.on {
+  background: var(--pos);
+  box-shadow: 0 0 0 3px rgba(52, 113, 74, 0.16);
+}
+
+/* ---- topbar ---- */
+.topbar-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.ptitle {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.psub {
+  font-size: 11.5px;
+  color: var(--text3);
+  font-weight: 600;
+  margin-top: 1px;
+}
+.tbr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* The sidebar already carries the logo on desktop.
+   The chip is not decoration. The Janus mark is two tones, and La La Land is
+   a monochrome brown palette, so no fixed pair of face colors reads well on
+   both the dark rail and a near white topbar. Putting the mark on a coffee
+   chip here means it always sits on the same dark ground, and ShiftLogo can
+   use cream and gold without picking a background to lose against. */
+.mobile-logo {
+  display: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 9px;
+  transition: transform var(--dur) var(--ease);
+}
+.mobile-logo:active {
+  transform: scale(0.94);
+}
+
+/* ============================ controls ============================ */
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  height: 32px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text2);
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.field:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.field input,
+.field select {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12.5px;
+  color: var(--text);
+  min-width: 0;
+}
+.field input::placeholder {
+  color: var(--text3);
+}
+.field-search input {
+  width: 168px;
+}
+/* The region picker drew a native arrow plus an <Icon name="down" />.
+   Native is off, the icon we control stays, so the chevron keeps the
+   same stroke weight as every other icon in the app. */
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 2px;
+}
+.field select::-ms-expand {
+  display: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 13px;
+  height: 32px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.btn:hover {
+  background: var(--surface-2);
+  border-color: var(--brown-500);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+.btn-primary {
+  background: var(--ink);
+  color: var(--cream);
+  border-color: var(--ink);
+}
+.btn-primary:hover {
+  background: var(--ink-3);
+  border-color: var(--ink-3);
+}
+.btn-icon {
+  width: 32px;
+  padding: 0;
+}
+.btn-sm {
+  height: 28px;
+  padding: 0 11px;
+  font-size: 12px;
+}
+.btn-full {
+  width: 100%;
+}
+.btn-green {
+  background: var(--pos-bg);
+  color: var(--pos);
+  border-color: var(--pos-line);
+}
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text2);
+}
+.btn-ghost:hover {
+  background: var(--surface-3);
+}
+.btn-quiet {
+  width: 100%;
+  height: 34px;
+  border-style: dashed;
+  color: var(--text2);
+  font-weight: 600;
+}
+
+/* segmented control */
+/* Cut like an iOS segmented control: a recessed track with the chosen
+   segment lifted out of it in white. It says "selected" with position
+   and a hairline of shadow instead of a slab of color, which is the
+   whole point of this pass. */
+.seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface-3);
+  padding: 2px;
+}
+.seg-btn {
+  border: none;
+  background: transparent;
+  padding: 0 12px;
+  height: 28px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.seg-btn + .seg-btn {
+  border-left: none;
+}
+.seg-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--text);
+}
+.seg-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.seg-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(43, 34, 26, 0.1);
+}
+.seg-label {
+  padding: 0 14px;
+  height: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--surface);
+}
+.seg-label b {
+  font-size: 12.5px;
+  letter-spacing: -0.01em;
+}
+.seg-label span {
+  font-size: 9.5px;
+  color: var(--text3);
+  margin-top: -1px;
+}
+
+/* red and green sort buttons */
+.seg-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.seg-dot.green {
+  background: var(--band-green);
+}
+.seg-dot.red {
+  background: var(--band-red);
+}
+.seg-btn.seg-green.active {
+  background: var(--surface);
+  color: var(--band-green);
+}
+.seg-btn.seg-red.active {
+  background: var(--surface);
+  color: var(--band-red);
+}
+.seg-btn.seg-green.active .seg-dot {
+  background: var(--band-green);
+}
+.seg-btn.seg-red.active .seg-dot {
+  background: var(--band-red);
+}
+
+/* ============================ chips ============================ */
+
+.badge,
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  padding: 3px 9px;
+  border-radius: 100px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.b-ok,
+.chip-pos {
+  background: var(--pos-bg);
+  color: var(--pos);
+  border-color: var(--pos-line);
+}
+.b-neutral,
+.chip-mute {
+  background: var(--surface-3);
+  color: var(--text2);
+  border-color: var(--line);
+}
+.b-warn,
+.chip-warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn-line);
+}
+.b-info,
+.chip-info {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+.b-bad,
+.chip-neg {
+  background: var(--neg-bg);
+  color: var(--neg);
+  border-color: var(--neg-line);
+}
+.chip-live {
+  background: var(--pos-bg);
+  color: var(--pos);
+  border-color: var(--pos-line);
+}
+.chip-live::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pos);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+.rbadge {
+  display: inline-block;
+  font-size: 9px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-weight: 700;
+}
+.rb-ca {
+  background: var(--pos-bg);
+  color: var(--pos);
+}
+.rb-tx {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+/* ============================ metric cards ============================ */
+
+.mc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.mc-grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 1080px;
+}
+.mc {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rl);
+  padding: 14px 16px;
+  box-shadow: var(--sh-1);
+  transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.mc:hover {
+  border-color: var(--line-2);
+}
+.mc-l {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+}
+.mc-v {
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.mc-v small,
+.mc-u {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text3);
+  letter-spacing: 0;
+}
+.mc-s {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 5px;
+  line-height: 1.4;
+}
+
+.slbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 8px;
+}
+
+/* context strip above content */
+.ctx {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.ctx-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: var(--rl);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--gold-ink);
+  color: var(--text);
+}
+.ctx-block b {
+  font-size: 13.5px;
+  font-weight: 800;
+}
+.ctx-block span {
+  font-size: 11.5px;
+  color: var(--text2);
+}
+
+/* ============================ day pills ============================ */
+
+.dpills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.dpill {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 100px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  cursor: pointer;
+  color: var(--text2);
+  transition: all var(--dur) var(--ease);
+}
+.dpill:hover {
+  color: var(--text);
+  border-color: var(--brown-500);
+}
+.dpill.active,
+.dpill.has.active {
+  background: var(--accent-bg);
+  color: var(--text);
+  border-color: var(--select-line);
+  font-weight: 700;
+}
+.dpill.has {
+  border-color: var(--pos-line);
+  color: var(--pos);
+  font-weight: 600;
+}
+
+/* ============================ cards + tables ============================ */
+
+.tcard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rl);
+  overflow: hidden;
+  margin-top: 16px;
+  box-shadow: var(--sh-1);
+}
+.tcard:first-child {
+  margin-top: 0;
+}
+.thead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.ttl {
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.tsub {
+  font-size: 11.5px;
+  color: var(--text3);
+  font-weight: 500;
+  margin-top: 1px;
+}
+.thead-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.scx {
+  overflow-x: auto;
+}
+.scx.tall {
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+}
+
+table.grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12.5px;
+}
+table.grid th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+table.grid th.r {
+  text-align: right;
+}
+table.grid td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12.5px;
+}
+table.grid .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+}
+table.grid tbody tr {
+  transition: background var(--dur) var(--ease);
+}
+table.grid tbody tr:hover td {
+  background: var(--surface-2);
+}
+table.grid tbody tr:last-child td {
+  border-bottom: none;
+}
+.sep {
+  box-shadow: inset 1px 0 0 var(--line-2);
+}
+.cell-ok {
+  color: var(--pos);
+  font-weight: 700;
+}
+.cell-bad {
+  color: var(--neg);
+  font-weight: 700;
+}
+.cell-dim {
+  color: var(--text3);
+}
+.grid .rrow td {
+  padding: 7px 10px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text2);
+  background: var(--surface-3);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 30px;
+  z-index: 1;
+}
+.grid .rrow:hover td {
+  background: var(--surface-3);
+}
+
+/* sortable headers */
+table.grid th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+table.grid th.sortable:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+table.grid th.sorted {
+  color: var(--accent);
+  background: var(--accent-bg);
+}
+.th-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+th.r .th-in {
+  flex-direction: row-reverse;
+}
+.th-caret {
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+th.sortable:hover .th-caret {
+  opacity: 0.45;
+}
+th.sorted .th-caret {
+  opacity: 1;
+}
+
+.lc-code {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.lc-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+}
+.lc-flag {
+  color: var(--warn);
+  display: inline-flex;
+}
+.lc-region {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  background: var(--surface-3);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+table.stores {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+table.stores th {
+  padding: 9px 14px;
+  text-align: left;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+table.stores th.r {
+  text-align: right;
+}
+table.stores td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+table.stores tr:hover td {
+  background: var(--surface-2);
+}
+
+/* ============================ inline bar ============================ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.bar-track {
+  position: relative;
+  flex: 1;
+  min-width: 54px;
+  max-width: 96px;
+  height: 5px;
+  border-radius: 100px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 100px;
+  background: var(--brown-500);
+  transform-origin: left center;
+  animation: grow 420ms var(--ease) both;
+}
+.bar-fill.pos {
+  background: var(--pos);
+}
+.bar-fill.neg {
+  background: var(--neg);
+}
+.bar-fill.warn {
+  background: var(--warn);
+}
+.bar-fill.cobalt {
+  background: var(--accent);
+}
+
+/* ============================ rail (signature) ============================
+   One shared visual grammar: every store plotted against the company
+   distribution. Band = middle 50%, line = median. No invented targets.
+   ======================================================================= */
+
+.rail {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rl);
+  padding: 18px 20px 14px;
+  box-shadow: var(--sh-1);
+}
+.rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.rail-track {
+  position: relative;
+  height: 34px;
+  margin: 0 6px;
+}
+.rail-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 16px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+.rail-band {
+  position: absolute;
+  top: 8px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-line);
+  animation: fade 320ms var(--ease) both;
+}
+.rail-median {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--ink);
+  border-radius: 2px;
+}
+.rail-median::after {
+  content: attr(data-label);
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text2);
+  white-space: nowrap;
+}
+/* The dot used to be centred with translate(-50%,-50%) inside the pop
+   keyframes, with animation-fill-mode: both. An animation's filled
+   value beats a plain declaration, so the :hover transform below was
+   dead code and the dot never grew. Centring is done with margins now
+   and pop only animates scale, so hover works. */
+.rail-dot {
+  position: absolute;
+  top: 11.5px;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--brown-500);
+  cursor: help;
+  animation: pop 380ms var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 14ms);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.rail-dot:hover {
+  transform: scale(1.7);
+  box-shadow: var(--sh-2);
+  z-index: 4;
+}
+/* Kept for any view still passing these class names. TPLH now sets the
+   fill inline from lib/scale.js, so the band colors stay in one place. */
+.rail-dot.fast {
+  background: var(--band-green);
+}
+.rail-dot.pace {
+  background: var(--accent);
+}
+.rail-dot.watch {
+  background: var(--band-red-soft);
+}
+.rail-dot.slow {
+  background: var(--band-red);
+}
+.rail-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 6px 0;
+  font-size: 10.5px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+.rail-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px;
+  color: var(--text2);
+}
+.rail-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+
+/* ============================ notes ============================ */
+
+.note,
+.infobox,
+.warnbox {
+  display: flex;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--r);
+  font-size: 12px;
+  line-height: 1.55;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text2);
+}
+.note-info,
+.infobox {
+  background: var(--accent-bg);
+  border-color: var(--accent-line);
+  color: var(--brown-700);
+}
+.note-warn,
+.warnbox {
+  background: var(--warn-bg);
+  border-color: var(--warn-line);
+  color: var(--warn);
+}
+.note b {
+  color: inherit;
+}
+.note .ic {
+  margin-top: 1px;
+  opacity: 0.8;
+}
+.footnote {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1.6;
+  margin-top: 14px;
+  max-width: 720px;
+}
+
+/* disclosure */
+.disc {
+  border: 1px solid var(--line);
+  border-radius: var(--rl);
+  background: var(--surface);
+  margin-top: 16px;
+  overflow: hidden;
+  box-shadow: var(--sh-1);
+}
+.disc-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur) var(--ease);
+}
+.disc-btn:hover {
+  background: var(--surface-2);
+}
+.disc-btn .ic {
+  transition: transform var(--dur) var(--ease);
+  color: var(--text3);
+}
+.disc.open .disc-btn .ic-caret {
+  transform: rotate(180deg);
+}
+.disc-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  flex: 1;
+}
+.disc-body {
+  border-top: 1px solid var(--line);
+  animation: fade 200ms var(--ease) both;
+}
+
+/* row list used inside cards */
+.lrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  transition: background var(--dur) var(--ease);
+}
+.lrow:last-child {
+  border-bottom: none;
+}
+.lrow:hover {
+  background: var(--surface-2);
+}
+.lrow-main {
+  flex: 1;
+  min-width: 0;
+}
+.lrow-name {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lrow-sub {
+  font-size: 10.5px;
+  color: var(--text3);
+  margin-top: 1px;
+}
+.lrow-val {
+  font-size: 14.5px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* ============================ inputs ============================ */
+
+.tinput {
+  width: 66px;
+  padding: 6px 9px;
+  font-size: 13px;
+  border: 1px solid var(--line-2);
+  border-radius: 6px;
+  text-align: right;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.tinput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* ============================ modal ============================ */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(62, 47, 35, 0.48);
+  backdrop-filter: blur(3px);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fade 140ms var(--ease) both;
+}
+.modal {
+  background: var(--surface);
+  border-radius: var(--rx);
+  padding: 22px;
+  width: 340px;
+  max-width: 100%;
+  box-shadow: var(--sh-3);
+  animation: rise 200ms var(--ease) both;
+}
+.modal-title {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.modal-sub {
+  font-size: 12px;
+  color: var(--text2);
+  margin: 5px 0 16px;
+  line-height: 1.5;
+}
+.modal-in {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--line-2);
+  font-size: 13px;
+  transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.modal-in:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.modal-err {
+  color: var(--neg);
+  font-size: 12px;
+  margin-top: 8px;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* ============================ states ============================ */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 24px;
+  color: var(--text3);
+  gap: 8px;
+  font-size: 13px;
+  text-align: center;
+  animation: fade 200ms var(--ease) both;
+}
+.empty-title {
+  font-size: 14.5px;
+  font-weight: 800;
+  color: var(--text);
+}
+.skel {
+  border-radius: var(--rl);
+  background: linear-gradient(90deg, var(--surface-3), var(--surface-2), var(--surface-3));
+  background-size: 240% 100%;
+  animation: shimmer 1.3s linear infinite;
+  height: 84px;
+}
+
+#toast {
+  position: fixed;
+  bottom: 22px;
+  right: 22px;
+  padding: 10px 16px;
+  border-radius: var(--r);
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 9999;
+  pointer-events: none;
+  display: none;
+  box-shadow: var(--sh-2);
+}
+.t-ok {
+  background: var(--pos-bg);
+  border: 1px solid var(--pos-line);
+  color: var(--pos);
+}
+.t-err {
+  background: var(--neg-bg);
+  border: 1px solid var(--neg-line);
+  color: var(--neg);
+}
+
+/* ============================ email ============================ */
+
+.email-frame {
+  width: 100%;
+  border: 1px solid var(--line);
+  min-height: 420px;
+  border-radius: var(--r);
+  background: var(--white);
+}
+.email-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.estep {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  border-radius: var(--r);
+  font-size: 12px;
+  color: var(--text2);
+}
+.estep-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ============================ mobile store cards ============================ */
+
+.mobile-cards {
+  display: none;
+}
+.desktop-table {
+  display: block;
+}
+.mobile-nav {
+  display: none;
+}
+
+.store-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rl);
+  padding: 15px;
+  margin-bottom: 12px;
+  box-shadow: var(--sh-1);
+}
+.store-card.ok {
+  border-left: 3px solid var(--band-green);
+}
+.store-card.bad {
+  border-left: 3px solid var(--band-red);
+}
+.store-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.store-card-name {
+  font-size: 15.5px;
+  font-weight: 800;
+}
+.store-card-code {
+  font-size: 10.5px;
+  color: var(--text3);
+  font-family: var(--font-mono);
+}
+.store-card-splh {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  line-height: 1;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: var(--r);
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-3);
+}
+.store-card-splh u {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.65;
+  text-decoration: none;
+  margin-top: 3px;
+}
+.scard-block {
+  margin-bottom: 10px;
+}
+.scard-block:last-child {
+  margin-bottom: 0;
+}
+.scard-block-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text3);
+  margin-bottom: 7px;
+}
+.scard-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.scard-cell {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 8px 9px;
+  text-align: center;
+}
+.scard-cell-lbl {
+  font-size: 9px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+.scard-cell-val {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.scard-cell.splh-ok {
+  background: var(--band-green-soft);
+  border-color: var(--band-green);
+}
+.scard-cell.splh-ok .scard-cell-val,
+.scard-cell.splh-ok .scard-cell-lbl {
+  color: var(--band-green);
+}
+.scard-cell.splh-bad {
+  background: var(--band-red-soft);
+  border-color: var(--band-red);
+}
+.scard-cell.splh-bad .scard-cell-val,
+.scard-cell.splh-bad .scard-cell-lbl {
+  color: var(--band-red);
+}
+.scard-region-head {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text3);
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  padding: 4px 2px;
+  margin: 18px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ============================ dashboard: exception rows ============================ */
+
+.dash-hero {
+  border-radius: var(--rx);
+  padding: 22px 26px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.dash-hero.clear {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 var(--pos);
+}
+.dash-hero.alert {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 var(--warn);
+  color: var(--text);
+}
+/* emoji slot in Dashboard.js, hidden until that file is refactored */
+.dash-hero-icon {
+  display: none;
+}
+.dash-hero-num {
+  font-size: 29px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+.dash-hero-sub {
+  font-size: 12.5px;
+  color: var(--text2);
+  margin-top: 7px;
+  max-width: 440px;
+  line-height: 1.55;
+}
+.dash-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 100px;
+  flex-shrink: 0;
+}
+.dash-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: var(--r);
+  margin-bottom: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  border-left-style: solid;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.dash-row:hover {
+  background: var(--surface-2);
+}
+.dash-row.sev-critical {
+  border-left-color: var(--band-red);
+}
+.dash-row.sev-data {
+  border-left-color: var(--warn);
+}
+.dash-row.sev-warning {
+  border-left-color: var(--line-2);
+}
+.dash-row-name {
+  font-size: 13.5px;
+  font-weight: 800;
+}
+.dash-row-label {
+  font-size: 11.5px;
+  margin-top: 1px;
+  font-weight: 600;
+}
+.dash-row-detail {
+  font-size: 10.5px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.dash-row.sev-critical .dash-row-label {
+  color: var(--band-red);
+}
+.dash-row.sev-data .dash-row-label {
+  color: var(--warn);
+}
+.dash-row.sev-warning .dash-row-label {
+  color: var(--text2);
+}
+.sev-chip-critical {
+  background: var(--neg-bg);
+  color: var(--neg);
+  border-color: var(--neg-line);
+}
+.sev-chip-data {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn-line);
+}
+.sev-chip-warning {
+  background: var(--surface-3);
+  color: var(--text2);
+  border-color: var(--line);
+}
+
+/* ============================ store trend ============================ */
+
+/* The verdict used to be a full bleed gradient. On a screen whose job
+   is to make you read a heatmap of numbers, a slab that size wins the
+   eye every time. It is a white card with a coloured rule now: the
+   verdict still reads at a glance, from the rule and from the weight
+   of the headline, without outshouting the grid below it. */
+.st-verdict {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rx);
+  padding: 22px 26px;
+  margin-bottom: 20px;
+  color: var(--text);
+}
+.st-verdict.good {
+  box-shadow: inset 4px 0 0 var(--band-green);
+}
+.st-verdict.bad {
+  box-shadow: inset 4px 0 0 var(--band-red);
+}
+.st-verdict.none {
+  box-shadow: inset 4px 0 0 var(--line-2);
+}
+.st-verdict-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 8px;
+}
+.st-verdict-head {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+.st-verdict-detail {
+  font-size: 13px;
+  color: var(--text2);
+  margin-top: 9px;
+  max-width: 600px;
+  line-height: 1.6;
+}
+.st-grid {
+  display: grid;
+  grid-template-columns: auto repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+.st-colhead {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  text-align: center;
+  padding-bottom: 4px;
+}
+.st-colhead.flagged {
+  color: var(--band-red);
+}
+.st-rowhead {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text3);
+  padding-right: 10px;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.25;
+}
+.st-rowhead small {
+  font-weight: 500;
+  opacity: 0.7;
+  font-size: 9.5px;
+}
+.st-cell {
+  aspect-ratio: 1.35;
+  border-radius: var(--r);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+  position: relative;
+  min-height: 42px;
+  font-variant-numeric: tabular-nums;
+}
+.st-cell:hover {
+  transform: scale(1.06);
+  box-shadow: var(--sh-2);
+  z-index: 3;
+}
+.st-cell small {
+  font-size: 8.5px;
+  font-weight: 600;
+  opacity: 0.7;
+  margin-top: 1px;
+}
+.st-cell.empty {
+  background: transparent;
+  border: 1px dashed var(--line-2);
+  color: var(--text3);
+  font-weight: 500;
+  font-size: 11px;
+  padding: 0;
+}
+.st-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  font-size: 10.5px;
+  color: var(--text3);
+}
+.st-legend-scale {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.st-legend-sw {
+  width: 19px;
+  height: 12px;
+  border-radius: 3px;
+}
+.st-wk {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.st-wk:last-child {
+  border-bottom: none;
+}
+.st-wk-num {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text3);
+  min-width: 62px;
+}
+.st-wk-splh {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+}
+.st-wk-meta {
+  font-size: 11px;
+  color: var(--text3);
+  margin-left: auto;
+  text-align: right;
+  line-height: 1.4;
+}
+.st-partial {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--warn);
+  background: var(--warn-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+/* ============================ forecast ============================ */
+
+.fc-hero {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rx);
+  padding: 22px 26px;
+  margin-bottom: 18px;
+  color: var(--text);
+}
+.fc-hero.over {
+  box-shadow: inset 4px 0 0 var(--band-red);
+}
+.fc-hero.ok {
+  box-shadow: inset 4px 0 0 var(--band-green);
+}
+.fc-hero.under {
+  box-shadow: inset 4px 0 0 var(--gold-ink);
+}
+.fc-hero.empty {
+  box-shadow: inset 4px 0 0 var(--line-2);
+}
+.fc-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 7px;
+}
+.fc-head {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.22;
+}
+.fc-detail {
+  font-size: 13px;
+  color: var(--text2);
+  margin-top: 8px;
+  max-width: 620px;
+  line-height: 1.6;
+}
+.fc-row {
+  display: grid;
+  grid-template-columns: 52px 1.5fr 90px 100px 96px;
+  gap: 10px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.fc-row.head {
+  border-bottom: 1px solid var(--line-2);
+  padding: 8px 14px;
+  background: var(--surface-2);
+}
+.fc-row.total {
+  border-bottom: none;
+  background: var(--surface-2);
+  font-weight: 700;
+}
+.fc-lbl {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.fc-day {
+  font-size: 13px;
+  font-weight: 700;
+}
+.fc-sales,
+.fc-allowed,
+.fc-var,
+.fc-range {
+  font-variant-numeric: tabular-nums;
+}
+.fc-sales {
+  font-size: 14px;
+  font-weight: 700;
+}
+.fc-range {
+  font-size: 10.5px;
+  color: var(--text3);
+  margin-top: 1px;
+}
+.fc-allowed {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: right;
+}
+.fc-input {
+  width: 84px;
+  padding: 7px 9px;
+  font-size: 14px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  text-align: right;
+  font-weight: 700;
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+}
+.fc-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.fc-var {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: right;
+}
+/* Forecast confidence is not a performance band, it is how much to
+   trust the number. It keeps its own scale on purpose. */
+.fc-conf {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.fc-conf.high {
+  background: var(--pos);
+}
+.fc-conf.medium {
+  background: var(--warn);
+}
+.fc-conf.low {
+  background: var(--line-2);
+}
+.fc-save {
+  padding: 0 22px;
+  height: 38px;
+  border-radius: var(--r);
+  border: none;
+  background: var(--ink);
+  color: var(--cream);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+.fc-save:hover:not(:disabled) {
+  background: var(--ink-3);
+}
+.fc-save:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fc-save.saved {
+  background: var(--pos);
+}
+
+/* ============================ detail panels ============================ */
+
+.day-panel,
+.kd-panel {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 var(--gold-ink);
+  color: var(--text);
+  border-radius: var(--rl);
+  padding: 18px 20px;
+  padding-right: 58px;
+  margin-bottom: 16px;
+  animation: rise 220ms var(--ease) both;
+}
+/* .kd-close used float: right, which took the button out of flow and
+   left the glyph off centre in its own box. Store detail never floated
+   its close button, which is why only that panel looked correct. One
+   definition now, centred by the grid rather than a line-height guess. */
+.kd-close,
+.day-panel-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--text2);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.kd-close:hover,
+.day-panel-close:hover {
+  background: var(--line-2);
+  color: var(--text);
+}
+.kd-close:active,
+.day-panel-close:active {
+  transform: scale(0.92);
+}
+.kd-close .ic,
+.day-panel-close .ic {
+  display: block;
+}
+.day-panel-grid,
+.kd-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.kd-summary {
+  margin: 15px 0 18px;
+}
+.day-panel-k,
+.kd-k {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.day-panel-v,
+.kd-v {
+  font-size: 21px;
+  font-weight: 800;
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.kd-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.kd-title {
+  font-size: 20px;
+  font-weight: 800;
+  margin-top: 4px;
+  letter-spacing: -0.02em;
+}
+.kd-sec {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 9px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.kd-st {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 0;
+}
+.kd-st-name {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-st-sub {
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 1px;
+}
+.kd-bar-track {
+  flex: 1.4;
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 100px;
+  overflow: hidden;
+  min-width: 52px;
+}
+.kd-bar-fill {
+  height: 100%;
+  border-radius: 100px;
+  transform-origin: left center;
+  animation: grow 420ms var(--ease) both;
+}
+.kd-st-val {
+  font-size: 15px;
+  font-weight: 700;
+  min-width: 52px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.kd-note {
+  font-size: 11.5px;
+  color: var(--text2);
+  margin-top: 15px;
+  line-height: 1.55;
+  max-width: 560px;
+}
+
+/* ============================ leaderboard ============================ */
+
+.lb-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.lb-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.lb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 100px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all var(--dur) var(--ease);
+}
+.lb-chip:hover {
+  border-color: var(--brown-500);
+  color: var(--text);
+}
+.lb-chip.active {
+  background: var(--accent-bg);
+  border-color: var(--select-line);
+  color: var(--text);
+  font-weight: 700;
+}
+.lb-chip-n {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 100px;
+  background: var(--surface-3);
+  color: var(--text2);
+}
+.lb-chip.active .lb-chip-n {
+  background: rgba(62, 47, 35, 0.14);
+  color: var(--select-ink);
+}
+/* The window and sort toggles sit together on the right. */
+.lb-segs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- podium ---- */
+.lb-podium {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 14px 0 4px;
+}
+.lb-pod {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--line-2);
+  border-radius: var(--rl);
+  background: var(--surface);
+  box-shadow: var(--sh-1);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.lb-pod:hover {
+  border-color: var(--line-2);
+}
+.lb-pod.pinned {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+.lb-pod.gold {
+  border-top-color: var(--gold-700);
+  background: linear-gradient(175deg, var(--gold-400) 0%, var(--surface) 58%);
+}
+.lb-pod.silver {
+  border-top-color: #a89c8e;
+  background: linear-gradient(175deg, #f4f0ea 0%, var(--surface) 58%);
+}
+.lb-pod.bronze {
+  border-top-color: #b0733e;
+  background: linear-gradient(175deg, #f7ece0 0%, var(--surface) 58%);
+}
+.lb-pod-body {
+  flex: 1;
+  min-width: 0;
+}
+.lb-pod-name {
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-pod-meta {
+  font-size: 10.5px;
+  color: var(--text3);
+  margin: 2px 0 9px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lb-pod-pct {
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.lb-pod-pct span {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.6;
+}
+.lb-pod-pct.up {
+  color: var(--band-green);
+}
+.lb-pod-pct.down {
+  color: var(--band-red);
+}
+.lb-pod-pct.neutral {
+  color: var(--text);
+}
+
+/* ---- medal ---- */
+.lb-medal {
+  flex-shrink: 0;
+}
+.lb-medal .ring {
+  fill: none;
+  stroke-width: 3;
+}
+.lb-medal .num {
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 700;
+  fill: #fff;
+}
+.lb-medal.gold .ribbon {
+  fill: var(--gold-500);
+}
+.lb-medal.gold .ribbon.r {
+  fill: var(--gold-600);
+}
+.lb-medal.gold .ring {
+  stroke: var(--gold-700);
+}
+.lb-medal.gold .disc {
+  fill: var(--gold-600);
+}
+.lb-medal.silver .ribbon {
+  fill: #c6bdb2;
+}
+.lb-medal.silver .ribbon.r {
+  fill: #a89c8e;
+}
+.lb-medal.silver .ring {
+  stroke: #8b8074;
+}
+.lb-medal.silver .disc {
+  fill: #a89c8e;
+}
+.lb-medal.bronze .ribbon {
+  fill: #c98d59;
+}
+.lb-medal.bronze .ribbon.r {
+  fill: #b0733e;
+}
+.lb-medal.bronze .ring {
+  stroke: #8d5a2d;
+}
+.lb-medal.bronze .disc {
+  fill: #b0733e;
+}
+/* No sleeve, so the silhouette is taller than it is wide and needs to
+   sit centred on the podium row rather than float above it. */
+.lb-cup {
+  flex-shrink: 0;
+  display: block;
+  align-self: center;
+}
+
+/* ---- goal bar ---- */
+.lb-goal {
+  position: relative;
+  height: 8px;
+  border-radius: 100px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.lb-goal-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 100px;
+  transform-origin: left center;
+  animation: grow 460ms var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 18ms);
+}
+.lb-goal-fill.up {
+  background: var(--band-green);
+}
+.lb-goal-fill.down {
+  background: var(--band-red);
+}
+.lb-goal-mark {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--ink);
+  opacity: 0.6;
+  z-index: 2;
+}
+
+/* ---- ranked list ----
+   Five columns: rank, name, goal bar, rating, score. */
+.lb-list {
+  padding: 4px 0;
+}
+.lb-row {
+  display: grid;
+  grid-template-columns: 30px minmax(140px, 1.2fr) minmax(120px, 2fr) 64px 52px;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  border-left: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.lb-row:hover {
+  background: var(--surface-2);
+}
+.lb-row.pinned {
+  background: var(--accent-bg);
+  border-left-color: var(--accent);
+}
+.lb-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 3px 0;
+  border-radius: 6px;
+  background: var(--surface-3);
+}
+.lb-rank.top {
+  background: var(--accent-bg);
+  color: var(--text);
+  border: 1px solid var(--select-line);
+}
+.lb-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+.lb-meta {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--text3);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Score is a 0 to 100 percentile blend, not a pass or fail against a
+   target, so it does not take the green or red treatment. */
+.lb-pct {
+  font-size: 15px;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.lb-pct.up {
+  color: var(--band-green);
+}
+.lb-pct.down {
+  color: var(--band-red);
+}
+
+.lb-rating {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.lb-rating b {
+  font-size: 13px;
+  font-weight: 700;
+}
+.lb-rating-n {
+  font-size: 9.5px;
+  color: var(--text3);
+  font-weight: 500;
+}
+.lb-rating.none {
+  color: var(--text3);
+}
+/* Thin sample: visible, but visibly not load bearing. */
+.lb-rating.thin b {
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.lb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 10.5px;
+  color: var(--text2);
+}
+.lb-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.lb-legend-item i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+/* ============================ dashboard ============================
+   db- prefixed so nothing collides with the legacy dash- rules the
+   exception rows still use.
+   ================================================================= */
+
+.db-scopes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+/* ---- hero rail ----
+   One number carries the screen: the blended SPLH for whatever scope
+   is selected. The attention count sits to its right as a button
+   rather than a headline, because a count is only useful if you can
+   get to the list. */
+/* One number carries this screen, so the card it sits in should carry
+   nothing. White, one hairline, and a coloured rule down the left that
+   says at a glance whether anything needs attention. The gradient this
+   replaced was the single loudest thing in the app. */
+.db-rail {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  flex-wrap: wrap;
+  border-radius: var(--rx);
+  padding: 22px 24px;
+  margin-bottom: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 4px 0 0 var(--gold-ink);
+  color: var(--text);
+}
+.db-rail.clear {
+  box-shadow: inset 4px 0 0 var(--pos);
+}
+.db-rail-main {
+  flex: 1;
+  min-width: 240px;
+}
+.db-rail-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.db-rail-num {
+  display: flex;
+  align-items: baseline;
+  gap: 11px;
+  flex-wrap: wrap;
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  margin-top: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.db-rail-unit {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.db-rail-sub {
+  font-size: 12.5px;
+  color: var(--text2);
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.db-rail-sub b {
+  font-variant-numeric: tabular-nums;
+}
+.db-rail-sub b.up {
+  color: #86ddab;
+}
+.db-rail-sub b.down {
+  color: #f5a79b;
+}
+
+.db-rail-cta {
+  flex-shrink: 0;
+  min-width: 176px;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: var(--rl);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+.db-rail-cta:hover {
+  background: var(--accent-bg);
+  border-color: var(--select-line);
+}
+.db-rail-cta-num {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.db-rail-cta-lbl {
+  font-size: 11.5px;
+  color: var(--text2);
+  margin-top: 5px;
+  line-height: 1.35;
+}
+.db-rail-cta-go {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-top: 11px;
+}
+
+/* ---- tiles ----
+   Built on the same type scale as .mc, with a footer that names where
+   the click lands. */
+.db-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.db-tile {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--line-2);
+  border-radius: var(--rl);
+  padding: 14px 16px 11px;
+  box-shadow: var(--sh-1);
+  cursor: pointer;
+  transition: box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+.db-tile:hover {
+  border-color: var(--line-2);
+}
+.db-tile.tone-pos {
+  border-top-color: var(--band-green);
+}
+.db-tile.tone-neg {
+  border-top-color: var(--band-red);
+}
+.db-tile.tone-warn {
+  border-top-color: var(--warn);
+}
+.db-tile-l {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
+}
+.db-tile-v {
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.db-tile-u {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text3);
+  margin-left: 5px;
+  letter-spacing: 0;
+}
+.db-tile-s {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 6px;
+  line-height: 1.4;
+  min-height: 31px;
+}
+.db-tile-go {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text3);
+  transition: color var(--dur) var(--ease);
+}
+.db-tile:hover .db-tile-go {
+  color: var(--accent);
+}
+
+/* ---- two column body ---- */
+.db-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.db-cols > .tcard {
+  margin-top: 0;
+}
+.db-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 4px 2px;
+  transition: color var(--dur) var(--ease);
+}
+.db-link:hover {
+  color: var(--accent);
+}
+
+/* ---- podium, stacked instead of side by side ---- */
+.db-podium {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.db-podium .lb-pod {
+  padding: 11px 13px;
+  gap: 11px;
+}
+/* The dashboard podium carries the same target bar as the Leaderboard,
+   so a store's position against its own target reads the same in both. */
+.db-podium .lb-pod-meta {
+  margin-bottom: 8px;
+}
+.db-podium .lb-goal {
+  height: 6px;
+}
+
+/* ---- movers ----
+   Two columns, improving and declining. One list of diverging bars
+   asked you to decode bar length against a shared axis. Split, it
+   answers the actual question at a glance: who is up, who is down. */
+.db-movers-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+.db-movers-col {
+  padding: 12px 14px 14px;
+}
+.db-movers-col + .db-movers-col {
+  border-left: 1px solid var(--line);
+}
+.db-movers-col-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding-bottom: 9px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.db-movers-col-head.up {
+  color: var(--band-green);
+}
+.db-movers-col-head.down {
+  color: var(--band-red);
+}
+.db-mover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur) var(--ease);
+}
+.db-mover-row:hover {
+  background: var(--surface-2);
+}
+.db-mover-row-name {
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The delta as a pill rather than a bar. With five rows per column the
+   rank order carries the magnitude, so the number only has to be
+   readable. */
+.db-mover-pill {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 9px;
+  border-radius: 100px;
+  border: 1px solid transparent;
+}
+.db-mover-pill.up {
+  background: var(--band-green-soft);
+  color: var(--band-green);
+  border-color: var(--band-green);
+}
+.db-mover-pill.down {
+  background: var(--band-red-soft);
+  color: var(--band-red);
+  border-color: var(--band-red);
+}
+.db-movers-empty {
+  font-size: 11.5px;
+  color: var(--text3);
+  padding: 10px 6px;
+  line-height: 1.5;
+}
+
+/* Single column diverging variant, still used by the older markup. */
+.db-movers {
+  padding: 6px 0;
+}
+.db-mover {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 132px 42px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur) var(--ease);
+}
+.db-mover:hover {
+  background: var(--surface-2);
+}
+.db-mover-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-mover-track {
+  position: relative;
+  display: block;
+  height: 8px;
+  border-radius: 100px;
+  background: var(--surface-3);
+}
+.db-mover-track::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 1.5px;
+  background: var(--line-2);
+}
+.db-mover-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 100px;
+  transform-origin: left center;
+  animation: grow 420ms var(--ease) both;
+}
+.db-mover-fill.up {
+  left: 50%;
+  background: var(--band-green);
+}
+.db-mover-fill.down {
+  right: 50%;
+  transform-origin: right center;
+  background: var(--band-red);
+}
+.db-mover-val {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.db-mover-val.up {
+  color: var(--band-green);
+}
+.db-mover-val.down {
+  color: var(--band-red);
+}
+
+/* ---- lists ---- */
+.db-list {
+  padding: 12px 14px;
+}
+.db-list .dash-row {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.db-more {
+  font-size: 11px;
+  color: var(--text3);
+  padding: 8px 4px 2px;
+}
+
+/* ---- review watchlist ---- */
+.db-watch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  margin-bottom: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.db-watch:hover {
+  background: var(--surface-2);
+}
+.db-watch-main {
+  flex: 1;
+  min-width: 0;
+}
+.db-watch-name {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.db-watch-sub {
+  font-size: 10.5px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.db-watch-rating {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.db-watch-rating span {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text3);
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+/* ============================================================
+   .wk-legacy
+   The Week view feeds the daily email, so it keeps the original
+   spreadsheet look. This block cancels the new table styling for
+   that view only. Nothing else on the app is affected.
+
+   The green and red here are the source of the --band-* tokens,
+   so this view and every other report share one definition. The
+   grid itself is re-cut in paper and coffee: the eleven hardcoded
+   greys it used to carry are now --wk-* tokens.
+   ============================================================ */
+
+/* The page is the only thing that scrolls. An inner scroll box cut
+   the table off and put a second scrollbar inside the card. */
+.wk-legacy .scx {
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+/* width: 100% with table-layout: fixed makes the column widths below
+   behave as ratios: the browser keeps their relative sizes and
+   stretches them to fill the card. min-width is the sum of those
+   widths, so below that the table scrolls instead of crushing the
+   numbers. It was 1300 against a 1348 total, which meant the ratios
+   were already squeezing at the fallback width. */
+.wk-legacy table.grid {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1348px;
+}
+
+/* Headers wrap on a space or a slash only. An earlier pass set
+   overflow-wrap: anywhere to stop "(OVER)/UNDER" spilling into its
+   neighbour, but for a single word with no break point that sliced
+   the word itself: "TARGE-T", "RATIN-G". Normal wrapping plus enough
+   width per column is the fix. */
+.wk-legacy table.grid th {
+  position: static;
+  padding: 8px 6px 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text3);
+  background: var(--wk-head);
+  border: 1px solid var(--wk-line);
+  box-shadow: none;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  overflow: hidden;
+  line-height: 1.2;
+  vertical-align: bottom;
+  letter-spacing: 0.02em;
+  width: auto;
+}
+.wk-legacy table.grid td {
+  padding: 6px;
+  font-size: 12px;
+  border: 1px solid var(--wk-line);
+  width: auto;
+  overflow: visible;
+  text-overflow: clip;
+}
+.wk-legacy table.grid .num {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0;
+}
+.wk-legacy table.grid tbody tr:last-child td {
+  border-bottom: 1px solid var(--wk-line);
+}
+.wk-legacy table.grid tbody tr:hover td {
+  background: var(--wk-hover);
+}
+.wk-legacy table.grid th.sorted {
+  background: var(--gold-400);
+  color: var(--brown-700);
+}
+
+/* Store name rides the left edge, so a row stays identifiable all the
+   way out to the PTD and review columns. */
+.wk-legacy table.grid tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--wk-line);
+}
+.wk-legacy table.grid tbody tr:hover td:first-child {
+  background: var(--wk-hover);
+}
+
+/* ---- column ratios ----
+   Grouped by what the column actually holds: a two or three digit
+   count, a dollar amount with a comma, or a short currency figure.
+   Totals 1348px, which is the min-width above.
+
+    1 location  184   2 hours      58   3 sales      78
+    4 target     66   5 splh       58   6 (over)/u   82
+    7 wtd hrs    66   8 wtd sales  73   9 wtd splh   66
+   10 wtd (o)/u  96  11 training   68  12 trainee    58
+   13 trainer    58  14 ptd hrs    66  15 ptd sales  73
+   16 ptd splh   62  17 rating     66  18 reviews    70
+   ------------------------------------------------------
+   The Bonus column that used to sit at 19 is gone, so this table is
+   18 columns wide. */
+.wk-legacy table.grid th:nth-child(1),
+.wk-legacy table.grid td:nth-child(1) {
+  width: 184px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wk-legacy table.grid th:nth-child(2),
+.wk-legacy table.grid td:nth-child(2),
+.wk-legacy table.grid th:nth-child(5),
+.wk-legacy table.grid td:nth-child(5),
+.wk-legacy table.grid th:nth-child(12),
+.wk-legacy table.grid td:nth-child(12),
+.wk-legacy table.grid th:nth-child(13),
+.wk-legacy table.grid td:nth-child(13) {
+  width: 58px;
+}
+.wk-legacy table.grid th:nth-child(3),
+.wk-legacy table.grid td:nth-child(3) {
+  width: 78px;
+}
+.wk-legacy table.grid th:nth-child(4),
+.wk-legacy table.grid td:nth-child(4),
+.wk-legacy table.grid th:nth-child(7),
+.wk-legacy table.grid td:nth-child(7),
+.wk-legacy table.grid th:nth-child(9),
+.wk-legacy table.grid td:nth-child(9),
+.wk-legacy table.grid th:nth-child(14),
+.wk-legacy table.grid td:nth-child(14),
+.wk-legacy table.grid th:nth-child(17),
+.wk-legacy table.grid td:nth-child(17) {
+  width: 66px;
+}
+.wk-legacy table.grid th:nth-child(6),
+.wk-legacy table.grid td:nth-child(6) {
+  width: 82px;
+}
+.wk-legacy table.grid th:nth-child(8),
+.wk-legacy table.grid td:nth-child(8),
+.wk-legacy table.grid th:nth-child(15),
+.wk-legacy table.grid td:nth-child(15) {
+  width: 73px;
+}
+.wk-legacy table.grid th:nth-child(10),
+.wk-legacy table.grid td:nth-child(10) {
+  width: 96px;
+}
+.wk-legacy table.grid th:nth-child(11),
+.wk-legacy table.grid td:nth-child(11) {
+  width: 68px;
+}
+.wk-legacy table.grid th:nth-child(16),
+.wk-legacy table.grid td:nth-child(16) {
+  width: 62px;
+}
+.wk-legacy table.grid th:nth-child(18),
+.wk-legacy table.grid td:nth-child(18) {
+  width: 70px;
+}
+
+/* The region banner spans all 18 columns, so no width rule may touch
+   it and pinning it left would drag the whole bar with the scroll. */
+.wk-legacy .grid .rrow td,
+.wk-legacy .grid .rrow:hover td {
+  position: static;
+  width: auto !important;
+  overflow: visible;
+  box-shadow: none;
+  padding: 10px 10px 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--text2);
+  background: var(--wk-band) !important;
+  letter-spacing: 0.09em;
+  border: 1px solid var(--wk-line);
+}
+
+.wk-legacy .cell-ok {
+  background: var(--band-green-soft) !important;
+  color: var(--band-green);
+  font-weight: 700;
+}
+.wk-legacy .cell-bad {
+  background: var(--band-red-soft) !important;
+  color: var(--band-red);
+  font-weight: 700;
+}
+.wk-legacy .sep {
+  box-shadow: none;
+  border-left: 2px solid var(--brown-500) !important;
+}
+.wk-legacy .tcard {
+  border-radius: 11px;
+  box-shadow: none;
+  border-color: var(--wk-line);
+}
+.wk-legacy .lc-code {
+  color: var(--text3);
+  font-weight: 700;
+}
+.wk-legacy .lc-name {
+  max-width: 160px;
+  font-weight: 500;
+}
+.wk-legacy .lc-flag {
+  color: var(--warn);
+}
+
+/* The rating cell paints its own background from lib/scale.js, so it
+   must not inherit the cell padding tweaks that assume plain text. */
+.wk-legacy table.grid td[style*="background"] {
+  font-weight: 700;
+}
+
+/* A scrollbar sized to be grabbed, not hunted for. */
+.wk-legacy .scx::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+.wk-legacy .scx::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+.wk-legacy .scx::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 100px;
+  border: 3px solid var(--surface-2);
+}
+.wk-legacy .scx::-webkit-scrollbar-thumb:hover {
+  background: var(--brown-500);
+}
+.wk-legacy .scx::-webkit-scrollbar-corner {
+  background: var(--surface-2);
+}
+
+/* metric cards, original weight and no hover lift */
+.wk-legacy .mc {
+  border-radius: 11px;
+  padding: 13px 15px;
+  border-color: var(--wk-line);
+  box-shadow: none;
+}
+.wk-legacy .mc:hover {
+  transform: none;
+  box-shadow: none;
+}
+.wk-legacy .mc-l {
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.wk-legacy .mc-v {
+  font-size: 24px;
+  letter-spacing: -0.025em;
+}
+.wk-legacy .mc-s {
+  font-size: 10.5px;
+  margin-top: 3px;
+}
+
+/* mobile cards, original chunky look */
+.wk-legacy .store-card {
+  border-radius: 12px;
+  padding: 16px;
+  border-color: var(--wk-line);
+  box-shadow: 0 2px 8px rgba(83, 63, 46, 0.08), 0 1px 2px rgba(83, 63, 46, 0.05);
+}
+.wk-legacy .store-card.ok {
+  border-left: 5px solid var(--band-green);
+}
+.wk-legacy .store-card.bad {
+  border-left: 5px solid var(--band-red);
+}
+.wk-legacy .store-card-splh {
+  background: var(--wk-chip);
+  font-size: 22px;
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 4px 12px;
+}
+.wk-legacy .store-card-splh u {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: -2px;
+}
+.wk-legacy .scard-block-label {
+  font-size: 10px;
+  color: var(--text);
+  letter-spacing: 0.06em;
+}
+.wk-legacy .scard-cell {
+  background: var(--wk-head);
+  border: none;
+  border-radius: 8px;
+  padding: 9px;
+}
+.wk-legacy .scard-cell-val {
+  font-size: 15px;
+}
+.wk-legacy .scard-cell.splh-ok {
+  background: var(--band-green-soft);
+  border: 1px solid var(--band-green);
+}
+.wk-legacy .scard-cell.splh-ok .scard-cell-val,
+.wk-legacy .scard-cell.splh-ok .scard-cell-lbl {
+  color: var(--band-green);
+}
+.wk-legacy .scard-cell.splh-bad {
+  background: var(--band-red-soft);
+  border: 1px solid var(--band-red);
+}
+.wk-legacy .scard-cell.splh-bad .scard-cell-val,
+.wk-legacy .scard-cell.splh-bad .scard-cell-lbl {
+  color: var(--band-red);
+}
+.wk-legacy .scard-region-head {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--text2);
+  background: var(--wk-band);
+  padding: 7px 12px;
+  border: none;
+  border-radius: 8px;
+  margin: 16px 0 10px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ============================================================
+   breakpoints
+   Three blocks, in order: 1080, 900, 640. Previously these were
+   scattered across seven separate @media rules, one of which was
+   swallowed entirely by a dangling ".lb-row:hover" selector with
+   no body, so every mobile leaderboard rule under it was dead.
+   ============================================================ */
+
+@media (max-width: 1080px) {
+  .db-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  /* ---- shell ---- */
+  .sidebar {
+    display: none;
+  }
+  .desktop-table {
+    display: none;
+  }
+  .mobile-cards {
+    display: block;
+  }
+  .content {
+    padding: 14px 12px 28px;
+  }
+  .topbar {
+    padding: 9px 12px;
+    gap: 8px;
+  }
+  .ptitle {
+    font-size: 15px;
+  }
+  .psub {
+    font-size: 10px;
+  }
+  .mobile-logo {
+    display: block;
+    flex-shrink: 0;
+  }
+  .field-search input {
+    width: 108px;
   }
 
-  if (variant === 'icon') {
-    return (
-      <svg viewBox="0 0 64 64" width={size} height={size} {...common}>
-        <rect width="64" height="64" rx="14" fill={ICON_BG} />
-        <Faces left={CREAM} right={GOLD} eye={ICON_BG} />
-      </svg>
-    );
+  .mobile-nav {
+    display: flex;
+    gap: 6px;
+    padding: 9px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 49px;
+    z-index: 19;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .mobile-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .mnav-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 13px;
+    border-radius: 100px;
+    border: 1px solid var(--line-2);
+    background: var(--surface);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text2);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--dur) var(--ease);
+  }
+  .mnav-btn.active {
+    background: var(--accent-bg);
+    color: var(--text);
+    border-color: var(--select-line);
+    font-weight: 700;
   }
 
-  if (variant === 'stacked') {
-    return (
-      <svg viewBox="0 0 160 108" width={(size * 160) / 108} height={size} {...common}>
-        <g transform="translate(48 0)">
-          <Faces />
-        </g>
-        <text
-          x="80"
-          y="98"
-          textAnchor="middle"
-          fontFamily={WORDMARK_FONT}
-          fontSize="28"
-          fontWeight="500"
-          letterSpacing="5"
-          fill="currentColor"
-        >
-          SHIFT
-        </text>
-      </svg>
-    );
+  /* ---- cards ---- */
+  .mc-grid,
+  .mc-grid.cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .mc {
+    padding: 12px 13px;
+  }
+  .mc-v {
+    font-size: 20px;
   }
 
-  return (
-    <svg viewBox="0 0 232 64" width={(size * 232) / 64} height={size} {...common}>
-      <Faces />
-      <text
-        x="82"
-        y="44"
-        fontFamily={WORDMARK_FONT}
-        fontSize="34"
-        fontWeight="500"
-        letterSpacing="6"
-        fill="currentColor"
-      >
-        SHIFT
-      </text>
-    </svg>
-  );
+  /* ---- dashboard ---- */
+  .dash-hero {
+    padding: 17px 18px;
+    gap: 14px;
+  }
+  .dash-hero-num {
+    font-size: 21px;
+  }
+  .db-rail {
+    padding: 17px 18px;
+    gap: 14px;
+  }
+  .db-rail-num {
+    font-size: 31px;
+  }
+  .db-rail-cta {
+    min-width: 0;
+    width: 100%;
+  }
+  .db-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .db-tile {
+    padding: 12px 13px 10px;
+  }
+  .db-tile-v {
+    font-size: 21px;
+  }
+  .db-tile-s {
+    min-height: 0;
+  }
+  .db-mover {
+    grid-template-columns: minmax(0, 1fr) 84px 38px;
+    gap: 9px;
+    padding: 8px 12px;
+  }
+  .db-scopes .lb-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  /* ---- store trend ---- */
+  .st-verdict {
+    padding: 18px 20px;
+  }
+  .st-verdict-head {
+    font-size: 19px;
+  }
+  .st-grid {
+    gap: 3px;
+  }
+  .st-cell {
+    min-height: 36px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .st-cell small {
+    display: none;
+  }
+  .st-rowhead {
+    font-size: 9.5px;
+    padding-right: 6px;
+  }
+
+  /* ---- forecast ---- */
+  .fc-hero {
+    padding: 17px 19px;
+  }
+  .fc-head {
+    font-size: 18px;
+  }
+  .fc-row {
+    grid-template-columns: 42px 1fr 62px 74px;
+    gap: 7px;
+    padding: 10px;
+  }
+  .fc-row .fc-var-col {
+    display: none;
+  }
+  .fc-input {
+    width: 64px;
+    font-size: 13px;
+  }
+  .fc-allowed {
+    font-size: 15px;
+  }
+
+  /* ---- panels ---- */
+  .kd-panel,
+  .day-panel {
+    padding: 15px 16px;
+    padding-right: 52px;
+  }
+  .kd-title {
+    font-size: 16px;
+  }
+  .kd-bar-track {
+    display: none;
+  }
+  .rail {
+    padding: 15px 14px 12px;
+  }
+
+  /* ---- leaderboard ----
+     The goal bar is the first thing to go on a narrow screen, so the
+     row drops to four columns: rank, name, rating, score. */
+  .lb-controls {
+    margin-bottom: 10px;
+  }
+  .lb-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .lb-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .lb-podium {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+  .lb-pod {
+    padding: 13px;
+  }
+  .lb-pod-pct {
+    font-size: 22px;
+  }
+  .lb-row {
+    grid-template-columns: 26px minmax(0, 1.4fr) 56px 40px;
+    gap: 9px;
+    padding: 10px 12px;
+  }
+  .lb-row .lb-goal {
+    display: none;
+  }
+  .lb-pct {
+    font-size: 12.5px;
+  }
+  .lb-rating b {
+    font-size: 12px;
+  }
+  .lb-rating-n {
+    display: none;
+  }
+  .lb-segs {
+    width: 100%;
+  }
+  .lb-legend {
+    padding: 9px 12px;
+    gap: 9px;
+  }
+
+  /* ---- week view, compact ---- */
+  .wk-legacy .scx {
+    max-height: none;
+  }
+  .wk-legacy .mc-grid,
+  .wk-legacy .mc-grid.cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .wk-legacy .mc {
+    padding: 9px;
+    border-radius: 9px;
+  }
+  .wk-legacy .mc-l {
+    font-size: 8px;
+    letter-spacing: 0.03em;
+    margin-bottom: 3px;
+    line-height: 1.25;
+  }
+  .wk-legacy .mc-v {
+    font-size: 16px;
+  }
+  .wk-legacy .mc-s {
+    display: none;
+  }
+  .wk-legacy .store-card {
+    padding: 11px;
+    margin-bottom: 9px;
+    border-radius: 10px;
+    border-left-width: 4px;
+  }
+  .wk-legacy .store-card-head {
+    margin-bottom: 9px;
+    padding-bottom: 8px;
+  }
+  .wk-legacy .store-card-name {
+    font-size: 13.5px;
+  }
+  .wk-legacy .store-card-code {
+    font-size: 9.5px;
+  }
+  .wk-legacy .store-card-splh {
+    font-size: 17px;
+    min-width: 58px;
+    padding: 3px 9px;
+  }
+  .wk-legacy .scard-block {
+    margin-bottom: 8px;
+  }
+  .wk-legacy .scard-block-label {
+    font-size: 8.5px;
+    margin-bottom: 4px;
+    letter-spacing: 0.07em;
+  }
+  .wk-legacy .scard-row {
+    gap: 5px;
+  }
+  .wk-legacy .scard-cell {
+    padding: 6px 5px;
+    border-radius: 6px;
+  }
+  .wk-legacy .scard-cell-lbl {
+    font-size: 8px;
+    margin-bottom: 1px;
+  }
+  .wk-legacy .scard-cell-val {
+    font-size: 12.5px;
+  }
+  .wk-legacy .scard-region-head {
+    font-size: 10.5px;
+    padding: 5px 10px;
+    margin: 12px 0 7px;
+    border-radius: 6px;
+  }
+  /* The week and sync banner. This selector is positional and needs
+     !important to beat an inline font-size, which makes it fragile:
+     it breaks the moment WeekView.js gains a wrapper div. Give that
+     banner a class (.wk-banner) and this rule can lose both. */
+  .wk-legacy .ctx-block,
+  .wk-legacy > div:first-child > div {
+    font-size: 11.5px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .db-movers-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .db-movers-col + .db-movers-col {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
 }
