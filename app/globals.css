@@ -56,9 +56,13 @@
 
   /* gold ramp */
   --gold-700: #c9a83f;
-  /* The one gold dark enough to be a mark rather than a fill. 3.5:1 on
-     white, which is what a 4px state rule has to clear to mean anything. */
-  --gold-ink: #a88424;
+  /* The rule that runs down the left edge of a card when the card has no
+     state to report. It was a dark gold, which at that saturation reads as
+     mustard rather than as brand. It is the house brown now: 4.9:1 on white,
+     and it is the same colour as the type, so a neutral card looks like one
+     object instead of a white card with a stripe stuck on it. Gold stays
+     where it works, on the nav marker and on selection hairlines. */
+  --rule-neutral: #7c5d45;
   --gold-600: #e0c45a;
   --gold-500: #f8e27e;
   --gold-400: #fff0b0;
@@ -470,7 +474,7 @@ select {
   height: 13px;
   width: auto;
   margin-top: 4px;
-  opacity: 0.72;
+  opacity: 0.92;
   transition: opacity var(--dur) var(--ease);
 }
 .logo:hover .logo-lockup {
@@ -537,7 +541,7 @@ select {
   bottom: 6px;
   width: 3px;
   border-radius: 0 3px 3px 0;
-  background: var(--gold-ink);
+  background: var(--gold-700);
   animation: fade var(--dur) var(--ease) both;
 }
 .nbtn .ic {
@@ -976,7 +980,7 @@ select {
   border-radius: var(--rl);
   background: var(--surface);
   border: 1px solid var(--line);
-  box-shadow: inset 3px 0 0 var(--gold-ink);
+  box-shadow: inset 3px 0 0 var(--rule-neutral);
   color: var(--text);
 }
 .ctx-block b {
@@ -1844,9 +1848,9 @@ table.stores tr:hover td {
   flex-wrap: wrap;
 }
 .dash-hero.clear {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: inset 4px 0 0 var(--pos);
+  background: var(--pos-bg);
+  border: 1px solid var(--pos-line);
+  box-shadow: inset 4px 0 0 var(--band-green);
 }
 .dash-hero.alert {
   background: var(--surface);
@@ -1948,11 +1952,15 @@ table.stores tr:hover td {
 
 /* ============================ store trend ============================ */
 
-/* The verdict used to be a full bleed gradient. On a screen whose job
-   is to make you read a heatmap of numbers, a slab that size wins the
-   eye every time. It is a white card with a coloured rule now: the
-   verdict still reads at a glance, from the rule and from the weight
-   of the headline, without outshouting the grid below it. */
+/* The verdict was a full bleed gradient, then a white card, and neither
+   was right. The gradient outshouted the heatmap below it. The white
+   card lost the one thing this block exists for: telling you whether
+   the answer is good or bad before you have read a word.
+
+   So it takes a soft tint and a coloured headline. Green or red is
+   legible from across the room, the tint is a tenth of the ink the
+   gradient used, and the body copy stays at 5.7:1 on it. Colour here
+   is not decoration, it is the whole message. */
 .st-verdict {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1962,10 +1970,20 @@ table.stores tr:hover td {
   color: var(--text);
 }
 .st-verdict.good {
+  background: var(--pos-bg);
+  border-color: var(--pos-line);
   box-shadow: inset 4px 0 0 var(--band-green);
 }
+.st-verdict.good .st-verdict-head {
+  color: var(--band-green);
+}
 .st-verdict.bad {
+  background: var(--neg-bg);
+  border-color: var(--neg-line);
   box-shadow: inset 4px 0 0 var(--band-red);
+}
+.st-verdict.bad .st-verdict-head {
+  color: var(--band-red);
 }
 .st-verdict.none {
   box-shadow: inset 4px 0 0 var(--line-2);
@@ -2128,13 +2146,23 @@ table.stores tr:hover td {
   color: var(--text);
 }
 .fc-hero.over {
+  background: var(--neg-bg);
+  border-color: var(--neg-line);
   box-shadow: inset 4px 0 0 var(--band-red);
 }
+.fc-hero.over .fc-head {
+  color: var(--band-red);
+}
 .fc-hero.ok {
+  background: var(--pos-bg);
+  border-color: var(--pos-line);
   box-shadow: inset 4px 0 0 var(--band-green);
 }
+.fc-hero.ok .fc-head {
+  color: var(--band-green);
+}
 .fc-hero.under {
-  box-shadow: inset 4px 0 0 var(--gold-ink);
+  box-shadow: inset 4px 0 0 var(--rule-neutral);
 }
 .fc-hero.empty {
   box-shadow: inset 4px 0 0 var(--line-2);
@@ -2279,7 +2307,7 @@ table.stores tr:hover td {
   position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
-  box-shadow: inset 4px 0 0 var(--gold-ink);
+  box-shadow: inset 4px 0 0 var(--rule-neutral);
   color: var(--text);
   border-radius: var(--rl);
   padding: 18px 20px;
@@ -2804,11 +2832,16 @@ table.stores tr:hover td {
   margin-bottom: 14px;
   background: var(--surface);
   border: 1px solid var(--line);
-  box-shadow: inset 4px 0 0 var(--gold-ink);
+  box-shadow: inset 4px 0 0 var(--rule-neutral);
   color: var(--text);
 }
 .db-rail.clear {
-  box-shadow: inset 4px 0 0 var(--pos);
+  background: var(--pos-bg);
+  border-color: var(--pos-line);
+  box-shadow: inset 4px 0 0 var(--band-green);
+}
+.db-rail.clear .db-rail-num {
+  color: var(--band-green);
 }
 .db-rail-main {
   flex: 1;

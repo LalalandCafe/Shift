@@ -3,19 +3,26 @@
 /**
  * Palette note.
  *
- * The shell went white, so the mark went with it. It used to be cream and gold
- * because it sat on a brown rail. On white those two are invisible, so the two
- * faces are brown and gold now: one carries the weight, the other carries the
- * brand, and both hold up against a white sidebar and a white topbar.
+ * The mark has now been blue and amber, then cream and gold, then brown and
+ * gold, and the gold never sat right. The reason is that La La Land has one
+ * hue. A two-hue mark in a one-hue brand always looks like two brands, and on
+ * a white rail the yellow half also has to be darkened so far to stay visible
+ * that it stops looking like the brand yellow anyway.
  *
- * Which means the mark no longer needs a chip behind it. .mobile-logo in
- * globals.css is transparent again.
+ * So the mark is monochrome. Two values of the house brown, dark left and
+ * light right, which is how the Janus bust reads in the brand's own line
+ * drawing: one face in shadow, one in light. It clears 3.3:1 between the two
+ * faces, so the seam holds at 30px, and the whole thing is unmistakably the
+ * same brown as the type it sits next to.
+ *
+ * If you ever want the gold back, set FACE_R to '#C9A83F'. Everything else in
+ * this file works either way.
  *
  * variant="icon" is the exception. That one is an app icon with its own dark
- * tile, so it keeps the cream and gold pair.
+ * tile, and on a dark tile the cream and gold pair is correct.
  */
-const FACE_L = '#5A4432';
-const FACE_R = '#C9A83F';
+const FACE_L = '#4A3728';
+const FACE_R = '#A5866E';
 const EYE = '#FFFFFF';
 
 const ICON_BG = '#533F2E';
@@ -27,8 +34,8 @@ const RIGHT = 'M33 8c11 0 19 8 19 18l4 7-4 2v4c0 4-3 6-6 7l-5 3v8h-8z';
 
 // Fillet, modelled on the Janus bust: a straight braided band across both
 // skulls, a double strip down the seam and a knot on top. Drawn OVER the faces
-// in the opposite color of the half it crosses, gold across the brown face and
-// brown across the gold one, so it reads as one piece worn by both heads and
+// in the opposite value of the half it crosses, light across the dark face and
+// dark across the light one, so it reads as one piece worn by both heads and
 // never needs an outline. The notches are painted in the face color underneath,
 // which is what gives the band its braided texture for free.
 const BAND_Y = 18.5;
