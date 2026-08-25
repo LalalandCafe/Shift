@@ -1,62 +1,114 @@
 /* ============================================================
    SHIFT design system
-   Tokens first, then shell, then components. Legacy class names
-   (.mc, .tcard, .grid, .dash-*, .st-*, .fc-*, .kd-*) are kept so
-   Dashboard, StoreTrend, Leaderboard and DriveThru keep working.
+   La La Land palette. Tokens first, then shell, then components.
+
+   This file replaces globals.css in full. The v3 through v12
+   append blocks are gone: every one of them has been folded into
+   the canonical rule for its selector, so each class is now
+   declared once with its final value. Nothing was dropped. Class
+   names, cascade order and computed output are the same or
+   corrected where the old stack contradicted itself.
+
+   Palette
+     cream  #FFF7D2   brand highlight, accent fills, crown
+     coffee #6C4C32   brand base, accent, dark chrome
+     paper  #FBF7F2   warm off white surface
+     taupe  #B2A194   muted type and hairlines
+
+   The one thing deliberately NOT rebranded is the --band-* pair.
+   Those greens and reds are the Excel colors the daily email
+   already uses. Changing them would make the app and the email
+   disagree about what a good number looks like.
    ============================================================ */
 
 :root {
-  /* dark shell */
-  --ink: #0e1116;
-  --ink-2: #161b23;
-  --ink-3: #232b36;
-  --ink-line: rgba(255, 255, 255, 0.09);
-  --ink-text: #e8ebf0;
-  --ink-text2: #97a1b0;
+  /* ---- brand ---- */
+  --cream: #fff7d2;
+  --coffee: #6c4c32;
+  --paper: #fbf7f2;
+  --taupe: #b2a194;
 
-  /* light surfaces */
-  --canvas: #f4f5f7;
+  /* coffee ramp, all derived from #6C4C32 */
+  --coffee-900: #21160f;
+  --coffee-800: #2e1f15;
+  --coffee-700: #3d2a1c;
+  --coffee-600: #523824;
+  --coffee-500: #6c4c32;
+  --coffee-400: #8a6647;
+  --coffee-300: #a98a6c;
+
+  /* cream ramp */
+  --cream-600: #d9b94a;
+  --cream-500: #f0d97e;
+  --cream-400: #fff7d2;
+  --cream-300: #fffbec;
+
+  /* ---- dark shell ---- */
+  --ink: #2e1f15;
+  --ink-2: #3d2a1c;
+  --ink-3: #523824;
+  --ink-line: rgba(255, 247, 210, 0.13);
+  --ink-text: #f6efe2;
+  --ink-text2: #bfab97;
+
+  /* ---- light surfaces ---- */
+  --canvas: #f3ede4;
   --surface: #ffffff;
-  --surface-2: #f8f9fb;
-  --surface-3: #eceff3;
-  --line: #e2e5ea;
-  --line-2: #cfd5dd;
+  --surface-2: #fbf7f2;
+  --surface-3: #f0e8dc;
+  --line: #e7decf;
+  --line-2: #d6c9b6;
 
-  --text: #11151b;
-  --text2: #5a6371;
-  --text3: #8c96a4;
+  --text: #2e1f15;
+  --text2: #6b5949;
+  --text3: #9c8b7b;
 
-  /* signal colors: one accent, three states */
-  --cobalt: #2258d8;
-  --cobalt-bg: #eef3fd;
-  --cobalt-line: #bfd1f7;
+  /* ---- signal colors: one accent, three states ----
+     The accent is the brand coffee, filled with cream. Cream is a
+     yellow, so warn had to move off amber or the two chips would
+     have been the same swatch at a glance. Warn is burnt orange
+     now: same warm family, clearly its own thing. */
+  --accent: #6c4c32;
+  --accent-strong: #523824;
+  --accent-bg: #fff7d2;
+  --accent-line: #ecd9a2;
 
-  --pos: #0b7a4c;
-  --pos-bg: #e8f6ef;
-  --pos-line: #a6ddc2;
+  --pos: #2f6b43;
+  --pos-bg: #e9f1e6;
+  --pos-line: #b4cfaf;
 
-  --neg: #b02a1f;
-  --neg-bg: #fdeeec;
-  --neg-line: #f2b9b2;
+  --neg: #a32a22;
+  --neg-bg: #fbeae6;
+  --neg-line: #eeb9ae;
 
-  --warn: #8a5a00;
-  --warn-bg: #fdf4e3;
-  --warn-line: #efd49a;
+  --warn: #9a5a16;
+  --warn-bg: #fbebd8;
+  --warn-line: #ebc391;
 
   /* ---- performance bands ----
-     The four fills that express how a store is doing against a target.
-     Read by lib/scale.js, which is the only thing allowed to decide which
-     band a number falls into. Values are lifted from the WeekView table so
-     every report reads like the daily email that goes out to the field.
+     The four fills that express how a store is doing against a
+     target. Read by lib/scale.js, which is the only thing allowed
+     to decide which band a number falls into. Values are lifted
+     from the WeekView table so every report reads like the daily
+     email that goes out to the field.
 
-     These are distinct from --warn above on purpose: --warn means "something
-     needs your attention" (missing data, partial week, a flag), while the
-     bands mean "this is how the number scored". Amber never appears as a
-     band. The chain reads red or green. */
+     Distinct from --warn on purpose: --warn means "something needs
+     your attention" (missing data, partial week, a flag), while the
+     bands mean "this is how the number scored". Amber never appears
+     as a band. The chain reads red or green. */
   --band-green: #1a6630;
   --band-green-soft: #c6efce;
   --band-red: #9c0006;
   --band-red-soft: #ffc7ce;
+
+  /* ---- week view, spreadsheet skin ----
+     The legacy grey grid, re-cut in paper and coffee. One place to
+     change it instead of eleven hardcoded hex values. */
+  --wk-head: #f7f2e9;
+  --wk-line: #e3d9c8;
+  --wk-hover: #fbf7f2;
+  --wk-band: #2e1f15;
+  --wk-chip: #f0e8dc;
 
   --r: 8px;
   --rl: 12px;
@@ -65,31 +117,38 @@
   --dur: 160ms;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
-  --sh-1: 0 1px 2px rgba(16, 22, 32, 0.05);
-  --sh-2: 0 4px 16px rgba(16, 22, 32, 0.09);
-  --sh-3: 0 18px 48px rgba(16, 22, 32, 0.22);
+  /* Shadows carry a brown cast so cards do not look grey on cream. */
+  --sh-1: 0 1px 2px rgba(46, 31, 21, 0.06);
+  --sh-2: 0 4px 16px rgba(46, 31, 21, 0.11);
+  --sh-3: 0 18px 48px rgba(46, 31, 21, 0.26);
+  --ring: 0 0 0 3px rgba(108, 76, 50, 0.16);
 
   --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
 
-  /* legacy aliases */
+  /* ---- legacy aliases ----
+     Kept so any component still writing var(--cobalt) or var(--navy)
+     inline keeps rendering. New code should use the names above. */
   --bg: var(--surface);
   --bg2: var(--canvas);
   --bg3: var(--surface-3);
   --border: var(--line);
   --border2: var(--line-2);
   --navy: var(--ink);
-  --accent: var(--cobalt);
+  --cobalt: var(--accent);
+  --cobalt-bg: var(--accent-bg);
+  --cobalt-line: var(--accent-line);
+  --accent-color: var(--accent);
   --green: var(--pos);
   --green-bg: var(--pos-bg);
   --green-b: var(--pos-line);
   --red: var(--neg);
   --red-bg: var(--neg-bg);
   --red-b: var(--neg-line);
-  --blue: var(--cobalt);
-  --blue-bg: var(--cobalt-bg);
-  --blue-b: var(--cobalt-line);
+  --blue: var(--accent);
+  --blue-bg: var(--accent-bg);
+  --blue-b: var(--accent-line);
   --amber: var(--warn);
   --amber-bg: var(--warn-bg);
   --amber-b: var(--warn-line);
@@ -125,7 +184,7 @@ select {
 }
 
 :focus-visible {
-  outline: 2px solid var(--cobalt);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 5px;
 }
@@ -164,13 +223,13 @@ select {
   }
 }
 @keyframes pop {
-  0% {
+  from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.4);
+    transform: scale(0.4);
   }
-  100% {
+  to {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
   }
 }
 @keyframes pulse {
@@ -180,6 +239,14 @@ select {
   }
   50% {
     opacity: 0.35;
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
   }
 }
 
@@ -221,10 +288,42 @@ select {
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  transition: width 200ms var(--ease), padding 200ms var(--ease);
 }
 .sidebar-spacer {
   flex: 1;
   min-height: 12px;
+}
+
+.sidebar.collapsed {
+  width: 68px;
+  padding-left: 10px;
+  padding-right: 10px;
+  align-items: stretch;
+}
+.sidebar.collapsed .logo {
+  justify-content: center;
+  padding: 4px 0 2px;
+}
+.sidebar.collapsed .logo-words,
+.sidebar.collapsed .nbtn-label,
+.sidebar.collapsed .nsec {
+  display: none;
+}
+.sidebar.collapsed .nbtn {
+  justify-content: center;
+  padding: 10px 0;
+}
+.sidebar.collapsed .nbtn.active::before {
+  left: -10px;
+}
+.sidebar.collapsed .nfoot {
+  justify-content: center;
+  padding: 12px 0;
+}
+/* Keeps breathing room between groups once the labels are gone. */
+.sidebar.collapsed .nsec + .nbtn {
+  margin-top: 10px;
 }
 
 .main {
@@ -235,7 +334,7 @@ select {
 }
 
 .topbar {
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(251, 247, 242, 0.88);
   backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--line);
   padding: 12px 24px;
@@ -262,26 +361,41 @@ select {
   gap: 10px;
   padding: 4px 8px 2px;
   margin-bottom: 16px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  border-radius: var(--r);
+  transition: background var(--dur) var(--ease);
+}
+.logo:hover {
+  background: var(--ink-2);
+}
+.logo-words {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .logo-mark {
   width: 30px;
   height: 30px;
   border-radius: 9px;
-  background: linear-gradient(150deg, #3b6df0, #1e3fa8);
+  background: linear-gradient(150deg, var(--coffee-400), var(--coffee-600));
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   font-size: 14px;
   font-weight: 700;
-  color: #fff;
+  color: var(--cream);
   letter-spacing: -0.02em;
 }
 .logo-text {
   font-size: 14.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: #fff;
+  color: var(--cream);
 }
 .logo-sub {
   font-size: 9.5px;
@@ -290,11 +404,47 @@ select {
   letter-spacing: 0.03em;
 }
 
+/* The brand mark is brown, which sinks into the dark rail, so it is
+   flattened to cream. It sits under SHIFT at caption scale: this is
+   the SHIFT app made for La La Land, not the other way around.
+   TODO: ship /logo/lalaland-cream.png and drop the filter. Inverting
+   a PNG at runtime costs a repaint and kills any antialiasing the
+   asset had. */
+.logo-lockup {
+  display: block;
+  height: 13px;
+  width: auto;
+  margin-top: 4px;
+  filter: brightness(0) invert(1) sepia(0.35) saturate(3) hue-rotate(2deg);
+  opacity: 0.72;
+  transition: opacity var(--dur) var(--ease);
+}
+.logo:hover .logo-lockup {
+  opacity: 1;
+}
+
+/* Crown reacts to the nav state. Mounted at all times so it can
+   animate both ways: lifts off and fades when the menu closes,
+   drops back on when it opens. */
+.shift-crown {
+  transform-origin: 32px 12px;
+  transition: opacity 220ms var(--ease), transform 260ms var(--ease);
+  opacity: 0;
+  transform: translateY(-6px) scaleY(0.7);
+}
+.shift-crown.on {
+  opacity: 1;
+  transform: none;
+}
+.logo:hover .shift-crown.on {
+  transform: translateY(-1.5px);
+}
+
 /* ---- nav ---- */
 .nsec {
   font-size: 9px;
   font-weight: 700;
-  color: #6b7684;
+  color: #8a7660;
   letter-spacing: 0.11em;
   text-transform: uppercase;
   padding: 16px 10px 6px;
@@ -322,7 +472,7 @@ select {
 }
 .nbtn.active {
   background: var(--ink-3);
-  color: #fff;
+  color: var(--cream-300);
   font-weight: 600;
 }
 .nbtn.active::before {
@@ -333,7 +483,7 @@ select {
   bottom: 7px;
   width: 2.5px;
   border-radius: 0 3px 3px 0;
-  background: #5b8bff;
+  background: var(--cream-500);
   animation: fade var(--dur) var(--ease) both;
 }
 .nbtn .ic {
@@ -359,15 +509,21 @@ select {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #3f4855;
+  background: #5c4633;
   flex-shrink: 0;
 }
 .ndot.on {
-  background: #35c37d;
-  box-shadow: 0 0 0 3px rgba(53, 195, 125, 0.16);
+  background: #57b581;
+  box-shadow: 0 0 0 3px rgba(87, 181, 129, 0.18);
 }
 
 /* ---- topbar ---- */
+.topbar-id {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
 .ptitle {
   font-size: 14px;
   font-weight: 700;
@@ -386,6 +542,24 @@ select {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+/* The sidebar already carries the logo on desktop.
+   The chip is not decoration. The Janus mark is two tones, and La La Land is
+   a monochrome brown palette, so no fixed pair of face colors reads well on
+   both the dark rail and a near white topbar. Putting the mark on a coffee
+   chip here means it always sits on the same dark ground, and ShiftLogo can
+   use cream and gold without picking a background to lose against. */
+.mobile-logo {
+  display: none;
+  border: none;
+  background: var(--ink);
+  padding: 3px;
+  cursor: pointer;
+  border-radius: 9px;
+  transition: transform var(--dur) var(--ease);
+}
+.mobile-logo:active {
+  transform: scale(0.94);
+}
 
 /* ============================ controls ============================ */
 
@@ -402,8 +576,8 @@ select {
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .field:focus-within {
-  border-color: var(--cobalt);
-  box-shadow: 0 0 0 3px rgba(34, 88, 216, 0.12);
+  border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 .field input,
 .field select {
@@ -419,6 +593,19 @@ select {
 }
 .field-search input {
   width: 168px;
+}
+/* The region picker drew a native arrow plus an <Icon name="down" />.
+   Native is off, the icon we control stays, so the chevron keeps the
+   same stroke weight as every other icon in the app. */
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 2px;
+}
+.field select::-ms-expand {
+  display: none;
 }
 
 .btn {
@@ -440,7 +627,7 @@ select {
 }
 .btn:hover {
   background: var(--surface-2);
-  border-color: var(--text3);
+  border-color: var(--taupe);
 }
 .btn:active {
   transform: translateY(1px);
@@ -452,7 +639,7 @@ select {
 }
 .btn-primary {
   background: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
   border-color: var(--ink);
 }
 .btn-primary:hover {
@@ -525,7 +712,7 @@ select {
 }
 .seg-btn.active {
   background: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
 }
 .seg-label {
   padding: 0 14px;
@@ -545,6 +732,33 @@ select {
   font-size: 9.5px;
   color: var(--text3);
   margin-top: -1px;
+}
+
+/* red and green sort buttons */
+.seg-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.seg-dot.green {
+  background: var(--band-green);
+}
+.seg-dot.red {
+  background: var(--band-red);
+}
+.seg-btn.seg-green.active {
+  background: var(--band-green);
+  border-color: var(--band-green);
+}
+.seg-btn.seg-red.active {
+  background: var(--band-red);
+  border-color: var(--band-red);
+}
+.seg-btn.seg-green.active .seg-dot,
+.seg-btn.seg-red.active .seg-dot {
+  background: #fff;
 }
 
 /* ============================ chips ============================ */
@@ -582,9 +796,9 @@ select {
 }
 .b-info,
 .chip-info {
-  background: var(--cobalt-bg);
-  color: var(--cobalt);
-  border-color: var(--cobalt-line);
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-line);
 }
 .b-bad,
 .chip-neg {
@@ -617,8 +831,8 @@ select {
   color: var(--pos);
 }
 .rb-tx {
-  background: var(--cobalt-bg);
-  color: var(--cobalt);
+  background: var(--accent-bg);
+  color: var(--accent);
 }
 
 /* ============================ metric cards ============================ */
@@ -698,7 +912,7 @@ select {
   padding: 9px 15px;
   border-radius: var(--rl);
   background: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
 }
 .ctx-block b {
   font-size: 13px;
@@ -730,12 +944,12 @@ select {
 }
 .dpill:hover {
   color: var(--text);
-  border-color: var(--text3);
+  border-color: var(--taupe);
 }
 .dpill.active,
 .dpill.has.active {
   background: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
   border-color: var(--ink);
   font-weight: 600;
 }
@@ -863,6 +1077,39 @@ table.grid tbody tr:last-child td {
 .grid .rrow:hover td {
   background: var(--surface-3);
 }
+
+/* sortable headers */
+table.grid th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+table.grid th.sortable:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+table.grid th.sorted {
+  color: var(--accent);
+}
+.th-in {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+th.r .th-in {
+  flex-direction: row-reverse;
+}
+.th-caret {
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+th.sortable:hover .th-caret {
+  opacity: 0.45;
+}
+th.sorted .th-caret {
+  opacity: 1;
+}
+
 .lc-code {
   font-size: 10px;
   font-weight: 600;
@@ -885,6 +1132,15 @@ table.grid tbody tr:last-child td {
 .lc-flag {
   color: var(--warn);
   display: inline-flex;
+}
+.lc-region {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text3);
+  background: var(--surface-3);
+  border-radius: 3px;
+  padding: 1px 5px;
 }
 
 table.stores {
@@ -938,7 +1194,7 @@ table.stores tr:hover td {
   top: 0;
   bottom: 0;
   border-radius: 100px;
-  background: var(--text3);
+  background: var(--taupe);
   transform-origin: left center;
   animation: grow 420ms var(--ease) both;
 }
@@ -952,7 +1208,7 @@ table.stores tr:hover td {
   background: var(--warn);
 }
 .bar-fill.cobalt {
-  background: var(--cobalt);
+  background: var(--accent);
 }
 
 /* ============================ rail (signature) ============================
@@ -993,8 +1249,8 @@ table.stores tr:hover td {
   top: 8px;
   height: 18px;
   border-radius: 5px;
-  background: var(--cobalt-bg);
-  border: 1px solid var(--cobalt-line);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-line);
   animation: fade 320ms var(--ease) both;
 }
 .rail-median {
@@ -1018,31 +1274,37 @@ table.stores tr:hover td {
   color: var(--text2);
   white-space: nowrap;
 }
+/* The dot used to be centred with translate(-50%,-50%) inside the pop
+   keyframes, with animation-fill-mode: both. An animation's filled
+   value beats a plain declaration, so the :hover transform below was
+   dead code and the dot never grew. Centring is done with margins now
+   and pop only animates scale, so hover works. */
 .rail-dot {
   position: absolute;
-  top: 17px;
+  top: 11.5px;
   width: 11px;
   height: 11px;
+  margin-left: -5.5px;
   border-radius: 50%;
   border: 2px solid var(--surface);
-  background: var(--text3);
+  background: var(--taupe);
   cursor: help;
-  animation: pop 380ms var(--ease) both;
+  animation: pop 380ms var(--ease) backwards;
   animation-delay: calc(var(--i, 0) * 14ms);
   transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .rail-dot:hover {
-  transform: translate(-50%, -50%) scale(1.7);
+  transform: scale(1.7);
   box-shadow: var(--sh-2);
   z-index: 4;
 }
-/* Kept for any view still passing these class names. TPLH now sets the fill
-   inline from lib/scale.js, so the band colors stay in one place. */
+/* Kept for any view still passing these class names. TPLH now sets the
+   fill inline from lib/scale.js, so the band colors stay in one place. */
 .rail-dot.fast {
   background: var(--band-green);
 }
 .rail-dot.pace {
-  background: var(--cobalt);
+  background: var(--accent);
 }
 .rail-dot.watch {
   background: var(--band-red-soft);
@@ -1096,9 +1358,9 @@ table.stores tr:hover td {
 }
 .note-info,
 .infobox {
-  background: var(--cobalt-bg);
-  border-color: var(--cobalt-line);
-  color: #1b3d8f;
+  background: var(--accent-bg);
+  border-color: var(--accent-line);
+  color: var(--coffee-600);
 }
 .note-warn,
 .warnbox {
@@ -1217,8 +1479,8 @@ table.stores tr:hover td {
 }
 .tinput:focus {
   outline: none;
-  border-color: var(--cobalt);
-  box-shadow: 0 0 0 3px rgba(34, 88, 216, 0.12);
+  border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 
 /* ============================ modal ============================ */
@@ -1226,7 +1488,7 @@ table.stores tr:hover td {
 .scrim {
   position: fixed;
   inset: 0;
-  background: rgba(9, 12, 18, 0.5);
+  background: rgba(33, 22, 15, 0.52);
   backdrop-filter: blur(3px);
   z-index: 999;
   display: flex;
@@ -1266,8 +1528,8 @@ table.stores tr:hover td {
 }
 .modal-in:focus {
   outline: none;
-  border-color: var(--cobalt);
-  box-shadow: 0 0 0 3px rgba(34, 88, 216, 0.12);
+  border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 .modal-err {
   color: var(--neg);
@@ -1306,14 +1568,6 @@ table.stores tr:hover td {
   background-size: 240% 100%;
   animation: shimmer 1.3s linear infinite;
   height: 84px;
-}
-@keyframes shimmer {
-  from {
-    background-position: 120% 0;
-  }
-  to {
-    background-position: -120% 0;
-  }
 }
 
 #toast {
@@ -1370,7 +1624,7 @@ table.stores tr:hover td {
   height: 20px;
   border-radius: 50%;
   background: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
   font-size: 10px;
   font-weight: 700;
   display: flex;
@@ -1386,6 +1640,9 @@ table.stores tr:hover td {
 }
 .desktop-table {
   display: block;
+}
+.mobile-nav {
+  display: none;
 }
 
 .store-card {
@@ -1509,79 +1766,7 @@ table.stores tr:hover td {
   border-bottom: 1px solid var(--line);
 }
 
-.mobile-nav {
-  display: none;
-}
-
-@media (max-width: 900px) {
-  .desktop-table {
-    display: none;
-  }
-  .mobile-cards {
-    display: block;
-  }
-  .sidebar {
-    display: none;
-  }
-  .content {
-    padding: 14px 12px 28px;
-  }
-  .topbar {
-    padding: 11px 14px;
-  }
-  .field-search input {
-    width: 108px;
-  }
-  .mc-grid,
-  .mc-grid.cols-3 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 9px;
-  }
-  .mc {
-    padding: 12px 13px;
-  }
-  .mc-v {
-    font-size: 20px;
-  }
-  .mobile-nav {
-    display: flex;
-    gap: 6px;
-    padding: 9px 12px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
-    position: sticky;
-    top: 51px;
-    z-index: 19;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .mobile-nav::-webkit-scrollbar {
-    display: none;
-  }
-  .mnav-btn {
-    flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 7px 13px;
-    border-radius: 100px;
-    border: 1px solid var(--line-2);
-    background: var(--surface);
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--text2);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all var(--dur) var(--ease);
-  }
-  .mnav-btn.active {
-    background: var(--ink);
-    color: #fff;
-    border-color: var(--ink);
-  }
-}
-
-/* ============================ legacy: dashboard ============================ */
+/* ============================ dashboard: exception rows ============================ */
 
 .dash-hero {
   border-radius: var(--rx);
@@ -1596,8 +1781,8 @@ table.stores tr:hover td {
   border: 1px solid var(--pos-line);
 }
 .dash-hero.alert {
-  background: linear-gradient(140deg, var(--ink) 0%, #232b3d 100%);
-  color: #fff;
+  background: linear-gradient(140deg, var(--coffee-800) 0%, var(--coffee-600) 100%);
+  color: var(--cream-300);
 }
 /* emoji slot in Dashboard.js, hidden until that file is refactored */
 .dash-hero-icon {
@@ -1667,8 +1852,32 @@ table.stores tr:hover td {
   color: var(--text3);
   margin-top: 2px;
 }
+.dash-row.sev-critical .dash-row-label {
+  color: var(--band-red);
+}
+.dash-row.sev-data .dash-row-label {
+  color: var(--warn);
+}
+.dash-row.sev-warning .dash-row-label {
+  color: var(--text2);
+}
+.sev-chip-critical {
+  background: var(--neg-bg);
+  color: var(--neg);
+  border-color: var(--neg-line);
+}
+.sev-chip-data {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-color: var(--warn-line);
+}
+.sev-chip-warning {
+  background: var(--surface-3);
+  color: var(--text2);
+  border-color: var(--line);
+}
 
-/* ============================ legacy: store trend ============================ */
+/* ============================ store trend ============================ */
 
 .st-verdict {
   border-radius: var(--rx);
@@ -1676,12 +1885,12 @@ table.stores tr:hover td {
   margin-bottom: 20px;
 }
 .st-verdict.good {
-  background: linear-gradient(140deg, #0a3d28 0%, #0b7a4c 100%);
-  color: #fff;
+  background: linear-gradient(140deg, #1c4630 0%, #2f6b43 100%);
+  color: var(--cream-300);
 }
 .st-verdict.bad {
-  background: linear-gradient(140deg, var(--ink) 0%, #3d1518 100%);
-  color: #fff;
+  background: linear-gradient(140deg, var(--coffee-800) 0%, #55211c 100%);
+  color: var(--cream-300);
 }
 .st-verdict.none {
   background: var(--surface-3);
@@ -1834,7 +2043,7 @@ table.stores tr:hover td {
   margin-left: 6px;
 }
 
-/* ============================ legacy: forecast ============================ */
+/* ============================ forecast ============================ */
 
 .fc-hero {
   border-radius: var(--rx);
@@ -1842,16 +2051,16 @@ table.stores tr:hover td {
   margin-bottom: 18px;
 }
 .fc-hero.over {
-  background: linear-gradient(140deg, var(--ink) 0%, #3d1518 100%);
-  color: #fff;
+  background: linear-gradient(140deg, var(--coffee-800) 0%, #55211c 100%);
+  color: var(--cream-300);
 }
 .fc-hero.ok {
-  background: linear-gradient(140deg, #0a3d28 0%, #0b7a4c 100%);
-  color: #fff;
+  background: linear-gradient(140deg, #1c4630 0%, #2f6b43 100%);
+  color: var(--cream-300);
 }
 .fc-hero.under {
-  background: linear-gradient(140deg, var(--ink) 0%, #1c3a63 100%);
-  color: #fff;
+  background: linear-gradient(140deg, var(--coffee-800) 0%, var(--coffee-500) 100%);
+  color: var(--cream-300);
 }
 .fc-hero.empty {
   background: var(--surface-3);
@@ -1940,16 +2149,16 @@ table.stores tr:hover td {
 }
 .fc-input:focus {
   outline: none;
-  border-color: var(--cobalt);
-  box-shadow: 0 0 0 3px rgba(34, 88, 216, 0.12);
+  border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 .fc-var {
   font-size: 12.5px;
   font-weight: 700;
   text-align: right;
 }
-/* Forecast confidence is not a performance band, it is how much to trust the
-   number. It keeps its own scale on purpose. */
+/* Forecast confidence is not a performance band, it is how much to
+   trust the number. It keeps its own scale on purpose. */
 .fc-conf {
   display: inline-block;
   width: 7px;
@@ -1973,7 +2182,7 @@ table.stores tr:hover td {
   border-radius: var(--r);
   border: none;
   background: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
@@ -1990,27 +2199,51 @@ table.stores tr:hover td {
   background: var(--pos);
 }
 
+/* ============================ detail panels ============================ */
+
 .day-panel,
 .kd-panel {
+  position: relative;
   background: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
   border-radius: var(--rl);
   padding: 18px 20px;
+  padding-right: 58px;
   margin-bottom: 16px;
   animation: rise 220ms var(--ease) both;
 }
-.day-panel-close,
-.kd-close {
-  float: right;
-  background: var(--ink-3);
+/* .kd-close used float: right, which took the button out of flow and
+   left the glyph off centre in its own box. Store detail never floated
+   its close button, which is why only that panel looked correct. One
+   definition now, centred by the grid rather than a line-height guess. */
+.kd-close,
+.day-panel-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border: none;
-  color: #fff;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
+  border-radius: 8px;
+  background: var(--ink-3);
+  color: var(--cream-300);
   cursor: pointer;
-  font-size: 15px;
-  line-height: 1;
+  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.kd-close:hover,
+.day-panel-close:hover {
+  background: var(--coffee-400);
+}
+.kd-close:active,
+.day-panel-close:active {
+  transform: scale(0.92);
+}
+.kd-close .ic,
+.day-panel-close .ic {
+  display: block;
 }
 .day-panel-grid,
 .kd-summary {
@@ -2018,6 +2251,9 @@ table.stores tr:hover td {
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
   gap: 14px;
   margin-top: 14px;
+}
+.kd-summary {
+  margin: 15px 0 18px;
 }
 .day-panel-k,
 .kd-k {
@@ -2046,9 +2282,6 @@ table.stores tr:hover td {
   font-weight: 700;
   margin-top: 4px;
   letter-spacing: -0.02em;
-}
-.kd-summary {
-  margin: 15px 0 18px;
 }
 .kd-sec {
   font-size: 9.5px;
@@ -2083,7 +2316,7 @@ table.stores tr:hover td {
 .kd-bar-track {
   flex: 1.4;
   height: 6px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 247, 210, 0.16);
   border-radius: 100px;
   overflow: hidden;
   min-width: 52px;
@@ -2110,347 +2343,8 @@ table.stores tr:hover td {
   max-width: 560px;
 }
 
-@media (max-width: 900px) {
-  .dash-hero {
-    padding: 17px 18px;
-    gap: 14px;
-  }
-  .dash-hero-num {
-    font-size: 21px;
-  }
-  .st-verdict {
-    padding: 18px 20px;
-  }
-  .st-verdict-head {
-    font-size: 19px;
-  }
-  .st-grid {
-    gap: 3px;
-  }
-  .st-cell {
-    min-height: 36px;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .st-cell small {
-    display: none;
-  }
-  .st-rowhead {
-    font-size: 9.5px;
-    padding-right: 6px;
-  }
-  .fc-hero {
-    padding: 17px 19px;
-  }
-  .fc-head {
-    font-size: 18px;
-  }
-  .fc-row {
-    grid-template-columns: 42px 1fr 62px 74px;
-    gap: 7px;
-    padding: 10px;
-  }
-  .fc-row .fc-var-col {
-    display: none;
-  }
-  .fc-input {
-    width: 64px;
-    font-size: 13px;
-  }
-  .fc-allowed {
-    font-size: 15px;
-  }
-  .kd-panel {
-    padding: 15px 16px;
-  }
-  .kd-title {
-    font-size: 16px;
-  }
-  .kd-bar-track {
-    display: none;
-  }
-  .rail {
-    padding: 15px 14px 12px;
-  }
-}
+/* ============================ leaderboard ============================ */
 
-/* ============================================================
-   .wk-legacy
-   The Week view feeds the daily email, so it keeps the original
-   spreadsheet look. This block cancels the new table styling for
-   that view only. Nothing else on the app is affected.
-
-   The green and red here are the source of the --band-* tokens,
-   so this view and every other report now share one definition.
-   ============================================================ */
-
-.wk-legacy table.grid {
-  border-collapse: collapse;
-}
-.wk-legacy table.grid th {
-  position: static;
-  padding: 7px;
-  font-size: 10px;
-  letter-spacing: 0.05em;
-  color: #999994;
-  background: #f7f7f5;
-  border: 1px solid #e0dfd8;
-}
-.wk-legacy table.grid td {
-  padding: 7px;
-  font-size: 12px;
-  border: 1px solid #e0dfd8;
-}
-.wk-legacy table.grid .num {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  letter-spacing: 0;
-}
-.wk-legacy table.grid tbody tr:last-child td {
-  border-bottom: 1px solid #e0dfd8;
-}
-.wk-legacy table.grid tbody tr:hover td {
-  background: #fafaf8;
-}
-.wk-legacy .cell-ok {
-  background: var(--band-green-soft) !important;
-  color: var(--band-green);
-  font-weight: 700;
-}
-.wk-legacy .cell-bad {
-  background: var(--band-red-soft) !important;
-  color: var(--band-red);
-  font-weight: 700;
-}
-.wk-legacy .grid .rrow td,
-.wk-legacy .grid .rrow:hover td {
-  position: static;
-  padding: 9px 10px 4px;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #fff;
-  background: #1a1a2e !important;
-  letter-spacing: 0.05em;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-.wk-legacy .sep {
-  box-shadow: none;
-  border-left: 2px solid #999 !important;
-}
-.wk-legacy .scx {
-  max-height: none;
-  overflow: auto;
-}
-.wk-legacy .tcard {
-  border-radius: 11px;
-  box-shadow: none;
-  border-color: #e0dfd8;
-}
-.wk-legacy .lc-code {
-  color: #999994;
-  font-weight: 700;
-}
-.wk-legacy .lc-name {
-  max-width: 160px;
-  font-weight: 500;
-}
-.wk-legacy .lc-flag {
-  color: #9a5e0a;
-}
-
-/* metric cards, original weight and no hover lift */
-.wk-legacy .mc {
-  border-radius: 11px;
-  padding: 13px 15px;
-  border-color: #e0dfd8;
-  box-shadow: none;
-}
-.wk-legacy .mc:hover {
-  transform: none;
-  box-shadow: none;
-}
-.wk-legacy .mc-l {
-  font-size: 9.5px;
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
-}
-.wk-legacy .mc-v {
-  font-size: 24px;
-  letter-spacing: -0.025em;
-}
-.wk-legacy .mc-s {
-  font-size: 10.5px;
-  margin-top: 3px;
-}
-
-/* mobile cards, original chunky look */
-.wk-legacy .store-card {
-  border-radius: 12px;
-  padding: 16px;
-  border-color: #e0dfd8;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-}
-.wk-legacy .store-card.ok {
-  border-left: 5px solid var(--band-green);
-}
-.wk-legacy .store-card.bad {
-  border-left: 5px solid var(--band-red);
-}
-.wk-legacy .store-card-splh {
-  background: #ededea;
-  font-size: 22px;
-  font-weight: 800;
-  border-radius: 8px;
-  padding: 4px 12px;
-}
-.wk-legacy .store-card-splh u {
-  font-size: 9px;
-  opacity: 0.6;
-  margin-top: -2px;
-}
-.wk-legacy .scard-block-label {
-  font-size: 10px;
-  color: #1a1a2e;
-  letter-spacing: 0.06em;
-}
-.wk-legacy .scard-cell {
-  background: #f7f7f5;
-  border: none;
-  border-radius: 8px;
-  padding: 9px;
-}
-.wk-legacy .scard-cell-val {
-  font-size: 15px;
-}
-.wk-legacy .scard-cell.splh-ok {
-  background: var(--band-green-soft);
-  border: 1px solid var(--band-green);
-}
-.wk-legacy .scard-cell.splh-ok .scard-cell-val,
-.wk-legacy .scard-cell.splh-ok .scard-cell-lbl {
-  color: var(--band-green);
-}
-.wk-legacy .scard-cell.splh-bad {
-  background: var(--band-red-soft);
-  border: 1px solid var(--band-red);
-}
-.wk-legacy .scard-cell.splh-bad .scard-cell-val,
-.wk-legacy .scard-cell.splh-bad .scard-cell-lbl {
-  color: var(--band-red);
-}
-.wk-legacy .scard-region-head {
-  font-size: 12px;
-  font-weight: 800;
-  color: #fff;
-  background: #1a1a2e;
-  padding: 7px 12px;
-  border: none;
-  border-radius: 8px;
-  margin: 16px 0 10px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-/* ============================================================
-   v3: collapsible nav, sortable headers, leaderboard chart
-   ============================================================ */
-
-/* ---- logo as a button ---- */
-.logo {
-  width: 100%;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  border-radius: var(--r);
-  transition: background var(--dur) var(--ease);
-}
-.logo:hover {
-  background: var(--ink-2);
-}
-.logo-words {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-/* ---- collapsed sidebar ---- */
-.sidebar {
-  transition: width 200ms var(--ease), padding 200ms var(--ease);
-}
-.sidebar.collapsed {
-  width: 68px;
-  padding-left: 10px;
-  padding-right: 10px;
-  align-items: stretch;
-}
-.sidebar.collapsed .logo {
-  justify-content: center;
-  padding: 4px 0 2px;
-}
-.sidebar.collapsed .logo-words,
-.sidebar.collapsed .nbtn-label,
-.sidebar.collapsed .nsec {
-  display: none;
-}
-.sidebar.collapsed .nbtn {
-  justify-content: center;
-  padding: 10px 0;
-}
-.sidebar.collapsed .nbtn.active::before {
-  left: -10px;
-}
-.sidebar.collapsed .nfoot {
-  justify-content: center;
-  padding: 12px 0;
-}
-/* keeps a little breathing room between groups once the labels are gone */
-.sidebar.collapsed .nsec + .nbtn {
-  margin-top: 10px;
-}
-
-/* ---- sortable table headers ---- */
-table.grid th.sortable {
-  cursor: pointer;
-  user-select: none;
-  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
-}
-table.grid th.sortable:hover {
-  color: var(--text);
-  background: var(--surface-3);
-}
-table.grid th.sorted {
-  color: var(--cobalt);
-}
-.th-in {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-th.r .th-in {
-  flex-direction: row-reverse;
-}
-.th-caret {
-  opacity: 0;
-  transition: opacity var(--dur) var(--ease);
-}
-th.sortable:hover .th-caret {
-  opacity: 0.45;
-}
-th.sorted .th-caret {
-  opacity: 1;
-}
-.lc-region {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  color: var(--text3);
-  background: var(--surface-3);
-  border-radius: 3px;
-  padding: 1px 5px;
-}
-
-/* ---- leaderboard ---- */
 .lb-controls {
   display: flex;
   align-items: center;
@@ -2479,13 +2373,13 @@ th.sorted .th-caret {
   transition: all var(--dur) var(--ease);
 }
 .lb-chip:hover {
-  border-color: var(--text3);
+  border-color: var(--taupe);
   color: var(--text);
 }
 .lb-chip.active {
   background: var(--ink);
   border-color: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
 }
 .lb-chip-n {
   font-size: 10px;
@@ -2496,47 +2390,17 @@ th.sorted .th-caret {
   color: var(--text2);
 }
 .lb-chip.active .lb-chip-n {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+  background: rgba(255, 247, 210, 0.18);
+  color: var(--cream-300);
+}
+/* The window and sort toggles sit together on the right. */
+.lb-segs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-/* Fixed: a dangling ".lb-row:hover" selector with no block used to sit here,
-   which swallowed the @media below it. Every mobile leaderboard rule was dead. */
-@media (max-width: 900px) {
-  .lb-controls {
-    margin-bottom: 10px;
-  }
-  .lb-chips {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    scrollbar-width: none;
-  }
-  .lb-chips::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-/* ---- crown reacts to the nav state ----
-   Mounted at all times so it can animate both ways. It lifts off and fades
-   when the menu closes, drops back on when it opens. */
-.shift-crown {
-  transform-origin: 32px 12px;
-  transition: opacity 220ms var(--ease), transform 260ms var(--ease);
-  opacity: 0;
-  transform: translateY(-6px) scaleY(0.7);
-}
-.shift-crown.on {
-  opacity: 1;
-  transform: none;
-}
-.logo:hover .shift-crown.on {
-  transform: translateY(-1.5px);
-}
-
-/* ============================================================
-   Leaderboard v2: podium, struck medals, goal bars
-   ============================================================ */
-
+/* ---- podium ---- */
 .lb-podium {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2562,20 +2426,20 @@ th.sorted .th-caret {
   box-shadow: var(--sh-2);
 }
 .lb-pod.pinned {
-  border-color: var(--cobalt);
-  box-shadow: 0 0 0 3px rgba(34, 88, 216, 0.12);
+  border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 .lb-pod.gold {
   border-top-color: #c9a227;
-  background: linear-gradient(175deg, #fdf8e8 0%, var(--surface) 55%);
+  background: linear-gradient(175deg, var(--cream-400) 0%, var(--surface) 58%);
 }
 .lb-pod.silver {
-  border-top-color: #9aa4ae;
-  background: linear-gradient(175deg, #f4f6f8 0%, var(--surface) 55%);
+  border-top-color: #a89c8e;
+  background: linear-gradient(175deg, #f4f0ea 0%, var(--surface) 58%);
 }
 .lb-pod.bronze {
   border-top-color: #b0733e;
-  background: linear-gradient(175deg, #fbf1e8 0%, var(--surface) 55%);
+  background: linear-gradient(175deg, #f7ece0 0%, var(--surface) 58%);
 }
 .lb-pod-body {
   flex: 1;
@@ -2615,6 +2479,9 @@ th.sorted .th-caret {
 .lb-pod-pct.down {
   color: var(--band-red);
 }
+.lb-pod-pct.neutral {
+  color: var(--text);
+}
 
 /* ---- medal ---- */
 .lb-medal {
@@ -2643,16 +2510,16 @@ th.sorted .th-caret {
   fill: #c9a227;
 }
 .lb-medal.silver .ribbon {
-  fill: #bcc4cc;
+  fill: #c6bdb2;
 }
 .lb-medal.silver .ribbon.r {
-  fill: #9aa4ae;
+  fill: #a89c8e;
 }
 .lb-medal.silver .ring {
-  stroke: #7d8892;
+  stroke: #8b8074;
 }
 .lb-medal.silver .disc {
-  fill: #9aa4ae;
+  fill: #a89c8e;
 }
 .lb-medal.bronze .ribbon {
   fill: #c98d59;
@@ -2665,6 +2532,13 @@ th.sorted .th-caret {
 }
 .lb-medal.bronze .disc {
   fill: #b0733e;
+}
+/* No sleeve, so the silhouette is taller than it is wide and needs to
+   sit centred on the podium row rather than float above it. */
+.lb-cup {
+  flex-shrink: 0;
+  display: block;
+  align-self: center;
 }
 
 /* ---- goal bar ---- */
@@ -2702,13 +2576,14 @@ th.sorted .th-caret {
   z-index: 2;
 }
 
-/* ---- ranked list ---- */
+/* ---- ranked list ----
+   Five columns: rank, name, goal bar, rating, score. */
 .lb-list {
   padding: 4px 0;
 }
 .lb-row {
   display: grid;
-  grid-template-columns: 30px minmax(140px, 1.2fr) minmax(120px, 2fr) 58px;
+  grid-template-columns: 30px minmax(140px, 1.2fr) minmax(120px, 2fr) 64px 52px;
   gap: 14px;
   align-items: center;
   width: 100%;
@@ -2724,8 +2599,8 @@ th.sorted .th-caret {
   background: var(--surface-2);
 }
 .lb-row.pinned {
-  background: var(--cobalt-bg);
-  border-left-color: var(--cobalt);
+  background: var(--accent-bg);
+  border-left-color: var(--accent);
 }
 .lb-rank {
   font-size: 12px;
@@ -2739,7 +2614,7 @@ th.sorted .th-caret {
 }
 .lb-rank.top {
   background: var(--ink);
-  color: #fff;
+  color: var(--cream-300);
 }
 .lb-name {
   display: flex;
@@ -2757,206 +2632,20 @@ th.sorted .th-caret {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Score is a 0 to 100 percentile blend, not a pass or fail against a
+   target, so it does not take the green or red treatment. */
 .lb-pct {
   font-size: 14px;
   font-weight: 700;
   text-align: right;
   font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
 .lb-pct.up {
   color: var(--band-green);
 }
 .lb-pct.down {
   color: var(--band-red);
-}
-
-/* ---- red and green sort buttons ---- */
-.seg-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  display: inline-block;
-  margin-right: 6px;
-}
-.seg-dot.green {
-  background: var(--band-green);
-}
-.seg-dot.red {
-  background: var(--band-red);
-}
-.seg-btn.seg-green.active {
-  background: var(--band-green);
-  border-color: var(--band-green);
-}
-.seg-btn.seg-red.active {
-  background: var(--band-red);
-  border-color: var(--band-red);
-}
-.seg-btn.seg-green.active .seg-dot,
-.seg-btn.seg-red.active .seg-dot {
-  background: #fff;
-}
-
-@media (max-width: 900px) {
-  .lb-podium {
-    grid-template-columns: 1fr;
-    gap: 9px;
-  }
-  .lb-pod {
-    padding: 13px;
-  }
-  .lb-pod-pct {
-    font-size: 22px;
-  }
-  .lb-row {
-    grid-template-columns: 26px minmax(0, 1.4fr) minmax(60px, 1fr) 46px;
-    gap: 9px;
-    padding: 10px 12px;
-  }
-  .lb-pct {
-    font-size: 12.5px;
-  }
-}
-
-/* ============================================================
-   v5: mobile logo, tighter week cards
-   ============================================================ */
-
-.topbar-id {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-/* the sidebar already carries the logo on desktop */
-.mobile-logo {
-  display: none;
-  border: none;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  border-radius: var(--r);
-  transition: transform var(--dur) var(--ease);
-}
-.mobile-logo:active {
-  transform: scale(0.94);
-}
-
-@media (max-width: 900px) {
-  .mobile-logo {
-    display: block;
-    flex-shrink: 0;
-  }
-  .topbar {
-    padding: 9px 12px;
-    gap: 8px;
-  }
-  .ptitle {
-    font-size: 15px;
-  }
-  .psub {
-    font-size: 10px;
-  }
-  .mobile-nav {
-    top: 49px;
-  }
-
-  /* ---- week view, compact ---- */
-  .wk-legacy .mc-grid,
-  .wk-legacy .mc-grid.cols-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-  }
-  .wk-legacy .mc {
-    padding: 9px 9px;
-    border-radius: 9px;
-  }
-  .wk-legacy .mc-l {
-    font-size: 8px;
-    letter-spacing: 0.03em;
-    margin-bottom: 3px;
-    line-height: 1.25;
-  }
-  .wk-legacy .mc-v {
-    font-size: 16px;
-  }
-  .wk-legacy .mc-s {
-    display: none;
-  }
-
-  .wk-legacy .store-card {
-    padding: 11px;
-    margin-bottom: 9px;
-    border-radius: 10px;
-    border-left-width: 4px;
-  }
-  .wk-legacy .store-card-head {
-    margin-bottom: 9px;
-    padding-bottom: 8px;
-  }
-  .wk-legacy .store-card-name {
-    font-size: 13.5px;
-  }
-  .wk-legacy .store-card-code {
-    font-size: 9.5px;
-  }
-  .wk-legacy .store-card-splh {
-    font-size: 17px;
-    min-width: 58px;
-    padding: 3px 9px;
-  }
-  .wk-legacy .scard-block {
-    margin-bottom: 8px;
-  }
-  .wk-legacy .scard-block-label {
-    font-size: 8.5px;
-    margin-bottom: 4px;
-    letter-spacing: 0.07em;
-  }
-  .wk-legacy .scard-row {
-    gap: 5px;
-  }
-  .wk-legacy .scard-cell {
-    padding: 6px 5px;
-    border-radius: 6px;
-  }
-  .wk-legacy .scard-cell-lbl {
-    font-size: 8px;
-    margin-bottom: 1px;
-  }
-  .wk-legacy .scard-cell-val {
-    font-size: 12.5px;
-  }
-  .wk-legacy .scard-region-head {
-    font-size: 10.5px;
-    padding: 5px 10px;
-    margin: 12px 0 7px;
-    border-radius: 6px;
-  }
-  /* the week and sync banner */
-  .wk-legacy .ctx-block,
-  .wk-legacy > div:first-child > div {
-    font-size: 11.5px !important;
-  }
-}
-/* ============================================================
-   Reviews in the leaderboard and week view
-   Append to the very end of app/globals.css.
-   These override the earlier .lb-row rules by source order.
-   ============================================================ */
-
-/* One more column for the rating, between the goal bar and the score. */
-.lb-row {
-  grid-template-columns: 30px minmax(140px, 1.2fr) minmax(120px, 2fr) 64px 52px;
-}
-
-/* Score is a 0 to 100 percentile blend, not a pass or fail against a
-   target, so it does not take the green or red treatment. */
-.lb-pct {
-  color: var(--text);
-}
-.lb-pod-pct.neutral {
-  color: var(--text);
 }
 
 .lb-rating {
@@ -2984,13 +2673,6 @@ th.sorted .th-caret {
   opacity: 0.7;
 }
 
-/* The window and sort toggles sit together on the right. */
-.lb-segs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .lb-legend {
   display: flex;
   flex-wrap: wrap;
@@ -3012,233 +2694,11 @@ th.sorted .th-caret {
   display: inline-block;
 }
 
-@media (max-width: 900px) {
-  /* The goal bar is the first thing to go on a narrow screen, so the row
-     drops to four columns: rank, name, rating, score. */
-  .lb-row {
-    grid-template-columns: 26px minmax(0, 1.4fr) 56px 40px;
-    gap: 9px;
-    padding: 10px 12px;
-  }
-  .lb-row .lb-goal {
-    display: none;
-  }
-  .lb-rating b {
-    font-size: 12px;
-  }
-  .lb-rating-n {
-    display: none;
-  }
-  .lb-segs {
-    width: 100%;
-  }
-  .lb-legend {
-    padding: 9px 12px;
-    gap: 9px;
-  }
-}
+/* ============================ dashboard ============================
+   db- prefixed so nothing collides with the legacy dash- rules the
+   exception rows still use.
+   ================================================================= */
 
-/* ---- week view review columns ----
-   The rating cell paints its own background from lib/scale.js, so it must
-   not inherit the .wk-legacy cell padding tweaks that assume plain text. */
-.wk-legacy table.grid td[style*="background"] {
-  font-weight: 700;
-}
-/* ============================================================
-   v6: panel close button, one chevron per select, week view
-   frozen columns, La La Land lockup, cup places.
-
-   Append this block to the very end of app/globals.css. Nothing
-   above it is edited: every rule here wins on source order, so
-   the existing design system stays intact and reversible.
-   ============================================================ */
-
-/* ---- 1. panel close button ----
-   .kd-close used float: right, which took the button out of flow and left the
-   glyph sitting off centre in its own box. Store detail never floated its
-   close button, which is why only that panel looked correct. One definition
-   now, both panels use it, and the icon is centred by the grid rather than by
-   a line-height guess. */
-.kd-panel,
-.day-panel {
-  position: relative;
-  padding-right: 58px;
-}
-.kd-close,
-.day-panel-close {
-  float: none;
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: 8px;
-  background: var(--ink-3);
-  color: #fff;
-  cursor: pointer;
-  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
-}
-.kd-close:hover,
-.day-panel-close:hover {
-  background: #313c4c;
-}
-.kd-close:active,
-.day-panel-close:active {
-  transform: scale(0.92);
-}
-.kd-close .ic,
-.day-panel-close .ic {
-  display: block;
-}
-
-/* ---- 2. one chevron per select ----
-   The topbar region picker rendered a native <select> arrow plus an
-   <Icon name="down" />, so it drew two. The native arrow is switched off and
-   the icon we control is kept, which also keeps the chevron on the same
-   stroke weight as every other icon in the app. */
-.field select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  cursor: pointer;
-  padding-right: 2px;
-}
-.field select::-ms-expand {
-  display: none;
-}
-
-/* ---- 3. week view: even columns, header and store name pinned ----
-   Every cell was sized by its own content, so the columns stepped in and out
-   down the table. table-layout: fixed hands sizing to the column rules below,
-   which makes the grid read evenly across all 34 stores.
-
-   The scroll box is also capped to the viewport, so the horizontal bar sits on
-   screen at all times. You can drag it from wherever you happen to be reading
-   instead of scrolling to the bottom of 34 rows to reach it. */
-.wk-legacy .scx {
-  max-height: calc(100vh - 300px);
-  overflow: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
-}
-.wk-legacy table.grid {
-  table-layout: fixed;
-  width: max-content;
-  min-width: 100%;
-}
-.wk-legacy table.grid th,
-.wk-legacy table.grid td {
-  width: 104px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.wk-legacy table.grid th:first-child,
-.wk-legacy table.grid td:first-child {
-  width: 200px;
-}
-
-/* Header rides the top of the scroll box. border-collapse drops borders on
-   sticky cells, so the rule under the header is drawn as an inset shadow. */
-.wk-legacy table.grid thead th {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  background: #f7f7f5;
-  box-shadow: inset 0 -1px 0 #e0dfd8, inset 1px 0 0 #e0dfd8;
-}
-.wk-legacy table.grid thead th:first-child {
-  left: 0;
-  z-index: 5;
-}
-
-/* Store name rides the left edge, so a row stays identifiable all the way out
-   to the PTD and review columns. */
-.wk-legacy table.grid tbody td:first-child {
-  position: sticky;
-  left: 0;
-  z-index: 3;
-  background: #fff;
-  box-shadow: 1px 0 0 #e0dfd8;
-}
-.wk-legacy table.grid tbody tr:hover td:first-child {
-  background: #fafaf8;
-}
-
-/* The region banner spans all 19 columns, so pinning it left would drag the
-   whole bar with the scroll. It stays in normal flow. */
-.wk-legacy .grid .rrow td,
-.wk-legacy .grid .rrow:hover td {
-  position: static;
-  width: auto;
-  box-shadow: none;
-}
-
-/* A scrollbar sized to be grabbed, not hunted for. */
-.wk-legacy .scx::-webkit-scrollbar {
-  height: 12px;
-  width: 12px;
-}
-.wk-legacy .scx::-webkit-scrollbar-track {
-  background: var(--surface-2);
-}
-.wk-legacy .scx::-webkit-scrollbar-thumb {
-  background: var(--line-2);
-  border-radius: 100px;
-  border: 3px solid var(--surface-2);
-}
-.wk-legacy .scx::-webkit-scrollbar-thumb:hover {
-  background: var(--text3);
-}
-.wk-legacy .scx::-webkit-scrollbar-corner {
-  background: var(--surface-2);
-}
-
-/* ---- 4. La La Land lockup in the sidebar ----
-   The brand mark is brown, which sinks into the dark rail, so it is flattened
-   to the same cream the rest of the sidebar type uses. It sits under SHIFT at
-   caption scale: this is the SHIFT app, made for La La Land, not the other way
-   around. */
-.logo-lockup {
-  display: block;
-  height: 13px;
-  width: auto;
-  margin-top: 4px;
-  filter: brightness(0) invert(1);
-  opacity: 0.7;
-  transition: opacity var(--dur) var(--ease);
-}
-.logo:hover .logo-lockup {
-  opacity: 1;
-}
-
-/* ---- 5. cup places ---- */
-.lb-cup {
-  flex-shrink: 0;
-  display: block;
-}
-
-@media (max-width: 900px) {
-  .wk-legacy .scx {
-    max-height: none;
-  }
-  .kd-panel,
-  .day-panel {
-    padding-right: 52px;
-  }
-}
-/* ============================================================
-   v7: dashboard
-
-   Append after the v6 block at the end of app/globals.css.
-   New classes are prefixed db- so nothing collides with the
-   legacy dash- rules, which the exception rows still use.
-   ============================================================ */
-
-/* ---- scope bar ---- */
 .db-scopes {
   display: flex;
   align-items: center;
@@ -3249,9 +2709,10 @@ th.sorted .th-caret {
 }
 
 /* ---- hero rail ----
-   One number carries the screen: the blended SPLH for whatever scope is
-   selected. The attention count sits to its right as a button rather than a
-   headline, because a count is only useful if you can get to the list. */
+   One number carries the screen: the blended SPLH for whatever scope
+   is selected. The attention count sits to its right as a button
+   rather than a headline, because a count is only useful if you can
+   get to the list. */
 .db-rail {
   display: flex;
   align-items: stretch;
@@ -3260,11 +2721,11 @@ th.sorted .th-caret {
   border-radius: var(--rx);
   padding: 22px 24px;
   margin-bottom: 14px;
-  background: linear-gradient(135deg, var(--ink) 0%, #1d2634 62%, #24314a 100%);
-  color: #fff;
+  background: linear-gradient(135deg, var(--coffee-900) 0%, var(--coffee-700) 58%, var(--coffee-500) 100%);
+  color: var(--cream-300);
 }
 .db-rail.clear {
-  background: linear-gradient(135deg, #0a3d28 0%, #0e5636 60%, #0b7a4c 100%);
+  background: linear-gradient(135deg, #16351f 0%, #24523a 58%, #2f6b43 100%);
 }
 .db-rail-main {
   flex: 1;
@@ -3306,10 +2767,10 @@ th.sorted .th-caret {
   font-variant-numeric: tabular-nums;
 }
 .db-rail-sub b.up {
-  color: #6ee7a8;
+  color: #86ddab;
 }
 .db-rail-sub b.down {
-  color: #ff9a91;
+  color: #f5a79b;
 }
 
 .db-rail-cta {
@@ -3318,15 +2779,15 @@ th.sorted .th-caret {
   text-align: left;
   padding: 14px 16px;
   border-radius: var(--rl);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 247, 210, 0.16);
+  background: rgba(255, 247, 210, 0.08);
   color: inherit;
   cursor: pointer;
   transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 .db-rail-cta:hover {
-  background: rgba(255, 255, 255, 0.13);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 247, 210, 0.15);
+  border-color: rgba(255, 247, 210, 0.32);
 }
 .db-rail-cta-num {
   font-size: 30px;
@@ -3354,8 +2815,8 @@ th.sorted .th-caret {
 }
 
 /* ---- tiles ----
-   Built on .mc so they sit on the same type scale as every other metric card
-   in the app, with a footer that names where the click lands. */
+   Built on the same type scale as .mc, with a footer that names where
+   the click lands. */
 .db-tiles {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
@@ -3433,7 +2894,7 @@ th.sorted .th-caret {
   transition: color var(--dur) var(--ease);
 }
 .db-tile:hover .db-tile-go {
-  color: var(--cobalt);
+  color: var(--accent);
 }
 
 /* ---- two column body ---- */
@@ -3462,7 +2923,7 @@ th.sorted .th-caret {
   transition: color var(--dur) var(--ease);
 }
 .db-link:hover {
-  color: var(--cobalt);
+  color: var(--accent);
 }
 
 /* ---- podium, stacked instead of side by side ---- */
@@ -3476,13 +2937,103 @@ th.sorted .th-caret {
   padding: 11px 13px;
   gap: 11px;
 }
+/* The dashboard podium carries the same target bar as the Leaderboard,
+   so a store's position against its own target reads the same in both. */
 .db-podium .lb-pod-meta {
-  margin-bottom: 0;
+  margin-bottom: 8px;
+}
+.db-podium .lb-goal {
+  height: 6px;
 }
 
 /* ---- movers ----
-   A diverging bar around a centre line. The bar is half width on each side so
-   up and down read at the same scale without a chart library. */
+   Two columns, improving and declining. One list of diverging bars
+   asked you to decode bar length against a shared axis. Split, it
+   answers the actual question at a glance: who is up, who is down. */
+.db-movers-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+.db-movers-col {
+  padding: 12px 14px 14px;
+}
+.db-movers-col + .db-movers-col {
+  border-left: 1px solid var(--line);
+}
+.db-movers-col-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding-bottom: 9px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.db-movers-col-head.up {
+  color: var(--band-green);
+}
+.db-movers-col-head.down {
+  color: var(--band-red);
+}
+.db-mover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--dur) var(--ease);
+}
+.db-mover-row:hover {
+  background: var(--surface-2);
+}
+.db-mover-row-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The delta as a pill rather than a bar. With five rows per column the
+   rank order carries the magnitude, so the number only has to be
+   readable. */
+.db-mover-pill {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 9px;
+  border-radius: 100px;
+  border: 1px solid transparent;
+}
+.db-mover-pill.up {
+  background: var(--band-green-soft);
+  color: var(--band-green);
+  border-color: var(--band-green);
+}
+.db-mover-pill.down {
+  background: var(--band-red-soft);
+  color: var(--band-red);
+  border-color: var(--band-red);
+}
+.db-movers-empty {
+  font-size: 11.5px;
+  color: var(--text3);
+  padding: 10px 6px;
+  line-height: 1.5;
+}
+
+/* Single column diverging variant, still used by the older markup. */
 .db-movers {
   padding: 6px 0;
 }
@@ -3566,30 +3117,6 @@ th.sorted .th-caret {
   font: inherit;
   color: inherit;
 }
-.dash-row.sev-critical .dash-row-label {
-  color: var(--band-red);
-}
-.dash-row.sev-data .dash-row-label {
-  color: var(--warn);
-}
-.dash-row.sev-warning .dash-row-label {
-  color: var(--text2);
-}
-.sev-chip-critical {
-  background: var(--neg-bg);
-  color: var(--neg);
-  border-color: var(--neg-line);
-}
-.sev-chip-data {
-  background: var(--warn-bg);
-  color: var(--warn);
-  border-color: var(--warn-line);
-}
-.sev-chip-warning {
-  background: var(--surface-3);
-  color: var(--text2);
-  border-color: var(--line);
-}
 .db-more {
   font-size: 11px;
   color: var(--text3);
@@ -3649,6 +3176,346 @@ th.sorted .th-caret {
   white-space: nowrap;
 }
 
+/* ============================================================
+   .wk-legacy
+   The Week view feeds the daily email, so it keeps the original
+   spreadsheet look. This block cancels the new table styling for
+   that view only. Nothing else on the app is affected.
+
+   The green and red here are the source of the --band-* tokens,
+   so this view and every other report share one definition. The
+   grid itself is re-cut in paper and coffee: the eleven hardcoded
+   greys it used to carry are now --wk-* tokens.
+   ============================================================ */
+
+/* The page is the only thing that scrolls. An inner scroll box cut
+   the table off and put a second scrollbar inside the card. */
+.wk-legacy .scx {
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+/* width: 100% with table-layout: fixed makes the column widths below
+   behave as ratios: the browser keeps their relative sizes and
+   stretches them to fill the card. min-width is the sum of those
+   widths, so below that the table scrolls instead of crushing the
+   numbers. It was 1300 against a 1348 total, which meant the ratios
+   were already squeezing at the fallback width. */
+.wk-legacy table.grid {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  min-width: 1348px;
+}
+
+/* Headers wrap on a space or a slash only. An earlier pass set
+   overflow-wrap: anywhere to stop "(OVER)/UNDER" spilling into its
+   neighbour, but for a single word with no break point that sliced
+   the word itself: "TARGE-T", "RATIN-G". Normal wrapping plus enough
+   width per column is the fix. */
+.wk-legacy table.grid th {
+  position: static;
+  padding: 8px 6px 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text3);
+  background: var(--wk-head);
+  border: 1px solid var(--wk-line);
+  box-shadow: none;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+  overflow: hidden;
+  line-height: 1.2;
+  vertical-align: bottom;
+  letter-spacing: 0.02em;
+  width: auto;
+}
+.wk-legacy table.grid td {
+  padding: 6px;
+  font-size: 12px;
+  border: 1px solid var(--wk-line);
+  width: auto;
+  overflow: visible;
+  text-overflow: clip;
+}
+.wk-legacy table.grid .num {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0;
+}
+.wk-legacy table.grid tbody tr:last-child td {
+  border-bottom: 1px solid var(--wk-line);
+}
+.wk-legacy table.grid tbody tr:hover td {
+  background: var(--wk-hover);
+}
+
+/* Store name rides the left edge, so a row stays identifiable all the
+   way out to the PTD and review columns. */
+.wk-legacy table.grid tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--wk-line);
+}
+.wk-legacy table.grid tbody tr:hover td:first-child {
+  background: var(--wk-hover);
+}
+
+/* ---- column ratios ----
+   Grouped by what the column actually holds: a two or three digit
+   count, a dollar amount with a comma, or a short currency figure.
+   Totals 1348px, which is the min-width above.
+
+    1 location  184   2 hours      58   3 sales      78
+    4 target     66   5 splh       58   6 (over)/u   82
+    7 wtd hrs    66   8 wtd sales  73   9 wtd splh   66
+   10 wtd (o)/u  96  11 training   68  12 trainee    58
+   13 trainer    58  14 ptd hrs    66  15 ptd sales  73
+   16 ptd splh   62  17 rating     66  18 reviews    70
+   ------------------------------------------------------
+   The Bonus column that used to sit at 19 is gone, so this table is
+   18 columns wide. */
+.wk-legacy table.grid th:nth-child(1),
+.wk-legacy table.grid td:nth-child(1) {
+  width: 184px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wk-legacy table.grid th:nth-child(2),
+.wk-legacy table.grid td:nth-child(2),
+.wk-legacy table.grid th:nth-child(5),
+.wk-legacy table.grid td:nth-child(5),
+.wk-legacy table.grid th:nth-child(12),
+.wk-legacy table.grid td:nth-child(12),
+.wk-legacy table.grid th:nth-child(13),
+.wk-legacy table.grid td:nth-child(13) {
+  width: 58px;
+}
+.wk-legacy table.grid th:nth-child(3),
+.wk-legacy table.grid td:nth-child(3) {
+  width: 78px;
+}
+.wk-legacy table.grid th:nth-child(4),
+.wk-legacy table.grid td:nth-child(4),
+.wk-legacy table.grid th:nth-child(7),
+.wk-legacy table.grid td:nth-child(7),
+.wk-legacy table.grid th:nth-child(9),
+.wk-legacy table.grid td:nth-child(9),
+.wk-legacy table.grid th:nth-child(14),
+.wk-legacy table.grid td:nth-child(14),
+.wk-legacy table.grid th:nth-child(17),
+.wk-legacy table.grid td:nth-child(17) {
+  width: 66px;
+}
+.wk-legacy table.grid th:nth-child(6),
+.wk-legacy table.grid td:nth-child(6) {
+  width: 82px;
+}
+.wk-legacy table.grid th:nth-child(8),
+.wk-legacy table.grid td:nth-child(8),
+.wk-legacy table.grid th:nth-child(15),
+.wk-legacy table.grid td:nth-child(15) {
+  width: 73px;
+}
+.wk-legacy table.grid th:nth-child(10),
+.wk-legacy table.grid td:nth-child(10) {
+  width: 96px;
+}
+.wk-legacy table.grid th:nth-child(11),
+.wk-legacy table.grid td:nth-child(11) {
+  width: 68px;
+}
+.wk-legacy table.grid th:nth-child(16),
+.wk-legacy table.grid td:nth-child(16) {
+  width: 62px;
+}
+.wk-legacy table.grid th:nth-child(18),
+.wk-legacy table.grid td:nth-child(18) {
+  width: 70px;
+}
+
+/* The region banner spans all 18 columns, so no width rule may touch
+   it and pinning it left would drag the whole bar with the scroll. */
+.wk-legacy .grid .rrow td,
+.wk-legacy .grid .rrow:hover td {
+  position: static;
+  width: auto !important;
+  overflow: visible;
+  box-shadow: none;
+  padding: 9px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--cream-300);
+  background: var(--wk-band) !important;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(255, 247, 210, 0.15);
+}
+
+.wk-legacy .cell-ok {
+  background: var(--band-green-soft) !important;
+  color: var(--band-green);
+  font-weight: 700;
+}
+.wk-legacy .cell-bad {
+  background: var(--band-red-soft) !important;
+  color: var(--band-red);
+  font-weight: 700;
+}
+.wk-legacy .sep {
+  box-shadow: none;
+  border-left: 2px solid var(--taupe) !important;
+}
+.wk-legacy .tcard {
+  border-radius: 11px;
+  box-shadow: none;
+  border-color: var(--wk-line);
+}
+.wk-legacy .lc-code {
+  color: var(--text3);
+  font-weight: 700;
+}
+.wk-legacy .lc-name {
+  max-width: 160px;
+  font-weight: 500;
+}
+.wk-legacy .lc-flag {
+  color: var(--warn);
+}
+
+/* The rating cell paints its own background from lib/scale.js, so it
+   must not inherit the cell padding tweaks that assume plain text. */
+.wk-legacy table.grid td[style*="background"] {
+  font-weight: 700;
+}
+
+/* A scrollbar sized to be grabbed, not hunted for. */
+.wk-legacy .scx::-webkit-scrollbar {
+  height: 12px;
+  width: 12px;
+}
+.wk-legacy .scx::-webkit-scrollbar-track {
+  background: var(--surface-2);
+}
+.wk-legacy .scx::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 100px;
+  border: 3px solid var(--surface-2);
+}
+.wk-legacy .scx::-webkit-scrollbar-thumb:hover {
+  background: var(--taupe);
+}
+.wk-legacy .scx::-webkit-scrollbar-corner {
+  background: var(--surface-2);
+}
+
+/* metric cards, original weight and no hover lift */
+.wk-legacy .mc {
+  border-radius: 11px;
+  padding: 13px 15px;
+  border-color: var(--wk-line);
+  box-shadow: none;
+}
+.wk-legacy .mc:hover {
+  transform: none;
+  box-shadow: none;
+}
+.wk-legacy .mc-l {
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.wk-legacy .mc-v {
+  font-size: 24px;
+  letter-spacing: -0.025em;
+}
+.wk-legacy .mc-s {
+  font-size: 10.5px;
+  margin-top: 3px;
+}
+
+/* mobile cards, original chunky look */
+.wk-legacy .store-card {
+  border-radius: 12px;
+  padding: 16px;
+  border-color: var(--wk-line);
+  box-shadow: 0 2px 8px rgba(46, 31, 21, 0.07), 0 1px 2px rgba(46, 31, 21, 0.05);
+}
+.wk-legacy .store-card.ok {
+  border-left: 5px solid var(--band-green);
+}
+.wk-legacy .store-card.bad {
+  border-left: 5px solid var(--band-red);
+}
+.wk-legacy .store-card-splh {
+  background: var(--wk-chip);
+  font-size: 22px;
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 4px 12px;
+}
+.wk-legacy .store-card-splh u {
+  font-size: 9px;
+  opacity: 0.6;
+  margin-top: -2px;
+}
+.wk-legacy .scard-block-label {
+  font-size: 10px;
+  color: var(--text);
+  letter-spacing: 0.06em;
+}
+.wk-legacy .scard-cell {
+  background: var(--wk-head);
+  border: none;
+  border-radius: 8px;
+  padding: 9px;
+}
+.wk-legacy .scard-cell-val {
+  font-size: 15px;
+}
+.wk-legacy .scard-cell.splh-ok {
+  background: var(--band-green-soft);
+  border: 1px solid var(--band-green);
+}
+.wk-legacy .scard-cell.splh-ok .scard-cell-val,
+.wk-legacy .scard-cell.splh-ok .scard-cell-lbl {
+  color: var(--band-green);
+}
+.wk-legacy .scard-cell.splh-bad {
+  background: var(--band-red-soft);
+  border: 1px solid var(--band-red);
+}
+.wk-legacy .scard-cell.splh-bad .scard-cell-val,
+.wk-legacy .scard-cell.splh-bad .scard-cell-lbl {
+  color: var(--band-red);
+}
+.wk-legacy .scard-region-head {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--cream-300);
+  background: var(--wk-band);
+  padding: 7px 12px;
+  border: none;
+  border-radius: 8px;
+  margin: 16px 0 10px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ============================================================
+   breakpoints
+   Three blocks, in order: 1080, 900, 640. Previously these were
+   scattered across seven separate @media rules, one of which was
+   swallowed entirely by a dangling ".lb-row:hover" selector with
+   no body, so every mobile leaderboard rule under it was dead.
+   ============================================================ */
+
 @media (max-width: 1080px) {
   .db-cols {
     grid-template-columns: minmax(0, 1fr);
@@ -3656,6 +3523,95 @@ th.sorted .th-caret {
 }
 
 @media (max-width: 900px) {
+  /* ---- shell ---- */
+  .sidebar {
+    display: none;
+  }
+  .desktop-table {
+    display: none;
+  }
+  .mobile-cards {
+    display: block;
+  }
+  .content {
+    padding: 14px 12px 28px;
+  }
+  .topbar {
+    padding: 9px 12px;
+    gap: 8px;
+  }
+  .ptitle {
+    font-size: 15px;
+  }
+  .psub {
+    font-size: 10px;
+  }
+  .mobile-logo {
+    display: block;
+    flex-shrink: 0;
+  }
+  .field-search input {
+    width: 108px;
+  }
+
+  .mobile-nav {
+    display: flex;
+    gap: 6px;
+    padding: 9px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 49px;
+    z-index: 19;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .mobile-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .mnav-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 13px;
+    border-radius: 100px;
+    border: 1px solid var(--line-2);
+    background: var(--surface);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text2);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--dur) var(--ease);
+  }
+  .mnav-btn.active {
+    background: var(--ink);
+    color: var(--cream-300);
+    border-color: var(--ink);
+  }
+
+  /* ---- cards ---- */
+  .mc-grid,
+  .mc-grid.cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .mc {
+    padding: 12px 13px;
+  }
+  .mc-v {
+    font-size: 20px;
+  }
+
+  /* ---- dashboard ---- */
+  .dash-hero {
+    padding: 17px 18px;
+    gap: 14px;
+  }
+  .dash-hero-num {
+    font-size: 21px;
+  }
   .db-rail {
     padding: 17px 18px;
     gap: 14px;
@@ -3690,260 +3646,200 @@ th.sorted .th-caret {
     flex-wrap: nowrap;
     scrollbar-width: none;
   }
-}
-/* ============================================================
-   v8: week view column proportions
 
-   Append after the v7 block. This block corrects v6: it gave all
-   19 columns the same 104px, so a column holding "96" was as wide
-   as one holding "$111,652", and it capped the scroll box height,
-   which cut the table with an inner scrollbar.
+  /* ---- store trend ---- */
+  .st-verdict {
+    padding: 18px 20px;
+  }
+  .st-verdict-head {
+    font-size: 19px;
+  }
+  .st-grid {
+    gap: 3px;
+  }
+  .st-cell {
+    min-height: 36px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .st-cell small {
+    display: none;
+  }
+  .st-rowhead {
+    font-size: 9.5px;
+    padding-right: 6px;
+  }
 
-   Both are undone here. Columns are now sized to the data they
-   carry, as a proportion of the card, so the table fills the width
-   exactly with no horizontal scroll and no dead space.
-   ============================================================ */
+  /* ---- forecast ---- */
+  .fc-hero {
+    padding: 17px 19px;
+  }
+  .fc-head {
+    font-size: 18px;
+  }
+  .fc-row {
+    grid-template-columns: 42px 1fr 62px 74px;
+    gap: 7px;
+    padding: 10px;
+  }
+  .fc-row .fc-var-col {
+    display: none;
+  }
+  .fc-input {
+    width: 64px;
+    font-size: 13px;
+  }
+  .fc-allowed {
+    font-size: 15px;
+  }
 
-/* No inner scroll box. The page is the only thing that scrolls. */
-.wk-legacy .scx {
-  max-height: none;
-  overflow-x: auto;
-  overflow-y: visible;
-}
+  /* ---- panels ---- */
+  .kd-panel,
+  .day-panel {
+    padding: 15px 16px;
+    padding-right: 52px;
+  }
+  .kd-title {
+    font-size: 16px;
+  }
+  .kd-bar-track {
+    display: none;
+  }
+  .rail {
+    padding: 15px 14px 12px;
+  }
 
-/* The frozen header needed a scroll container to stick to. Without one it
-   would pin itself behind the topbar, so it goes back to normal flow. */
-.wk-legacy table.grid thead th {
-  position: static;
-  box-shadow: none;
-}
+  /* ---- leaderboard ----
+     The goal bar is the first thing to go on a narrow screen, so the
+     row drops to four columns: rank, name, rating, score. */
+  .lb-controls {
+    margin-bottom: 10px;
+  }
+  .lb-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .lb-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .lb-podium {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+  .lb-pod {
+    padding: 13px;
+  }
+  .lb-pod-pct {
+    font-size: 22px;
+  }
+  .lb-row {
+    grid-template-columns: 26px minmax(0, 1.4fr) 56px 40px;
+    gap: 9px;
+    padding: 10px 12px;
+  }
+  .lb-row .lb-goal {
+    display: none;
+  }
+  .lb-pct {
+    font-size: 12.5px;
+  }
+  .lb-rating b {
+    font-size: 12px;
+  }
+  .lb-rating-n {
+    display: none;
+  }
+  .lb-segs {
+    width: 100%;
+  }
+  .lb-legend {
+    padding: 9px 12px;
+    gap: 9px;
+  }
 
-/* width: 100% with table-layout: fixed makes the widths below behave as
-   ratios: the browser keeps their relative sizes and stretches them to fill
-   the card. min-width keeps the numbers from crushing on a narrow laptop,
-   where the table falls back to scrolling. */
-.wk-legacy table.grid {
-  table-layout: fixed;
-  width: 100%;
-  min-width: 1300px;
-}
-
-/* One pixel off each side of every cell, recovered across 19 columns. */
-.wk-legacy table.grid th,
-.wk-legacy table.grid td {
-  padding: 6px;
-  width: auto;
-  overflow: visible;
-  text-overflow: clip;
-}
-
-/* Long headers wrap onto a second line instead of forcing the whole column
-   wide. "WTD (OVER)/UNDER" was the worst offender. */
-.wk-legacy table.grid th {
-  white-space: normal;
-  line-height: 1.25;
-  vertical-align: bottom;
-}
-
-/* ---- column ratios ----
-   Grouped by what the column actually holds: a two or three digit count, a
-   dollar amount with a comma, or a short currency figure. */
-
-/* 1 location name */
-.wk-legacy table.grid th:nth-child(1),
-.wk-legacy table.grid td:nth-child(1) {
-  width: 184px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* 2 hours · 4 target · 5 splh */
-.wk-legacy table.grid th:nth-child(2),
-.wk-legacy table.grid td:nth-child(2),
-.wk-legacy table.grid th:nth-child(4),
-.wk-legacy table.grid td:nth-child(4),
-.wk-legacy table.grid th:nth-child(5),
-.wk-legacy table.grid td:nth-child(5) {
-  width: 58px;
-}
-/* 3 sales */
-.wk-legacy table.grid th:nth-child(3),
-.wk-legacy table.grid td:nth-child(3) {
-  width: 78px;
-}
-/* 7 wtd hours · 9 wtd splh */
-.wk-legacy table.grid th:nth-child(7),
-.wk-legacy table.grid td:nth-child(7),
-.wk-legacy table.grid th:nth-child(9),
-.wk-legacy table.grid td:nth-child(9) {
-  width: 66px;
-}
-/* 8 wtd sales */
-.wk-legacy table.grid th:nth-child(8),
-.wk-legacy table.grid td:nth-child(8) {
-  width: 82px;
-}
-/* 10 wtd (over)/under */
-.wk-legacy table.grid th:nth-child(10),
-.wk-legacy table.grid td:nth-child(10) {
-  width: 78px;
-}
-/* 11 total training */
-.wk-legacy table.grid th:nth-child(11),
-.wk-legacy table.grid td:nth-child(11) {
-  width: 68px;
-}
-/* 12 trainee · 13 trainer */
-.wk-legacy table.grid th:nth-child(12),
-.wk-legacy table.grid td:nth-child(12),
-.wk-legacy table.grid th:nth-child(13),
-.wk-legacy table.grid td:nth-child(13) {
-  width: 58px;
-}
-/* 14 ptd hours */
-.wk-legacy table.grid th:nth-child(14),
-.wk-legacy table.grid td:nth-child(14) {
-  width: 66px;
-}
-/* 15 ptd sales */
-.wk-legacy table.grid th:nth-child(15),
-.wk-legacy table.grid td:nth-child(15) {
-  width: 82px;
-}
-/* 16 ptd splh */
-.wk-legacy table.grid th:nth-child(16),
-.wk-legacy table.grid td:nth-child(16) {
-  width: 62px;
-}
-/* 17 rating · 18 reviews.
-   Was 17/18/19 with a Bonus column at 19; that column is gone, so the
-   table is 18 columns now. */
-.wk-legacy table.grid th:nth-child(17),
-.wk-legacy table.grid td:nth-child(17),
-.wk-legacy table.grid th:nth-child(18),
-.wk-legacy table.grid td:nth-child(18) {
-  width: 58px;
-}
-
-
-/* The region banner spans all 19, so no width rule may touch it. */
-.wk-legacy .grid .rrow td,
-.wk-legacy .grid .rrow:hover td {
-  width: auto !important;
-  position: static;
-  box-shadow: none;
-  overflow: visible;
-}
-
-/* ---- cup ----
-   No sleeve now, so the silhouette is taller than it is wide and needs to sit
-   centred on the podium row rather than float above it. */
-.lb-cup {
-  flex-shrink: 0;
-  display: block;
-  align-self: center;
-}
-/* ============================================================
-   v9: two column movers, podium goal bar
-
-   Append after v8. The movers block used to be one list of
-   diverging bars, which asked you to decode bar length against a
-   shared axis. Split into "improving" and "declining" columns it
-   answers the actual question at a glance: who is up, who is down.
-   ============================================================ */
-
-.db-movers-cols {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
-}
-.db-movers-col {
-  padding: 12px 14px 14px;
-}
-.db-movers-col + .db-movers-col {
-  border-left: 1px solid var(--line);
-}
-.db-movers-col-head {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding-bottom: 9px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--line);
-}
-.db-movers-col-head.up {
-  color: var(--band-green);
-}
-.db-movers-col-head.down {
-  color: var(--band-red);
-}
-
-.db-mover-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 6px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  text-align: left;
-  transition: background var(--dur) var(--ease);
-}
-.db-mover-row:hover {
-  background: var(--surface-2);
-}
-.db-mover-row-name {
-  font-size: 12.5px;
-  font-weight: 600;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* The delta as a pill rather than a bar. With five rows per column the rank
-   order carries the magnitude, so the number only has to be readable. */
-.db-mover-pill {
-  flex-shrink: 0;
-  font-size: 11.5px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  padding: 2px 9px;
-  border-radius: 100px;
-  border: 1px solid transparent;
-}
-.db-mover-pill.up {
-  background: var(--band-green-soft);
-  color: var(--band-green);
-  border-color: var(--band-green);
-}
-.db-mover-pill.down {
-  background: var(--band-red-soft);
-  color: var(--band-red);
-  border-color: var(--band-red);
-}
-
-.db-movers-empty {
-  font-size: 11.5px;
-  color: var(--text3);
-  padding: 10px 6px;
-  line-height: 1.5;
-}
-
-/* ---- podium goal bar ----
-   The dashboard podium now carries the same target bar as the Leaderboard, so
-   a store's position against its own target reads the same in both places. */
-.db-podium .lb-pod-meta {
-  margin-bottom: 8px;
-}
-.db-podium .lb-goal {
-  height: 6px;
+  /* ---- week view, compact ---- */
+  .wk-legacy .scx {
+    max-height: none;
+  }
+  .wk-legacy .mc-grid,
+  .wk-legacy .mc-grid.cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .wk-legacy .mc {
+    padding: 9px;
+    border-radius: 9px;
+  }
+  .wk-legacy .mc-l {
+    font-size: 8px;
+    letter-spacing: 0.03em;
+    margin-bottom: 3px;
+    line-height: 1.25;
+  }
+  .wk-legacy .mc-v {
+    font-size: 16px;
+  }
+  .wk-legacy .mc-s {
+    display: none;
+  }
+  .wk-legacy .store-card {
+    padding: 11px;
+    margin-bottom: 9px;
+    border-radius: 10px;
+    border-left-width: 4px;
+  }
+  .wk-legacy .store-card-head {
+    margin-bottom: 9px;
+    padding-bottom: 8px;
+  }
+  .wk-legacy .store-card-name {
+    font-size: 13.5px;
+  }
+  .wk-legacy .store-card-code {
+    font-size: 9.5px;
+  }
+  .wk-legacy .store-card-splh {
+    font-size: 17px;
+    min-width: 58px;
+    padding: 3px 9px;
+  }
+  .wk-legacy .scard-block {
+    margin-bottom: 8px;
+  }
+  .wk-legacy .scard-block-label {
+    font-size: 8.5px;
+    margin-bottom: 4px;
+    letter-spacing: 0.07em;
+  }
+  .wk-legacy .scard-row {
+    gap: 5px;
+  }
+  .wk-legacy .scard-cell {
+    padding: 6px 5px;
+    border-radius: 6px;
+  }
+  .wk-legacy .scard-cell-lbl {
+    font-size: 8px;
+    margin-bottom: 1px;
+  }
+  .wk-legacy .scard-cell-val {
+    font-size: 12.5px;
+  }
+  .wk-legacy .scard-region-head {
+    font-size: 10.5px;
+    padding: 5px 10px;
+    margin: 12px 0 7px;
+    border-radius: 6px;
+  }
+  /* The week and sync banner. This selector is positional and needs
+     !important to beat an inline font-size, which makes it fragile:
+     it breaks the moment WeekView.js gains a wrapper div. Give that
+     banner a class (.wk-banner) and this rule can lose both. */
+  .wk-legacy .ctx-block,
+  .wk-legacy > div:first-child > div {
+    font-size: 11.5px !important;
+  }
 }
 
 @media (max-width: 640px) {
@@ -3955,113 +3851,3 @@ th.sorted .th-caret {
     border-top: 1px solid var(--line);
   }
 }
-/* ============================================================
-   v10: week view header wrapping
-
-   v8 let headers wrap, but "(OVER)/UNDER" and "WTD (OVER)/UNDER"
-   carry no spaces, so the browser found no break opportunity and
-   let them spill over the neighbouring column instead.
-
-   overflow-wrap: anywhere gives it somewhere to break. Greedy line
-   filling puts the break after the slash, which is where a person
-   would have put it. overflow: hidden is the safety net so nothing
-   can ever paint outside its own cell again.
-   ============================================================ */
-
-.wk-legacy table.grid th {
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: normal;
-  hyphens: none;
-  overflow: hidden;
-  line-height: 1.2;
-  vertical-align: bottom;
-  /* Tighter than the 0.05em the rest of the table uses. Uppercase
-     tracking is what pushed these labels past their column in the
-     first place. */
-  letter-spacing: 0.02em;
-  font-size: 9.5px;
-  padding: 8px 6px 6px;
-}
-/* ============================================================
-   v11: week view header text breaking mid-word
-
-   v10 added overflow-wrap: anywhere so long headers like
-   "(OVER)/UNDER" would not spill over their neighbour. But for a
-   single word with no natural break point (TARGET, RATING,
-   REVIEWS), "anywhere" means the browser slices the word itself:
-   "TARGE-T", "RATIN-G". That is worse than the overflow it fixed.
-
-   The correct rule is normal wrapping, which only breaks at a
-   space or a slash, both of which the two-word headers already
-   have. Single-word headers get a little more room instead, so
-   they fit on one line without needing to break at all.
-   ============================================================ */
-
-.wk-legacy table.grid th {
-  overflow-wrap: normal;
-  word-break: normal;
-}
-
-/* Single-word headers that were breaking mid-word. A few extra
-   pixels each, taken evenly so the table still fits its card. */
-.wk-legacy table.grid th:nth-child(4),  /* Target */
-.wk-legacy table.grid td:nth-child(4) {
-  width: 66px;
-}
-.wk-legacy table.grid th:nth-child(17), /* Rating */
-.wk-legacy table.grid td:nth-child(17) {
-  width: 66px;
-}
-.wk-legacy table.grid th:nth-child(18), /* Reviews */
-.wk-legacy table.grid td:nth-child(18) {
-  width: 70px;
-}
-
-/* Recovered by trimming columns that had headroom to spare. */
-.wk-legacy table.grid th:nth-child(8),  /* WTD Sales */
-.wk-legacy table.grid td:nth-child(8),
-.wk-legacy table.grid th:nth-child(15), /* PTD Sales */
-.wk-legacy table.grid td:nth-child(15) {
-  width: 76px;
-}
-/* ============================================================
-   v12: WTD (Over)/Under header, clean two-line wrap
-
-   This is the longest header in the table. At 78px it sat right at
-   the edge where "WTD (OVER)/" no longer fits on one line, so the
-   browser broke it in an ugly spot. 96px is enough for "WTD
-   (OVER)/" on line one and "UNDER" on line two, which is the same
-   two-line shape every other multi-word header already has.
-
-   Two columns that had a little slack give up a few pixels each
-   so the table keeps proportions sane; with table-layout: fixed and
-   width: 100%, every declared width is a ratio, not an absolute
-   size, so this is a rebalance, not a widening of the whole table.
-   ============================================================ */
-
-.wk-legacy table.grid th:nth-child(10), /* WTD (Over)/Under */
-.wk-legacy table.grid td:nth-child(10) {
-  width: 96px;
-}
-.wk-legacy table.grid th:nth-child(8),  /* WTD Sales */
-.wk-legacy table.grid td:nth-child(8),
-.wk-legacy table.grid th:nth-child(15), /* PTD Sales */
-.wk-legacy table.grid td:nth-child(15) {
-  width: 73px;
-}
-/* ============================================================
-   Day (Over)/Under header, same two-line wrap as WTD
-   Column 10 got 96px in v12 so "WTD (OVER)/" fits on line one.
-   Column 6 holds the shorter "(OVER)/UNDER" but was left at the
-   default ratio, so it broke mid-word. 82px is enough for
-   "(OVER)/" on line one and "UNDER" on line two. With
-   table-layout: fixed the widths are ratios, so this pulls a few
-   pixels from the flexible columns rather than widening the table.
-   ============================================================ */
-.wk-legacy table.grid th:nth-child(6),
-.wk-legacy table.grid td:nth-child(6) {
-  width: 82px;
-}
-
-

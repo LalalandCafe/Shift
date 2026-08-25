@@ -1,16 +1,32 @@
 'use client';
 
-const BLUE = '#3B6FB6';
-const AMBER = '#D08A2C';
-const EYE = '#F4F7F2';
+/**
+ * Palette note.
+ *
+ * This mark used to be blue and amber, two colors from opposite ends of the
+ * wheel, which is why it read on any background. La La Land is monochrome
+ * brown, so that trick is gone: any two brand tones dark enough for the paper
+ * topbar are too dark for the coffee sidebar, and vice versa.
+ *
+ * The fix is not to compromise on the colors, it is to stop asking the mark to
+ * sit on two grounds. Cream and gold, always on coffee. The sidebar is already
+ * coffee, and .mobile-logo in globals.css puts a coffee chip behind the mark in
+ * the topbar. If you ever place variant="mark" on a light surface, wrap it the
+ * same way or use variant="mono", which inherits currentColor.
+ */
+const CREAM = '#FFF7D2';
+const GOLD = '#D9B94A';
+const EYE = '#2E1F15';
+
+const ICON_BG = '#2E1F15';
 
 const LEFT = 'M31 8C20 8 12 16 12 26L8 33l4 2v4c0 4 3 6 6 7l5 3v8h8z';
 const RIGHT = 'M33 8c11 0 19 8 19 18l4 7-4 2v4c0 4-3 6-6 7l-5 3v8h-8z';
 
 // Fillet, modelled on the Janus bust: a straight braided band across both
 // skulls, a double strip down the seam and a knot on top. Drawn OVER the faces
-// in the opposite color of the half it crosses, amber across the blue face and
-// blue across the amber one, so it reads as one piece worn by both heads and
+// in the opposite color of the half it crosses, gold across the cream face and
+// cream across the gold one, so it reads as one piece worn by both heads and
 // never needs an outline. The notches are painted in the face color underneath,
 // which is what gives the band its braided texture for free.
 const BAND_Y = 18.5;
@@ -35,7 +51,7 @@ function notchRects(x0, x1, color) {
 const WORDMARK_FONT =
   'Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif';
 
-function Crown({ on, left = AMBER, right = BLUE, faceLeft = BLUE, faceRight = AMBER }) {
+function Crown({ on, left = GOLD, right = CREAM, faceLeft = CREAM, faceRight = GOLD }) {
   return (
     <g className={'shift-crown' + (on ? ' on' : '')}>
       <rect x={BAND_X} y={BAND_Y} width={31.7 - BAND_X} height={BAND_H} fill={left} />
@@ -50,7 +66,7 @@ function Crown({ on, left = AMBER, right = BLUE, faceLeft = BLUE, faceRight = AM
   );
 }
 
-function Faces({ left = BLUE, right = AMBER, eye = EYE, showEyes = true }) {
+function Faces({ left = CREAM, right = GOLD, eye = EYE, showEyes = true }) {
   return (
     <>
       <path d={LEFT} fill={left} />
@@ -71,9 +87,9 @@ function Faces({ left = BLUE, right = AMBER, eye = EYE, showEyes = true }) {
  * variant:
  *   'lockup'  mark + wordmark, horizontal (default)
  *   'stacked' mark above wordmark, centered
- *   'mark'    Janus mark only, in brand colors
+ *   'mark'    Janus mark only, in brand colors, expects a dark ground
  *   'mono'    Janus mark only, single color (inherits currentColor)
- *   'icon'    rounded square app icon, dark background
+ *   'icon'    rounded square app icon, coffee background
  *
  * crown:
  *   omitted   no crown, original tight viewBox
@@ -120,10 +136,10 @@ export default function ShiftLogo({
         {hasCrown && (
           <Crown
             on={crown}
-            left={mono ? 'currentColor' : AMBER}
-            right={mono ? 'currentColor' : BLUE}
-            faceLeft={mono ? 'transparent' : BLUE}
-            faceRight={mono ? 'transparent' : AMBER}
+            left={mono ? 'currentColor' : GOLD}
+            right={mono ? 'currentColor' : CREAM}
+            faceLeft={mono ? 'transparent' : CREAM}
+            faceRight={mono ? 'transparent' : GOLD}
           />
         )}
       </svg>
@@ -133,8 +149,8 @@ export default function ShiftLogo({
   if (variant === 'icon') {
     return (
       <svg viewBox="0 0 64 64" width={size} height={size} {...common}>
-        <rect width="64" height="64" rx="14" fill="#132235" />
-        <Faces left="#5B93DA" right="#E5A03F" eye="#132235" />
+        <rect width="64" height="64" rx="14" fill={ICON_BG} />
+        <Faces left={CREAM} right={GOLD} eye={ICON_BG} />
       </svg>
     );
   }

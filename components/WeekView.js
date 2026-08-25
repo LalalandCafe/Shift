@@ -147,8 +147,8 @@ export default function WeekView({ report, loading, error, groupFilter, search }
       <div style={{ marginBottom: 17 }}>
         <div
           style={{
-            background: "#1a1a2e",
-            color: "#fff",
+            background: "var(--ink)",
+            color: "var(--cream-300)",
             padding: "8px 16px",
             borderRadius: 10,
             fontSize: 13,
@@ -171,7 +171,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
             style={{
               display: "inline-block",
               marginLeft: 10,
-              background: "#1a6630",
+              background: "var(--band-green)",
               color: "#fff",
               padding: "8px 14px",
               borderRadius: 10,
@@ -191,8 +191,8 @@ export default function WeekView({ report, loading, error, groupFilter, search }
             style={{
               display: "inline-block",
               marginLeft: 10,
-              background: "#ededea",
-              color: "#5f5f5c",
+              background: "var(--surface-3)",
+              color: "var(--text2)",
               padding: "8px 14px",
               borderRadius: 10,
               fontSize: 12,
@@ -479,7 +479,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                   <div className="scard-block">
                     <div className="scard-block-label">Period to Date</div>
                     {s.ptd.empty ? (
-                      <div style={{ fontSize: 12, color: "#999994", padding: "4px 2px" }}>
+                      <div style={{ fontSize: 12, color: "var(--text3)", padding: "4px 2px" }}>
                         No period data
                       </div>
                     ) : (
@@ -505,7 +505,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                       Guest Reviews - Period {report.period}
                     </div>
                     {!rev || rev.rating === null ? (
-                      <div style={{ fontSize: 12, color: "#999994", padding: "4px 2px" }}>
+                      <div style={{ fontSize: 12, color: "var(--text3)", padding: "4px 2px" }}>
                         No Google or Yelp reviews this period
                       </div>
                     ) : (
@@ -525,7 +525,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                       </div>
                     )}
                     {rev && rev.unanswered > 0 && (
-                      <div style={{ fontSize: 10.5, color: "#999994", marginTop: 5 }}>
+                      <div style={{ fontSize: 10.5, color: "var(--text3)", marginTop: 5 }}>
                         {rev.unanswered} of {rev.count} still have no reply
                       </div>
                     )}

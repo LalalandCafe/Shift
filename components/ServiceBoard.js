@@ -242,7 +242,6 @@ export default function ServiceBoard({ isoDate }) {
               className={"rail-dot " + s.band}
               style={{
                 left: railPos(s.medianMin, lo, hi) + "%",
-                transform: "translate(-50%, -50%)",
                 "--i": i,
               }}
               title={`${s.name} · ${dec(s.medianMin, 1)} min`}
@@ -261,7 +260,7 @@ export default function ServiceBoard({ isoDate }) {
             Fast, under 0.7× median
           </span>
           <span>
-            <i style={{ background: "var(--cobalt)" }} />
+            <i style={{ background: "var(--accent)" }} />
             On pace
           </span>
           <span>
@@ -272,7 +271,7 @@ export default function ServiceBoard({ isoDate }) {
             <i style={{ background: "var(--neg)" }} />
             Slow, {th.flagRatio}×
           </span>
-          <span style={{ marginLeft: "auto" }}>Blue band holds the middle 50%</span>
+          <span style={{ marginLeft: "auto" }}>Shaded band holds the middle 50%</span>
         </div>
       </div>
 

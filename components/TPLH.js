@@ -280,7 +280,6 @@ export default function TPLH() {
                   className="rail-dot"
                   style={{
                     left: railPos(r.tplh, lo, hi) + "%",
-                    transform: "translate(-50%, -50%)",
                     background: fillOfBand(b),
                     // Light bands would vanish against the rail without this.
                     border: `1px solid ${inkOfBand(b)}`,

@@ -29,7 +29,7 @@ function ChartTip({ active, payload }) {
   if (!active || !payload || !payload.length) return null;
   const d = payload[0].payload;
   return (
-    <div style={{ background: "#1a1a2e", color: "#fff", padding: "10px 13px", borderRadius: 9, fontSize: 12, lineHeight: 1.5, boxShadow: "0 8px 24px rgba(0,0,0,.3)" }}>
+    <div style={{ background: "var(--ink)", color: "var(--cream-300)", padding: "10px 13px", borderRadius: 9, fontSize: 12, lineHeight: 1.5, boxShadow: "0 8px 24px rgba(0,0,0,.3)" }}>
       <div style={{ fontWeight: 700 }}>Week {d.weekNum}</div>
       <div style={{ opacity: 0.8 }}>{d.weekStart}</div>
       <div style={{ marginTop: 4 }}>SPLH ${d.splh} &middot; {d.hours} hrs</div>
@@ -370,7 +370,7 @@ export default function StoreTrend({ isoDate }) {
                   label={{ value: "target $" + target, position: "insideTopRight", fontSize: 10.5, fill: "#9c0006" }}
                 />
                 <Tooltip content={<ChartTip />} />
-                <Line type="monotone" dataKey="splh" stroke="#1a1a2e" strokeWidth={2.5} dot={{ r: 4, fill: "#1a1a2e" }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="splh" stroke="#2E1F15" strokeWidth={2.5} dot={{ r: 4, fill: "#2E1F15" }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

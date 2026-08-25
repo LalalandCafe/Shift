@@ -12,6 +12,14 @@ import { useId } from "react";
  *
  * Gradient ids come from useId(), so the same place can appear more than once
  * on a page (podium and dashboard) without the fills colliding.
+ *
+ * Palette note: gold and bronze were already warm and are untouched, and the
+ * gold highlight is close enough to the brand cream to leave alone. Silver was
+ * the only cool ramp in the app after the rebrand, and a blue grey cup on a
+ * cream canvas reads as a rendering mistake rather than as second place. It is
+ * cut from the taupe now, and the highlight is a warm white instead of #ffffff.
+ * These values are the CupMedal counterpart of the .lb-medal.silver rules in
+ * globals.css, so the two silvers agree.
  */
 
 const FINISH = {
@@ -23,11 +31,11 @@ const FINISH = {
     ink: "#6b4a03",
   },
   silver: {
-    hi: "#ffffff",
-    mid: "#c4cbd2",
-    lo: "#7d8791",
-    rim: "#66707a",
-    ink: "#576068",
+    hi: "#fffdf8",
+    mid: "#cbc1b6",
+    lo: "#8b8074",
+    rim: "#746a5f",
+    ink: "#635a50",
   },
   bronze: {
     hi: "#ffe4c8",
@@ -97,8 +105,9 @@ export default function CupMedal({ place = "gold", rank, size = 44, className = 
         />
       </g>
 
-      {/* one specular stripe, left of centre */}
-      <rect x="19.6" y="31" width="4" height="34" rx="2" fill="#fff" opacity="0.3" />
+      {/* One specular stripe, left of centre. Warm white rather than #fff, so
+          it does not read as a cool highlight sitting on a warm metal. */}
+      <rect x="19.6" y="31" width="4" height="34" rx="2" fill="#fffdf6" opacity="0.32" />
 
       {/* engraved rank */}
       <text
