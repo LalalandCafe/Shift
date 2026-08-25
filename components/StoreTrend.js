@@ -370,7 +370,7 @@ export default function StoreTrend({ isoDate }) {
                   label={{ value: "target $" + target, position: "insideTopRight", fontSize: 10.5, fill: "#9c0006" }}
                 />
                 <Tooltip content={<ChartTip />} />
-                <Line type="monotone" dataKey="splh" stroke="#2E1F15" strokeWidth={2.5} dot={{ r: 4, fill: "#2E1F15" }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="splh" stroke="#533F2E" strokeWidth={2.5} dot={{ r: 4, fill: "#533F2E" }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

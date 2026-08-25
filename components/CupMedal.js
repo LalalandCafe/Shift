@@ -24,11 +24,11 @@ import { useId } from "react";
 
 const FINISH = {
   gold: {
-    hi: "#fff6d4",
-    mid: "#e2ba43",
-    lo: "#9a6f0d",
-    rim: "#7a5503",
-    ink: "#6b4a03",
+    hi: "#fffbe4",
+    mid: "#f0d264",
+    lo: "#b48c1c",
+    rim: "#8f6d0a",
+    ink: "#7a5c06",
   },
   silver: {
     hi: "#fffdf8",

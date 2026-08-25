@@ -15,10 +15,10 @@
  * same way or use variant="mono", which inherits currentColor.
  */
 const CREAM = '#FFF7D2';
-const GOLD = '#D9B94A';
-const EYE = '#2E1F15';
+const GOLD = '#F8E27E';
+const EYE = '#533F2E';
 
-const ICON_BG = '#2E1F15';
+const ICON_BG = '#533F2E';
 
 const LEFT = 'M31 8C20 8 12 16 12 26L8 33l4 2v4c0 4 3 6 6 7l5 3v8h8z';
 const RIGHT = 'M33 8c11 0 19 8 19 18l4 7-4 2v4c0 4-3 6-6 7l-5 3v8h-8z';
