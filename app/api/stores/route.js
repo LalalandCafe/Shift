@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase";
 import { getAllStores, updateStoreTargets } from "@/lib/data";
-import { reporterGuard } from "@/lib/reporter-auth";
+import { requireAdmin } from "@/lib/auth";
 
 export async function GET() {
   try {
@@ -8,12 +8,15 @@ export async function GET() {
     const list = Object.values(map).sort((a, b) => a.code - b.code);
     return Response.json({ ok: true, stores: list });
   } catch (err) {
-    return Response.json({ ok: false, error: err.message }, { status: 500 });
+    console.error("[stores GET]", err);
+    return Response.json({ ok: false, error: "No se pudieron cargar las tiendas" }, { status: 500 });
   }
 }
 
 export async function PATCH(request) {
-  const denied = reporterGuard(request);
+  // Los targets deciden quien sale en verde. Solo admin, y desde el paso 3
+  // cada cambio queda en access_log con nombre y hora.
+  const denied = requireAdmin(request);
   if (denied) return denied;
 
   try {
@@ -25,6 +28,7 @@ export async function PATCH(request) {
     await updateStoreTargets(supabaseAdmin, code, weekdayTarget, weekendTarget, ptdTarget);
     return Response.json({ ok: true, code });
   } catch (err) {
-    return Response.json({ ok: false, error: err.message }, { status: 500 });
+    console.error("[stores PATCH]", err);
+    return Response.json({ ok: false, error: "No se pudo guardar el target" }, { status: 500 });
   }
 }

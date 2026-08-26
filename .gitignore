@@ -12,3 +12,6 @@ scripts/tattle-change-password.js
 shift-full-dump.txt
 snap/
 cookies.txt
+snap/
+cookies.txt
+*.bak

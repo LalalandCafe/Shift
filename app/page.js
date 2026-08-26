@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import "./globals.css";
 
 import Icon from "../components/Icon";
 import ShiftLogo from "../components/ShiftLogo";
-import UnlockModal from "../components/UnlockModal";
+import Login from "../components/Login";
 import WeekView from "../components/WeekView";
 import Targets from "../components/Targets";
 import EmailPreview from "../components/EmailPreview";
@@ -18,27 +18,37 @@ import DriveThru from "../components/DriveThru";
 import { yesterdayISO } from "../lib/ui";
 
 /**
- * One source of truth for navigation, page titles and which topbar controls
- * appear. Adding a view means adding a row here, nothing else.
- *   lock    reporter mode required
- *   desktop hidden on narrow screens
- *   date / group / search  which controls the topbar shows
+ * Una sola fuente de verdad para la navegacion, los titulos y que controles
+ * aparecen en la barra superior.
+ *
+ *   roles    quien puede abrir la vista. El servidor impone lo mismo: esta
+ *            lista decide que se DIBUJA, el middleware y requireRole deciden
+ *            que se PUEDE. Antes solo existia la primera mitad.
+ *   desktop  se oculta en pantallas angostas
+ *   date / region / search  que controles muestra la barra superior
  */
+const ALL = ["admin", "region", "store"];
+
 const VIEWS = [
-  { key: "dashboard", label: "Dashboard", short: "Dashboard", icon: "dashboard", group: "Today", lock: true, date: true },
-  { key: "week", label: "Week view", short: "Week", icon: "table", group: "Today", date: true, region: true, search: true },
-  { key: "storetrend", label: "Store detail", short: "Store", icon: "search", group: "Stores", date: true },
-  { key: "leaderboard", label: "Leaderboard", short: "Board", icon: "rank", group: "Stores", date: true },
-  { key: "service", label: "Service times", short: "Service", icon: "timer", group: "Operations", lock: true, date: true },
-  { key: "tplh", label: "TPLH", short: "TPLH", icon: "activity", group: "Operations", lock: true },
-  { key: "drivethru", label: "Drive-thru", short: "Drive", icon: "car", group: "Operations", lock: true },
-  { key: "email", label: "HTML email", short: "Email", icon: "mail", group: "Share", lock: true, desktop: true, date: true, region: true },
-  { key: "targets", label: "Store targets", short: "Targets", icon: "target", group: "Share", lock: true, desktop: true },
+  { key: "dashboard",   label: "Dashboard",     short: "Dashboard", icon: "dashboard", group: "Today",      roles: ["admin"], date: true },
+  { key: "week",        label: "Week view",     short: "Week",      icon: "table",     group: "Today",      roles: ALL, date: true, region: true, search: true },
+  { key: "storetrend",  label: "Store detail",  short: "Store",     icon: "search",    group: "Stores",     roles: ALL, date: true },
+  { key: "leaderboard", label: "Leaderboard",   short: "Board",     icon: "rank",      group: "Stores",     roles: ALL, date: true },
+  { key: "service",     label: "Service times", short: "Service",   icon: "timer",     group: "Operations", roles: ["admin"], date: true },
+  { key: "tplh",        label: "TPLH",          short: "TPLH",      icon: "activity",  group: "Operations", roles: ["admin"] },
+  { key: "drivethru",   label: "Drive-thru",    short: "Drive",     icon: "car",       group: "Operations", roles: ["admin"] },
+  { key: "email",       label: "HTML email",    short: "Email",     icon: "mail",      group: "Share",      roles: ["admin"], desktop: true, date: true, region: true },
+  { key: "targets",     label: "Store targets", short: "Targets",   icon: "target",    group: "Share",      roles: ["admin"], desktop: true },
 ];
 
 const NAV_GROUPS = ["Today", "Stores", "Operations", "Share"];
 
+const ROLE_LABEL = { admin: "Admin", region: "Region lead", store: "Store" };
+
 export default function ShiftApp() {
+  const [session, setSession] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [view, setView] = useState("week");
   const [isoDate, setIsoDate] = useState(yesterdayISO());
   const [region, setRegion] = useState("All");
@@ -48,20 +58,27 @@ export default function ShiftApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [reporter, setReporter] = useState(false);
-  const [showUnlock, setShowUnlock] = useState(false);
   const [notice, setNotice] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
 
+  const visible = VIEWS.filter((v) => session && v.roles.includes(session.role));
   const cfg = VIEWS.find((v) => v.key === view) || VIEWS[1];
-  const visible = VIEWS.filter((v) => !v.lock || reporter);
+  const allowed = session ? cfg.roles.includes(session.role) : false;
 
-  // Restore a reporter session and land on the dashboard
+  // La sesion vive en una cookie HttpOnly, asi que el cliente no puede
+  // leerla: se la tiene que preguntar al servidor.
   useEffect(() => {
-    if (sessionStorage.getItem("shift_reporter_code")) {
-      setReporter(true);
-      setView("dashboard");
-    }
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.ok && d.session) {
+          setSession(d.session);
+          if (d.session.role === "admin") setView("dashboard");
+        }
+      })
+      .catch(() => {})
+      .finally(() => setAuthChecked(true));
+
     if (localStorage.getItem("shift_nav_collapsed") === "1") setCollapsed(true);
   }, []);
 
@@ -72,17 +89,33 @@ export default function ShiftApp() {
     });
   }
 
-  // The week view and the leaderboard share one report payload
+  // Una sesion vencida a media manana devuelve 401 en la siguiente peticion.
+  // Sin esto, la pantalla se quedaria mostrando "Error: No autenticado" en
+  // vez de pedir el codigo otra vez.
+  const expired = useCallback((message) => {
+    setSession(null);
+    setReport(null);
+    setView("week");
+    setNotice(message || "Tu sesion expiro. Ingresa tu codigo otra vez.");
+  }, []);
+
+  // El week view y el leaderboard comparten un solo payload de reporte.
   useEffect(() => {
-    if (!isoDate) return;
+    if (!isoDate || !session) return;
     let dead = false;
     setLoading(true);
     setError(null);
 
     fetch(`/api/report?date=${isoDate}`)
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (r.status === 401) {
+          if (!dead) expired();
+          return null;
+        }
+        return r.json();
+      })
       .then((d) => {
-        if (dead) return;
+        if (dead || !d) return;
         if (!d.ok) {
           setError(d.error);
           setReport(null);
@@ -100,25 +133,54 @@ export default function ShiftApp() {
     return () => {
       dead = true;
     };
-  }, [isoDate]);
+  }, [isoDate, session, expired]);
 
-  // Today's numbers keep moving, so refresh every five minutes
+  // Los numeros de hoy siguen moviendose, refresca cada cinco minutos.
   useEffect(() => {
-    if (!report?.isLive) return;
+    if (!report?.isLive || !session) return;
     const id = setInterval(() => {
       fetch(`/api/report?date=${isoDate}`)
-        .then((r) => r.json())
-        .then((d) => d.ok && setReport(d))
+        .then((r) => {
+          if (r.status === 401) {
+            expired();
+            return null;
+          }
+          return r.json();
+        })
+        .then((d) => d?.ok && setReport(d))
         .catch(() => {});
     }, 300000);
     return () => clearInterval(id);
-  }, [report?.isLive, isoDate]);
+  }, [report?.isLive, isoDate, session, expired]);
 
-  function lock(message) {
-    sessionStorage.removeItem("shift_reporter_code");
-    setReporter(false);
-    setNotice(message || null);
-    if (VIEWS.find((v) => v.key === view)?.lock) setView("week");
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {}
+    setSession(null);
+    setReport(null);
+    setView("week");
+    setNotice(null);
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="empty" style={{ minHeight: "100vh" }}>
+        <ShiftLogo variant="mark" size={38} crown />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <Login
+        onSignedIn={(s) => {
+          setSession(s);
+          setNotice(null);
+          setView(s.role === "admin" ? "dashboard" : "week");
+        }}
+      />
+    );
   }
 
   return (
@@ -133,8 +195,6 @@ export default function ShiftApp() {
           <ShiftLogo variant="mark" size={34} crown={!collapsed} />
           <div className="logo-words">
             <div className="logo-text">SHIFT</div>
-            {/* The brand lockup, not a typed name. Flattened to cream in CSS
-                so the brown mark stays legible on the dark rail. */}
             <img
               className="logo-lockup"
               src="/logo/lalaland.png"
@@ -168,54 +228,36 @@ export default function ShiftApp() {
 
         <div className="sidebar-spacer" />
 
-        <button
-          className="nbtn"
-          onClick={() => (reporter ? lock() : setShowUnlock(true))}
-          title={collapsed ? (reporter ? "Lock reporter mode" : "Unlock reporter mode") : undefined}
-        >
-          <Icon name={reporter ? "lock" : "unlock"} />
-          <span className="nbtn-label">
-            {reporter ? "Lock reporter mode" : "Unlock reporter mode"}
-          </span>
+        <button className="nbtn" onClick={logout} title={collapsed ? "Cerrar sesion" : undefined}>
+          <Icon name="lock" />
+          <span className="nbtn-label">Cerrar sesion</span>
         </button>
-        <div className="nfoot" title={reporter ? "Reporter access on" : "Read only"}>
-          <span className={"ndot" + (reporter ? " on" : "")} />
+        <div
+          className="nfoot"
+          title={`${session.name} · ${ROLE_LABEL[session.role] || session.role}`}
+        >
+          <span className="ndot on" />
           <span className="nbtn-label">
-            {reporter ? "Reporter access on" : "Read only"}
+            {session.name}
+            <div style={{ fontSize: 10, color: "var(--text3)", fontWeight: 500 }}>
+              {ROLE_LABEL[session.role] || session.role}
+              {session.scope ? ` · ${session.scope}` : ""}
+              {session.storeCode ? ` · ${session.storeCode}` : ""}
+            </div>
           </span>
         </div>
       </nav>
 
-      {showUnlock && (
-        <UnlockModal
-          onClose={() => setShowUnlock(false)}
-          onUnlocked={() => {
-            setReporter(true);
-            setShowUnlock(false);
-            setNotice(null);
-            setView("dashboard");
-          }}
-        />
-      )}
-
       <div className="main">
         <header className="topbar">
           <div className="topbar-id">
-            <button
-              className="mobile-logo"
-              onClick={toggleNav}
-              title="SHIFT"
-              aria-label="SHIFT"
-            >
+            <button className="mobile-logo" onClick={toggleNav} title="SHIFT" aria-label="SHIFT">
               <ShiftLogo variant="mark" size={30} crown />
             </button>
             <div>
               <div className="ptitle">{cfg.label}</div>
               {report && (
                 <div className="psub">
-                  {/* Counted off the payload, not typed in. This read "34
-                      stores" for as long as it took somebody to notice the
-                      chain had opened a thirty fifth. */}
                   Week {report.weekNum} · Period {report.period} ·{" "}
                   {(report.rows || []).length} stores
                 </div>
@@ -276,37 +318,34 @@ export default function ShiftApp() {
             </div>
           )}
 
-          {view === "week" && (
-            <WeekView
-              report={report}
-              loading={loading}
-              error={error}
-              groupFilter={region}
-              search={search}
-            />
-          )}
-          {view === "leaderboard" && <Leaderboard report={report} />}
-          {view === "storetrend" && <StoreTrend isoDate={isoDate} />}
-          {/* The dashboard summarises the other tabs, so it gets the report
-              payload that is already in memory and a way to hand the user off
-              to the tab a number came from. */}
-          {view === "dashboard" && reporter && (
-            <Dashboard isoDate={isoDate} report={report} onNavigate={setView} />
-          )}
-          {view === "service" && reporter && <ServiceBoard isoDate={isoDate} />}
-          {view === "tplh" && reporter && <TPLH />}
-          {view === "drivethru" && reporter && <DriveThru />}
-          {view === "email" && reporter && (
-            <EmailPreview isoDate={isoDate} groupFilter={region} />
-          )}
-          {view === "targets" && reporter && <Targets onAuthExpired={lock} />}
-
-          {cfg.lock && !reporter && (
+          {!allowed ? (
             <div className="empty">
               <Icon name="lock" size={22} />
-              <div className="empty-title">Reporter mode required</div>
-              <div>Unlock from the sidebar to open this view.</div>
+              <div className="empty-title">Esta vista no esta disponible para tu acceso</div>
+              <div>Si necesitas entrar, pidelo al equipo de tecnologia.</div>
             </div>
+          ) : (
+            <>
+              {view === "week" && (
+                <WeekView
+                  report={report}
+                  loading={loading}
+                  error={error}
+                  groupFilter={region}
+                  search={search}
+                />
+              )}
+              {view === "leaderboard" && <Leaderboard report={report} />}
+              {view === "storetrend" && <StoreTrend isoDate={isoDate} />}
+              {view === "dashboard" && (
+                <Dashboard isoDate={isoDate} report={report} onNavigate={setView} />
+              )}
+              {view === "service" && <ServiceBoard isoDate={isoDate} />}
+              {view === "tplh" && <TPLH />}
+              {view === "drivethru" && <DriveThru />}
+              {view === "email" && <EmailPreview isoDate={isoDate} groupFilter={region} />}
+              {view === "targets" && <Targets onAuthExpired={expired} />}
+            </>
           )}
         </main>
       </div>

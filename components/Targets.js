@@ -39,12 +39,6 @@ export default function Targets({ onAuthExpired }) {
   };
 
   async function save(st) {
-    const code = sessionStorage.getItem("shift_reporter_code");
-    if (!code) {
-      setErr("Reporter mode is required to change targets.");
-      return;
-    }
-
     const e = edits[st.code] || {};
     const payload = {
       code: st.code,
@@ -56,9 +50,11 @@ export default function Targets({ onAuthExpired }) {
     setErr(null);
     setSaving(st.code);
 
+    // Sin cabeceras de credencial: la sesion va en la cookie, que el
+    // navegador manda sola en peticiones al mismo origen.
     const res = await fetch("/api/stores", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", "x-reporter-code": code },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const d = await res.json();
@@ -84,11 +80,14 @@ export default function Targets({ onAuthExpired }) {
     }
 
     if (res.status === 401) {
-      sessionStorage.removeItem("shift_reporter_code");
-      onAuthExpired("Your reporter session expired. Unlock again to keep editing.");
+      onAuthExpired("Tu sesion expiro. Ingresa tu codigo otra vez.");
       return;
     }
-    setErr(d.error || "Could not save that target.");
+    if (res.status === 403) {
+      setErr("Tu acceso no permite cambiar targets.");
+      return;
+    }
+    setErr(d.error || "No se pudo guardar ese target.");
   }
 
   if (loading) return <div className="empty">Loading stores</div>;
@@ -162,11 +161,7 @@ export default function Targets({ onAuthExpired }) {
                             onClick={() => save(st)}
                             disabled={saving === st.code || (!changed && saved !== st.code)}
                           >
-                            {saving === st.code
-                              ? "Saving"
-                              : saved === st.code
-                              ? "Saved"
-                              : "Save"}
+                            {saving === st.code ? "Saving" : saved === st.code ? "Saved" : "Save"}
                           </button>
                         </td>
                       </tr>
