@@ -25,6 +25,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
      * it is also the first thing to check when nobody can get in.
      */
     async signIn({ profile }) {
+      // TEMPORAL: quitar cuando el rollout este listo. Sirve para
+      // distinguir un claim que no llega de un GUID que no coincide.
+      console.log("SHIFT_DEBUG_PROFILE", JSON.stringify({
+        keys: Object.keys(profile ?? {}),
+        groups: profile?.groups ?? null,
+        expected: process.env.ENTRA_GROUP_ADMIN ?? null,
+      }));
       return resolveAccess(profile?.groups).role !== ROLE_NONE;
     },
 
