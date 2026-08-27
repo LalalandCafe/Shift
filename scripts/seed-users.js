@@ -44,6 +44,7 @@ const USERS = [
   { name: "Heather Zhou",        email: "heather@lalalandkindcafe.com",  role: "admin" },
   { name: "Ethan Hassett",       email: "ethan@lalalandkindcafe.com",    role: "admin" },
   { name: "August Edwards",      email: "august@lalalandkindcafe.com",   role: "admin" },
+  { name: "Jackson Lane",        email: "jackson@lalalandkindcafe.com",  role: "admin" },
 ];
 
 (async () => {
