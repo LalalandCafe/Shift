@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
-const PUBLIC = new Set(["/api/auth/login", "/api/auth/logout", "/api/auth/me"]);
+const PUBLIC = new Set(["/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/debug-env"]);
 
 // Rutas de maquina: se autentican con x-sync-secret DENTRO del handler.
 // Lista explicita y no prefijo a proposito: si fuera "/api/toast/", las
