@@ -80,11 +80,11 @@ export default function Targets({ onAuthExpired }) {
     }
 
     if (res.status === 401) {
-      onAuthExpired("Tu sesion expiro. Ingresa tu codigo otra vez.");
+      onAuthExpired("Your session expired. Enter your code again.");
       return;
     }
     if (res.status === 403) {
-      setErr("Tu acceso no permite cambiar targets.");
+      setErr("Your access does not allow changing targets.");
       return;
     }
     setErr(d.error || "No se pudo guardar ese target.");

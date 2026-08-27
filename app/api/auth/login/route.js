@@ -16,7 +16,7 @@ export async function POST(request) {
   try {
     if (await isRateLimited(ip)) {
       return NextResponse.json(
-        { ok: false, error: "Demasiados intentos. Espera unos minutos." },
+        { ok: false, error: "Too many attempts. Wait a few minutes." },
         { status: 429 }
       );
     }
@@ -36,7 +36,7 @@ export async function POST(request) {
       });
       // Un solo mensaje para codigo inexistente y usuario desactivado.
       // Distinguirlos le confirmaria a un atacante que el codigo existe.
-      return NextResponse.json({ ok: false, error: "Ese codigo no funciono." }, { status: 401 });
+      return NextResponse.json({ ok: false, error: "That code did not work." }, { status: 401 });
     }
 
     const token = await signSession(user);
@@ -81,6 +81,6 @@ export async function POST(request) {
     return res;
   } catch (err) {
     console.error("[auth/login]", err);
-    return NextResponse.json({ ok: false, error: "No se pudo iniciar sesion." }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not sign you in." }, { status: 500 });
   }
 }

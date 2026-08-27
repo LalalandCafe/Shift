@@ -90,13 +90,13 @@ export default function ShiftApp() {
   }
 
   // Una sesion vencida a media manana devuelve 401 en la siguiente peticion.
-  // Sin esto, la pantalla se quedaria mostrando "Error: No autenticado" en
+  // Sin esto, la pantalla se quedaria mostrando "Error: Not signed in" en
   // vez de pedir el codigo otra vez.
   const expired = useCallback((message) => {
     setSession(null);
     setReport(null);
     setView("week");
-    setNotice(message || "Tu sesion expiro. Ingresa tu codigo otra vez.");
+    setNotice(message || "Your session expired. Enter your code again.");
   }, []);
 
   // El week view y el leaderboard comparten un solo payload de reporte.
@@ -228,9 +228,9 @@ export default function ShiftApp() {
 
         <div className="sidebar-spacer" />
 
-        <button className="nbtn" onClick={logout} title={collapsed ? "Cerrar sesion" : undefined}>
+        <button className="nbtn" onClick={logout} title={collapsed ? "Sign out" : undefined}>
           <Icon name="lock" />
-          <span className="nbtn-label">Cerrar sesion</span>
+          <span className="nbtn-label">Sign out</span>
         </button>
         <div
           className="nfoot"
@@ -321,8 +321,8 @@ export default function ShiftApp() {
           {!allowed ? (
             <div className="empty">
               <Icon name="lock" size={22} />
-              <div className="empty-title">Esta vista no esta disponible para tu acceso</div>
-              <div>Si necesitas entrar, pidelo al equipo de tecnologia.</div>
+              <div className="empty-title">This view is not available for your access</div>
+              <div>If you need it, ask technology for access.</div>
             </div>
           ) : (
             <>

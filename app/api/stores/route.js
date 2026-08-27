@@ -9,7 +9,7 @@ export async function GET() {
     return Response.json({ ok: true, stores: list });
   } catch (err) {
     console.error("[stores GET]", err);
-    return Response.json({ ok: false, error: "No se pudieron cargar las tiendas" }, { status: 500 });
+    return Response.json({ ok: false, error: "Could not load stores" }, { status: 500 });
   }
 }
 
@@ -23,12 +23,12 @@ export async function PATCH(request) {
     const body = await request.json();
     const { code, weekdayTarget, weekendTarget, ptdTarget } = body;
     if (!code) {
-      return Response.json({ ok: false, error: "Falta code" }, { status: 400 });
+      return Response.json({ ok: false, error: "Missing store code" }, { status: 400 });
     }
     await updateStoreTargets(supabaseAdmin, code, weekdayTarget, weekendTarget, ptdTarget);
     return Response.json({ ok: true, code });
   } catch (err) {
     console.error("[stores PATCH]", err);
-    return Response.json({ ok: false, error: "No se pudo guardar el target" }, { status: 500 });
+    return Response.json({ ok: false, error: "Could not save that target" }, { status: 500 });
   }
 }
