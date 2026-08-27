@@ -1,15 +1,20 @@
 // middleware.js
 //
-// Una sola puerta para todo /api. Esto es lo que convierte el "roles" de
-// VIEWS de una etiqueta de UI a una regla que el servidor impone.
+// Una sola puerta para todo /api y para las paginas. Esto es lo que
+// convierte el "roles" de VIEWS de una etiqueta de UI a una regla que el
+// servidor impone.
 //
 // VA EN LA RAIZ, junto a package.json. Si esta en app/, Next lo ignora
 // en silencio y el API queda abierto.
-
+//
+// La sesion ahora viene de Entra ID, no del sistema de codigos. Las
+// cabeceras que escribe son las mismas de antes a proposito: ningun
+// route handler tuvo que cambiar.
 import { NextResponse } from "next/server";
-import { SESSION_COOKIE, verifySession } from "@/lib/session";
+import NextAuth from "next-auth";
+import authConfig from "./auth.config";
 
-const PUBLIC = new Set(["/api/auth/login", "/api/auth/logout", "/api/auth/me"]);
+const { auth } = NextAuth(authConfig);
 
 // Rutas de maquina: se autentican con x-sync-secret DENTRO del handler.
 // Lista explicita y no prefijo a proposito: si fuera "/api/toast/", las
@@ -24,28 +29,40 @@ const MACHINE = new Set([
   "/api/sync/tattle",
 ]);
 
-export async function middleware(request) {
+export default auth(function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // NextAuth maneja su propio ciclo completo bajo /api/auth/: el redirect
-  // a Microsoft, el callback con el code, la sesion y el signout. Ninguna
-  // de esas peticiones trae la cookie del sistema viejo, por definicion:
-  // la del callback llega justo antes de que exista una sesion.
-  //
-  // Va por prefijo y no por lista porque NextAuth genera varias rutas y
-  // agregarlas a mano significa que la proxima se rompe en silencio.
-  if (pathname.startsWith("/api/auth/")) {
+  // Auth.js maneja su propio ciclo completo bajo /api/auth/. Ninguna de
+  // esas peticiones trae sesion por definicion: la del callback llega
+  // justo antes de que exista una.
+  if (pathname.startsWith("/api/auth/") || pathname === "/signin") {
     return NextResponse.next();
   }
 
-  if (PUBLIC.has(pathname) || MACHINE.has(pathname)) {
+  if (MACHINE.has(pathname)) {
     return NextResponse.next();
   }
 
-  const session = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
+  const user = request.auth?.user;
 
-  if (!session) {
-    return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
+  if (!user || user.role === "none") {
+    // Las paginas se mandan al login. El API responde JSON, porque un
+    // redirect a HTML rompe cualquier fetch que lo reciba.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL("/signin", request.nextUrl));
+  }
+
+  // El nivel regional todavia no tiene forma de expresarse en estas
+  // cabeceras: no existe un x-shift-grp y ningun handler lo leeria. Hasta
+  // que eso se construya, un regional entra pero no ve nada, en vez de
+  // verlo todo por omision.
+  if (user.role !== "admin") {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ ok: false, error: "Not allowed" }, { status: 403 });
+    }
+    return NextResponse.redirect(new URL("/signin?error=scope", request.nextUrl));
   }
 
   // Se BORRAN antes de escribirlas. Sin esto, cualquiera podria mandar
@@ -58,15 +75,14 @@ export async function middleware(request) {
   headers.delete("x-shift-scope");
   headers.delete("x-shift-store");
 
-  headers.set("x-shift-user", session.userId);
-  headers.set("x-shift-role", session.role);
-  if (session.name) headers.set("x-shift-name", encodeURIComponent(session.name));
-  if (session.scope) headers.set("x-shift-scope", session.scope);
-  if (session.storeCode != null) headers.set("x-shift-store", String(session.storeCode));
+  headers.set("x-shift-user", user.email ?? "unknown");
+  headers.set("x-shift-role", "admin");
+  headers.set("x-shift-scope", "all");
+  if (user.name) headers.set("x-shift-name", encodeURIComponent(user.name));
 
   return NextResponse.next({ request: { headers } });
-}
+});
 
 export const config = {
-  matcher: ["/api/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.svg|apple-icon.png).*)"],
 };
