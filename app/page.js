@@ -68,12 +68,22 @@ export default function ShiftApp() {
   // La sesion vive en una cookie HttpOnly, asi que el cliente no puede
   // leerla: se la tiene que preguntar al servidor.
   useEffect(() => {
-    fetch("/api/auth/me")
+    fetch("/api/whoami")
       .then((r) => r.json())
       .then((d) => {
-        if (d.ok && d.session) {
-          setSession(d.session);
-          if (d.session.role === "admin") setView("dashboard");
+        if (d.ok && d.signedIn) {
+          // whoami habla el lenguaje de Entra: role y grps. El resto de
+          // esta pantalla espera la forma vieja, con scope y storeCode.
+          // Se traduce aqui y no en el endpoint, para que el dia que se
+          // construya el nivel regional solo cambie este mapeo.
+          setSession({
+            userId: d.email,
+            name: d.name,
+            role: d.role,
+            scope: d.allStores ? "all" : null,
+            storeCode: null,
+          });
+          if (d.role === "admin") setView("dashboard");
         }
       })
       .catch(() => {})
