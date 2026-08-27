@@ -27,6 +27,17 @@ const MACHINE = new Set([
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
+  // NextAuth maneja su propio ciclo completo bajo /api/auth/: el redirect
+  // a Microsoft, el callback con el code, la sesion y el signout. Ninguna
+  // de esas peticiones trae la cookie del sistema viejo, por definicion:
+  // la del callback llega justo antes de que exista una sesion.
+  //
+  // Va por prefijo y no por lista porque NextAuth genera varias rutas y
+  // agregarlas a mano significa que la proxima se rompe en silencio.
+  if (pathname.startsWith("/api/auth/")) {
+    return NextResponse.next();
+  }
+
   if (PUBLIC.has(pathname) || MACHINE.has(pathname)) {
     return NextResponse.next();
   }
