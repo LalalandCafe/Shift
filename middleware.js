@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
-const PUBLIC = new Set(["/api/auth/login", "/api/auth/logout", "/api/auth/me"]);
+const PUBLIC = new Set(["/api/auth/login", "/api/auth/logout", "/api/auth/me", "/api/debug-env"]);
 
 // Rutas de maquina: se autentican con x-sync-secret DENTRO del handler.
 // Lista explicita y no prefijo a proposito: si fuera "/api/toast/", las
@@ -34,7 +34,7 @@ export async function middleware(request) {
   const session = await verifySession(request.cookies.get(SESSION_COOKIE)?.value);
 
   if (!session) {
-    return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
   }
 
   // Se BORRAN antes de escribirlas. Sin esto, cualquiera podria mandar
