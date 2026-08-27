@@ -27,14 +27,14 @@ export default function Login({ onSignedIn }) {
       });
       const j = await res.json();
       if (!j.ok) {
-        setErr(j.error || "Ese codigo no funciono.");
+        setErr(j.error || "That code did not work.");
         setBusy(false);
         return;
       }
       setCode("");
       onSignedIn(j.session);
     } catch {
-      setErr("No se pudo contactar al servidor. Intenta de nuevo.");
+      setErr("Could not reach the server. Try again in a moment.");
       setBusy(false);
     }
   }
@@ -67,10 +67,10 @@ export default function Login({ onSignedIn }) {
           </div>
         </div>
 
-        <div className="modal-title">Ingresa tu codigo</div>
+        <div className="modal-title">Enter your code</div>
         <div className="modal-sub">
-          Tu codigo es personal. Lo que ves depende de el, asi que no lo compartas:
-          si alguien mas lo necesita, pidele uno propio al equipo de tecnologia.
+          Your code is personal. What you can see depends on it, so please don't
+          share it: if someone else needs access, ask technology for their own.
         </div>
 
         <input
@@ -79,7 +79,7 @@ export default function Login({ onSignedIn }) {
           value={code}
           autoFocus
           autoComplete="off"
-          placeholder="Codigo de acceso"
+          placeholder="Access code"
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
         />
@@ -87,7 +87,7 @@ export default function Login({ onSignedIn }) {
 
         <div className="modal-actions">
           <button className="btn btn-primary btn-full" onClick={submit} disabled={!code || busy}>
-            {busy ? "Verificando" : "Entrar"}
+            {busy ? "Checking" : "Sign in"}
           </button>
         </div>
       </div>
