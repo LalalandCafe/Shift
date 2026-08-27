@@ -163,14 +163,11 @@ export default function ShiftApp() {
     return () => clearInterval(id);
   }, [report?.isLive, isoDate, session, expired]);
 
-  async function logout() {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch {}
-    setSession(null);
-    setReport(null);
-    setView("week");
-    setNotice(null);
+  function logout() {
+    // Auth.js cierra la sesion del lado del servidor y borra su cookie.
+    // Limpiar el estado de React aqui no serviria: la cookie de Entra
+    // seguiria viva y la siguiente carga volveria a entrar sola.
+    window.location.href = "/api/auth/signout";
   }
 
   if (!authChecked) {
@@ -181,15 +178,15 @@ export default function ShiftApp() {
     );
   }
 
+  // Ya no hay pantalla de codigo. El middleware exige una sesion de Entra
+  // antes de que esta pagina se renderice, asi que llegar aqui sin sesion
+  // significa que whoami fallo, no que el usuario no haya entrado.
   if (!session) {
+    if (typeof window !== "undefined") window.location.href = "/signin";
     return (
-      <Login
-        onSignedIn={(s) => {
-          setSession(s);
-          setNotice(null);
-          setView(s.role === "admin" ? "dashboard" : "week");
-        }}
-      />
+      <div className="empty" style={{ minHeight: "100vh" }}>
+        <ShiftLogo variant="mark" size={38} crown />
+      </div>
     );
   }
 
