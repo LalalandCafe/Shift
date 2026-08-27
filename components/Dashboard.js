@@ -498,7 +498,7 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
         </div>
       </div>
 
-      <EfficiencyQuadrant isoDate={isoDate} />
+      <EfficiencyQuadrant isoDate={isoDate} report={report} />
     </div>
   );
 }

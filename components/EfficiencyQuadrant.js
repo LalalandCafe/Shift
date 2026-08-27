@@ -37,20 +37,24 @@ function CustomTip({ active, payload }) {
   );
 }
 
-export default function EfficiencyQuadrant({ isoDate }) {
-  const [report, setReport] = useState(null);
+/**
+ * El reporte llega como prop, no se vuelve a pedir.
+ *
+ * Este componente es hijo de Dashboard, que ya recibe report desde page.js.
+ * Pedirlo por su cuenta significaba una tercera construccion completa de
+ * buildDailyReport por cada carga de la pantalla, con sus once viajes a la
+ * base, para llegar exactamente al mismo objeto que ya estaba en memoria.
+ */
+export default function EfficiencyQuadrant({ isoDate, report }) {
   const [kitchen, setKitchen] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isoDate) return;
     setLoading(true);
-    Promise.all([
-      fetch(`/api/report?date=${isoDate}`).then((r) => r.json()),
-      fetch(`/api/kitchen-week?date=${isoDate}`).then((r) => r.json()),
-    ])
-      .then(([rep, kit]) => {
-        if (rep.ok) setReport(rep);
+    fetch(`/api/kitchen-week?date=${isoDate}`)
+      .then((r) => r.json())
+      .then((kit) => {
         if (kit.ok) setKitchen(kit);
         setLoading(false);
       })
