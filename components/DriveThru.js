@@ -2,7 +2,9 @@
 // Goes in components/DriveThru.js
 //
 // Single view, progressive disclosure. Click a store card to switch stores,
-// click a day in the calendar to drill into that day's hour-by-hour.
+// click a day in the calendar to drill into that day's hour-by-hour. Once a
+// day is selected, the headline banner, eyebrow, and the four KPI cards all
+// scope to that single day instead of the window average.
 //
 // Every color and every threshold on this screen comes from lib/scale.js and
 // metric_targets. There is no goal number and no hex in this file, which is
@@ -31,6 +33,14 @@ const AT_TARGET_BANDS = ["green", "lightGreen"];
 function shortDate(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// "FRI, AUG 14" — used by the eyebrow once a single day is selected.
+function dayLabel(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d)
+    .toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })
+    .toUpperCase();
 }
 
 function mondayOf(iso) {
@@ -83,6 +93,15 @@ export default function DriveThru() {
       .catch(() => {});
   }, [selectedStore, days]);
 
+  // Esc always clears the day drill-down, wherever focus happens to be.
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === "Escape") setSelectedDay(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   if (loading) return <div className="empty">Loading drive-thru data...</div>;
   if (error) return <div className="empty">Error: {error}</div>;
   if (!summary?.stores?.length)
@@ -107,6 +126,21 @@ export default function DriveThru() {
     weekMap.get(wk)[dowIndex(r.business_date)] = r;
   }
   const weeks = [...weekMap.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+
+  function toggleDay(date) {
+    setSelectedDay((cur) => (cur === date ? null : date));
+  }
+
+  const selectedDayRow = selectedDay
+    ? dailyRows.find((r) => r.business_date === selectedDay)
+    : null;
+
+  // Only trust a day selection that actually resolves to a row for this
+  // store's current window. Store/window switches already clear selectedDay,
+  // so this should always be true whenever selectedDay is set, but the KPI
+  // row and banner key off this rather than off selectedDay directly so a
+  // stale selection can never show day-shaped numbers with no day behind them.
+  const isDaySelected = !!selectedDay && !!selectedDayRow;
 
   // Hourly rows, either for the clicked day or aggregated across the window
   const allHourly = hourly?.rows || [];
@@ -135,12 +169,15 @@ export default function DriveThru() {
   const worstHour = hours.reduce((w, h) => (h.avg != null && (!w || h.avg > w.avg) ? h : w), null);
   const bestHour = hours.reduce((b, h) => (h.avg != null && (!b || h.avg < b.avg) ? h : b), null);
 
-  const selectedDayRow = selectedDay
-    ? dailyRows.find((r) => r.business_date === selectedDay)
-    : null;
+  // A single hour can't be "toughest" or "best" against nothing, so a day
+  // with fewer than two distinct hours of data gets a placeholder instead of
+  // a real-looking value.
+  const insufficientHourData = !!selectedDay && hours.length < 2;
 
   // Distribution. The band ships with each row, so this component never has to
-  // work out which buckets count as at-target.
+  // work out which buckets count as at-target. This stays a whole-window,
+  // whole-store figure: there is no per-day distribution endpoint, and the
+  // day view below uses the daily row's own pct_green instead.
   const distRows = (distribution?.rows || [])
     .slice()
     .sort((a, b) => a.bucket_order - b.bucket_order);
@@ -150,32 +187,44 @@ export default function DriveThru() {
     .reduce((a, r) => a + r.car_count, 0);
   const pctAtGoal = distTotal ? (100 * atGoalCars) / distTotal : 0;
 
+  // Everything the banner and the first two KPI cards read scopes to the
+  // selected day when there is one, and falls back to the window aggregate
+  // otherwise. When isDaySelected is false, every value below is byte-for-byte
+  // the same computation the 30-day view always did.
+  const activeAvgWindowTime = isDaySelected
+    ? selectedDayRow.avg_window_time == null
+      ? null
+      : Number(selectedDayRow.avg_window_time)
+    : store.avgWindowTime;
+  const activeCars = isDaySelected ? Number(selectedDayRow.car_count ?? 0) : store.cars;
+  const activeAtGoalPct = isDaySelected ? Number(selectedDayRow.pct_green ?? 0) : pctAtGoal;
+  const activeBand = bandFor(activeAvgWindowTime, cfg);
+
   // Headline
-  const storeBand = bandFor(store.avgWindowTime, cfg);
   const headline =
-    storeBand === "green"
+    activeBand === "green"
       ? "Running clear of target"
-      : storeBand === "lightGreen"
+      : activeBand === "lightGreen"
       ? "Running at target"
-      : storeBand === "lightRed"
+      : activeBand === "lightRed"
       ? "Just over target"
-      : storeBand === "red"
+      : activeBand === "red"
       ? "Well over target"
       : "No data yet";
-  const gap = store.avgWindowTime != null ? store.avgWindowTime - cfg.target : null;
+  const gap = activeAvgWindowTime != null ? activeAvgWindowTime - cfg.target : null;
   const detail =
-    store.avgWindowTime == null
+    activeAvgWindowTime == null
       ? "No cars recorded in this window."
       : gap <= 0
-      ? `Average window time is ${fmtSeconds(store.avgWindowTime)}, at or under the ${fmtSeconds(
+      ? `Average window time is ${fmtSeconds(activeAvgWindowTime)}, at or under the ${fmtSeconds(
           cfg.target
-        )} target, with ${pctAtGoal.toFixed(0)}% of cars making it.`
-      : `Average window time is ${fmtSeconds(store.avgWindowTime)}. That is ${fmtSeconds(
+        )} target, with ${activeAtGoalPct.toFixed(0)}% of cars making it.`
+      : `Average window time is ${fmtSeconds(activeAvgWindowTime)}. That is ${fmtSeconds(
           gap
-        )} over the ${fmtSeconds(cfg.target)} target, with ${pctAtGoal.toFixed(
+        )} over the ${fmtSeconds(cfg.target)} target, with ${activeAtGoalPct.toFixed(
           0
         )}% of cars already making it.`;
-  const banner = styleOfBand(storeBand);
+  const banner = styleOfBand(activeBand);
 
   const legend = bandLegend(cfg, fmtSeconds);
 
@@ -272,14 +321,44 @@ export default function DriveThru() {
       >
         <div
           style={{
-            fontSize: 11.5,
-            fontWeight: 700,
-            opacity: 0.75,
-            letterSpacing: 0.5,
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 10,
             marginBottom: 6,
           }}
         >
-          {store.storeCode} &middot; {store.storeName.toUpperCase()} &middot; LAST {days} DAYS
+          <div
+            style={{
+              fontSize: 11.5,
+              fontWeight: 700,
+              opacity: 0.75,
+              letterSpacing: 0.5,
+            }}
+          >
+            {store.storeCode} &middot; {store.storeName.toUpperCase()} &middot;{" "}
+            {isDaySelected ? dayLabel(selectedDay) : `LAST ${days} DAYS`}
+          </div>
+          {isDaySelected && (
+            <button
+              type="button"
+              onClick={() => setSelectedDay(null)}
+              style={{
+                padding: "3px 10px",
+                borderRadius: 6,
+                border: "1.5px solid currentColor",
+                background: "rgba(255,255,255,0.16)",
+                color: "inherit",
+                cursor: "pointer",
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: "inherit",
+                letterSpacing: 0.3,
+              }}
+            >
+              Back to 30 days
+            </button>
+          )}
         </div>
         <div style={{ fontSize: 26, fontWeight: 700, marginBottom: 6 }}>{headline}</div>
         <div style={{ fontSize: 14, opacity: 0.92 }}>{detail}</div>
@@ -289,35 +368,60 @@ export default function DriveThru() {
       <div className="mc-grid" style={{ marginBottom: 22 }}>
         <div className="mc">
           <div className="mc-l">Average Window Time</div>
-          <div className="mc-v" style={{ color: bandInk(store.avgWindowTime, cfg) }}>
-            {fmtSeconds(store.avgWindowTime)}
+          <div className="mc-v" style={{ color: bandInk(activeAvgWindowTime, cfg) }}>
+            {fmtSeconds(activeAvgWindowTime)}
           </div>
           <div className="mc-s">
-            {store.cars.toLocaleString()} cars &middot; target {fmtSeconds(cfg.target)}
+            {activeCars.toLocaleString()} cars &middot; target {fmtSeconds(cfg.target)}
           </div>
         </div>
         <div className="mc">
           <div className="mc-l">Cars At Target</div>
-          <div className="mc-v" style={{ color: pctAtGoal >= 50 ? BANDS.green.ink : BANDS.red.ink }}>
-            {pctAtGoal.toFixed(0)}%
+          <div
+            className="mc-v"
+            style={{ color: activeAtGoalPct >= 50 ? BANDS.green.ink : BANDS.red.ink }}
+          >
+            {activeAtGoalPct.toFixed(0)}%
           </div>
           <div className="mc-s">
-            {(100 - pctAtGoal).toFixed(0)}% still over {fmtSeconds(cfg.target)}
+            {(100 - activeAtGoalPct).toFixed(0)}% still over {fmtSeconds(cfg.target)}
           </div>
         </div>
         <div className="mc">
           <div className="mc-l">Toughest Hour</div>
-          <div className="mc-v" style={{ color: bandInk(worstHour?.avg, cfg) }}>
-            {worstHour ? `${worstHour.hour}:00` : "--"}
-          </div>
-          <div className="mc-s">{worstHour ? `avg ${fmtSeconds(worstHour.avg)}` : "no data"}</div>
+          {insufficientHourData ? (
+            <>
+              <div className="mc-v" style={{ color: bandInk(null, cfg), fontSize: 16 }}>
+                Not enough data
+              </div>
+              <div className="mc-s">fewer than 2 hours recorded</div>
+            </>
+          ) : (
+            <>
+              <div className="mc-v" style={{ color: bandInk(worstHour?.avg, cfg) }}>
+                {worstHour ? `${worstHour.hour}:00` : "--"}
+              </div>
+              <div className="mc-s">{worstHour ? `avg ${fmtSeconds(worstHour.avg)}` : "no data"}</div>
+            </>
+          )}
         </div>
         <div className="mc">
           <div className="mc-l">Best Hour</div>
-          <div className="mc-v" style={{ color: bandInk(bestHour?.avg, cfg) }}>
-            {bestHour ? `${bestHour.hour}:00` : "--"}
-          </div>
-          <div className="mc-s">{bestHour ? `avg ${fmtSeconds(bestHour.avg)}` : "no data"}</div>
+          {insufficientHourData ? (
+            <>
+              <div className="mc-v" style={{ color: bandInk(null, cfg), fontSize: 16 }}>
+                Not enough data
+              </div>
+              <div className="mc-s">fewer than 2 hours recorded</div>
+            </>
+          ) : (
+            <>
+              <div className="mc-v" style={{ color: bandInk(bestHour?.avg, cfg) }}>
+                {bestHour ? `${bestHour.hour}:00` : "--"}
+              </div>
+              <div className="mc-s">{bestHour ? `avg ${fmtSeconds(bestHour.avg)}` : "no data"}</div>
+            </>
+          )}
         </div>
       </div>
 
@@ -389,7 +493,16 @@ export default function DriveThru() {
                   return (
                     <div
                       key={i}
-                      onClick={() => setSelectedDay(isSel ? null : r.business_date)}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={isSel}
+                      onClick={() => toggleDay(r.business_date)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          toggleDay(r.business_date);
+                        }
+                      }}
                       title={`${r.business_date} · ${r.car_count} cars`}
                       style={{
                         ...bandStyle(r.avg_window_time, cfg),
