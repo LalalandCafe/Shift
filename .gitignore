@@ -16,3 +16,10 @@ snap/
 cookies.txt
 *.bak
 codigos-shift.txt
+backfill-hme-done.txt
+backfill-hme-failed.txt
+hme-stores.json
+backfill-hme-done.txt
+backfill-hme-failed.txt
+hme-stores.json
+.env.work
