@@ -21,6 +21,27 @@ function daysAgoISO(n) {
   return d.toISOString().slice(0, 10);
 }
 
+// PostgREST caps a single response at 1000 rows by default. A 90-day window
+// across even one store's hourly rows, or the daily summary across every
+// store, can exceed that - the same truncation class that once inflated WTD
+// SPLH. Same pattern as lib/report.js's fetchAllRows: page with .range()
+// until a page comes back short.
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows(buildQuery, label) {
+  const all = [];
+  let from = 0;
+  for (let guard = 0; guard < 200; guard++) {
+    const { data, error } = await buildQuery(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(label + ": " + error.message);
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 async function loadTarget() {
   // green_value is optional on this table: it lets a metric name its own
   // green line instead of accepting target * 0.85. Drive-thru window time
@@ -53,14 +74,18 @@ export async function GET(request) {
           { status: 400 }
         );
       }
-      const { data, error } = await supabaseAdmin
-        .from("drive_thru_hourly")
-        .select("*")
-        .eq("store_code", Number(storeCode))
-        .gte("business_date", since)
-        .order("business_date", { ascending: false })
-        .order("departure_hour", { ascending: true });
-      if (error) throw new Error(error.message);
+      const data = await fetchAllRows(
+        (from, to) =>
+          supabaseAdmin
+            .from("drive_thru_hourly")
+            .select("*")
+            .eq("store_code", Number(storeCode))
+            .gte("business_date", since)
+            .order("business_date", { ascending: false })
+            .order("departure_hour", { ascending: true })
+            .range(from, to),
+        "drive_thru_hourly"
+      );
       return Response.json({
         ok: true,
         view,
@@ -82,10 +107,16 @@ export async function GET(request) {
     }
 
     // default: summary, one row per store over the requested window
-    let query = supabaseAdmin.from("drive_thru_daily").select("*").gte("business_date", since);
-    if (storeCode) query = query.eq("store_code", Number(storeCode));
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
+    const data = await fetchAllRows((from, to) => {
+      let query = supabaseAdmin
+        .from("drive_thru_daily")
+        .select("*")
+        .gte("business_date", since)
+        .order("business_date", { ascending: true })
+        .order("store_code", { ascending: true });
+      if (storeCode) query = query.eq("store_code", Number(storeCode));
+      return query.range(from, to);
+    }, "drive_thru_daily");
 
     const byStore = new Map();
     for (const r of data) {

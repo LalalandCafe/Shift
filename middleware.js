@@ -32,14 +32,37 @@ const MACHINE = new Set([
   "/api/sync/tattle",
 ]);
 
+// Solo lo que Auth.js necesita para su propio ciclo OAuth, no todo el prefijo
+// /api/auth/. El codigo de acceso viejo (retirado) vivia bajo ese mismo
+// prefijo en /api/auth/login, /api/auth/logout y /api/auth/me, y un
+// startsWith("/api/auth/") de puerta ancha lo dejaba pasar sin sesion junto
+// con Auth.js. Esta lista es exactamente lo que NextAuth sirve desde
+// app/api/auth/[...nextauth]/route.js: signin, el callback de cada
+// proveedor, session, csrf, providers, signout y su pagina de error.
+// Cualquier otra cosa que alguien deje caer bajo /api/auth/ en el futuro NO
+// pasa gratis por aqui.
+const AUTH_JS_EXACT = new Set([
+  "/api/auth/signin",
+  "/api/auth/session",
+  "/api/auth/csrf",
+  "/api/auth/providers",
+  "/api/auth/signout",
+  "/api/auth/error",
+]);
+const AUTH_JS_PREFIXES = ["/api/auth/signin/", "/api/auth/callback/"];
+
+function isAuthJsPath(pathname) {
+  if (AUTH_JS_EXACT.has(pathname)) return true;
+  return AUTH_JS_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
 export default auth(function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  // Auth.js maneja su propio ciclo completo bajo /api/auth/. Ninguna de
-  // esas peticiones trae sesion por definicion: la del callback llega
-  // justo antes de que exista una.
+  // Ninguna de estas peticiones trae sesion por definicion: la del callback
+  // llega justo antes de que exista una.
   if (
-    pathname.startsWith("/api/auth/") ||
+    isAuthJsPath(pathname) ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
   ) {
     return NextResponse.next();

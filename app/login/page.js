@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
-import { auth, signIn } from '@/auth';
+import { auth } from '@/auth';
 import AuthShell from '@/components/AuthShell';
+import { signInWithMicrosoft } from './actions';
 import '../auth.css';
 
 export const metadata = { title: 'Sign in to SHIFT' };
@@ -58,12 +59,7 @@ export default async function LoginPage({ searchParams }) {
   const errorCode = typeof searchParams?.error === 'string' ? searchParams.error : null;
   const errorMessage = errorCode ? ERROR_MESSAGES[errorCode] || DEFAULT_ERROR : null;
 
-  async function signInWithMicrosoft() {
-    'use server';
-    // Same-origin only, so ?callbackUrl cannot bounce a manager off-site.
-    const target = callbackUrl.startsWith('/') ? callbackUrl : '/';
-    await signIn('microsoft-entra-id', { redirectTo: target });
-  }
+  const signIn = signInWithMicrosoft.bind(null, callbackUrl);
 
   return (
     <AuthShell>
@@ -74,7 +70,7 @@ export default async function LoginPage({ searchParams }) {
         </div>
       )}
 
-      <form action={signInWithMicrosoft} className="auth-actions">
+      <form action={signIn} className="auth-actions">
         <button type="submit" className="auth-btn auth-btn-primary">
           <MicrosoftLogo />
           Sign in with Microsoft

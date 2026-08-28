@@ -1,10 +1,9 @@
 import ShiftLogo from '@/components/ShiftLogo';
 import LalalandLogo from '@/components/LalalandLogo';
-import HourBand from '@/components/HourBand';
 
 /**
  * Shared frame for the sign-in and sign-out screens so the two never drift
- * apart. Server component: the only client-side piece is HourBand.
+ * apart.
  */
 export default function AuthShell({ children }) {
   return (
@@ -17,8 +16,6 @@ export default function AuthShell({ children }) {
           <h1 className="auth-wordmark">SHIFT</h1>
           <p className="auth-tagline">Labor and sales reporting</p>
         </header>
-
-        <HourBand />
 
         {children}
 

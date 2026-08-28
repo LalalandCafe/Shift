@@ -10,6 +10,14 @@ on:
         required: false
         default: ""
 
+# Sin esto, un dispatch manual mientras corre el cron programado (o el daily
+# sync pisando el mismo dia) puede solaparse: el sync de labor hace un
+# delete-then-insert por tienda/dia, y dos corridas concurrentes sobre la
+# misma ventana pueden borrarse turnos recien escritos entre si.
+concurrency:
+  group: shift-weekly-reload
+  cancel-in-progress: false
+
 jobs:
   reload:
     runs-on: ubuntu-latest
@@ -34,10 +42,24 @@ jobs:
             -o stores.json
           echo "Tiendas: $(jq 'length' stores.json)"
 
+          # La lista de arriba ya viene filtrada por toast_guid: una tienda
+          # recien abierta a la que se le olvido cargar el GUID nunca
+          # aparece ahi, nunca falla, y nunca se nota. La cobertura de cada
+          # dia se compara mas abajo contra CADA fila de stores, sin
+          # filtro - la unica fuente de verdad de que tiendas estan
+          # abiertas - para que ese olvido sea un rojo, no un silencio.
+          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/stores?select=code" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -o all-stores.json
+          jq -r '.[].code' all-stores.json | sort -n > expected-codes.txt
+          echo "Tiendas esperadas (sin filtro): $(wc -l < expected-codes.txt)"
+
       - name: Recargar 7 dias
         run: |
           START="${{ steps.semana.outputs.start }}"
           TOTAL_OK=0; TOTAL_FAIL=0; STALE=0
+          COVERAGE_FAIL=0
 
           # Resolved once and printed to the summary below, never the secret.
           APP_HOST=$(echo "${{ secrets.APP_URL }}" | sed -E 's#^[a-zA-Z]+://##; s#/.*##')
@@ -46,6 +68,7 @@ jobs:
             ISO=$(date -d "$START + $OFFSET days" +%Y-%m-%d)
             BUSINESS=$(echo $ISO | tr -d '-')
             echo "::group::$ISO"
+            : > "synced-codes-$ISO.txt"
 
             for row in $(jq -r '.[] | @base64' stores.json); do
               CODE=$(echo $row | base64 -d | jq -r '.code')
@@ -60,7 +83,10 @@ jobs:
                 HTTP=$(echo "$RESP" | tail -n1)
                 BODY=$(echo "$RESP" | sed '$d')
                 # A 200 only counts as success if the body agrees, not just
-                # the HTTP status.
+                # the HTTP status. ok now reflects the transactions/hourly
+                # writes too (see app/api/toast/sync-store/route.js), not
+                # just labor and sales, so this check is finally
+                # trustworthy end to end.
                 BODY_OK=$(echo "$BODY" | jq -r '.ok // false' 2>/dev/null || echo false)
                 if [ "$HTTP" = "200" ] && [ "$BODY_OK" = "true" ]; then
                   RM=$(echo "$BODY" | jq -r '.staleRemoved // 0')
@@ -74,18 +100,34 @@ jobs:
 
               if [ "$SUCCESS" = "1" ]; then
                 TOTAL_OK=$((TOTAL_OK+1))
+                echo "$CODE" >> "synced-codes-$ISO.txt"
               else
                 TOTAL_FAIL=$((TOTAL_FAIL+1))
                 echo "::error::Store $CODE failed to reload for $ISO"
               fi
               sleep 1
             done
+
+            # Cobertura de ESTE dia contra la tabla stores completa.
+            sort -n "synced-codes-$ISO.txt" | uniq > "actual-codes-$ISO.txt"
+            MISSING=$(comm -23 expected-codes.txt "actual-codes-$ISO.txt")
+            if [ -n "$MISSING" ]; then
+              MISSING_LIST=$(echo "$MISSING" | tr '\n' ' ')
+              echo "::error::Cobertura incompleta para $ISO: faltan las tiendas$MISSING_LIST"
+              COVERAGE_FAIL=1
+            fi
+
             echo "::endgroup::"
           done
 
+          EXPECTED_COUNT=$(wc -l < expected-codes.txt)
           echo "### Recarga semanal desde $START" >> $GITHUB_STEP_SUMMARY
           echo "App host: $APP_HOST" >> $GITHUB_STEP_SUMMARY
+          echo "Tiendas en la tabla stores: $EXPECTED_COUNT" >> $GITHUB_STEP_SUMMARY
           echo "Syncs exitosos: $TOTAL_OK" >> $GITHUB_STEP_SUMMARY
           echo "Syncs fallidos: $TOTAL_FAIL" >> $GITHUB_STEP_SUMMARY
           echo "Turnos viejos eliminados: $STALE" >> $GITHUB_STEP_SUMMARY
-          if [ "$TOTAL_FAIL" -gt 0 ]; then exit 1; fi
+          if [ "$COVERAGE_FAIL" -eq 1 ]; then
+            echo "Cobertura incompleta en al menos un dia de la semana - ver arriba." >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "$TOTAL_FAIL" -gt 0 ] || [ "$COVERAGE_FAIL" -eq 1 ]; then exit 1; fi
