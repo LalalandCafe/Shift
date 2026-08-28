@@ -108,5 +108,5 @@ jobs:
             echo "Failed:$FAILED_LIST" >> $GITHUB_STEP_SUMMARY
           fi
           curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/refresh_drive_thru_views" \
-  -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
-  -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}"
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}"
