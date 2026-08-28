@@ -44,6 +44,11 @@ jobs:
         run: |
           DAYS="${{ github.event.inputs.days || '1' }}"
 
+          # Resolved once for the whole run and printed to the summary below,
+          # so a bad alias (e.g. one sitting behind Vercel deployment
+          # protection) is visible without ever printing the secret itself.
+          APP_HOST=$(echo "${{ secrets.APP_URL }}" | sed -E 's#^[a-zA-Z]+://##; s#/.*##')
+
           # 20 min buffer: HME cloud data runs at least 15 min behind.
           END_EPOCH=$(( $(date +%s) - 1200 ))
           START_EPOCH=$(( END_EPOCH - DAYS * 86400 ))
@@ -76,7 +81,11 @@ jobs:
                   -d "{\"storeCode\":$CODE,\"hmeStoreNumber\":\"$HME\",\"startDateTime\":\"$S\",\"endDateTime\":\"$E\"}")
                 HTTP=$(echo "$RESP" | tail -n1)
                 BODY=$(echo "$RESP" | sed '$d')
-                if [ "$HTTP" = "200" ]; then
+                # A 200 only counts as success if the body agrees. An unmapped
+                # store, for example, can come back 200 with "ok":false, and
+                # checking HTTP status alone would miss that entirely.
+                BODY_OK=$(echo "$BODY" | jq -r '.ok // false' 2>/dev/null || echo false)
+                if [ "$HTTP" = "200" ] && [ "$BODY_OK" = "true" ]; then
                   N=$(echo "$BODY" | jq -r '.cars // 0')
                   STORE_CARS=$(( STORE_CARS + N ))
                   SUCCESS=1
@@ -88,7 +97,7 @@ jobs:
               if [ "$SUCCESS" != "1" ]; then
                 FAIL=$((FAIL+1))
                 FAILED_LIST="$FAILED_LIST ${CODE}@${S:0:10}"
-                echo "::warning::Store $CODE failed on window $S"
+                echo "::error::Store $CODE failed on window $S"
               fi
 
               CURSOR=$CHUNK_END
@@ -101,6 +110,7 @@ jobs:
           done
 
           echo "### Drive-thru sync" >> $GITHUB_STEP_SUMMARY
+          echo "App host: $APP_HOST" >> $GITHUB_STEP_SUMMARY
           echo "Range: $DAYS day(s)" >> $GITHUB_STEP_SUMMARY
           echo "Stores processed: $OK · Failed windows: $FAIL" >> $GITHUB_STEP_SUMMARY
           echo "Cars synced: $CARS" >> $GITHUB_STEP_SUMMARY
@@ -110,3 +120,10 @@ jobs:
           curl -s -X POST "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/refresh_drive_thru_views" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}"
+
+          # The refresh above should run regardless of per-window failures, but
+          # a run where every window failed must not exit 0 and show green.
+          if [ "$FAIL" -gt 0 ]; then
+            echo "::error::$FAIL window(s) failed across this run"
+            exit 1
+          fi

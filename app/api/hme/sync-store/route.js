@@ -45,9 +45,13 @@ export async function POST(request) {
 
     const code = Number(storeCode);
 
-    // HME serves nothing older than 90 days.
+    // HME serves nothing older than 90 days. The requested start is kept
+    // separately so a caller asking for a range older than that can tell its
+    // request was clamped, instead of silently getting a shorter window back.
     const floor = new Date(Date.now() - 89 * 24 * 3600e3);
-    const start = new Date(startDateTime) < floor ? floor : new Date(startDateTime);
+    const requestedStart = new Date(startDateTime);
+    const startClamped = requestedStart < floor;
+    const start = startClamped ? floor : requestedStart;
     const end = new Date(endDateTime);
 
     if (end <= start) {
@@ -123,7 +127,12 @@ export async function POST(request) {
       ok: true,
       storeCode: code,
       hmeStoreNumber,
-      window: { start: start.toISOString(), end: end.toISOString() },
+      window: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        requestedStart: requestedStart.toISOString(),
+        startClamped,
+      },
       cars: written,
       newestDeparture: newest ? newest.toISOString() : null,
     });

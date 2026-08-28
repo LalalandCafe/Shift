@@ -39,6 +39,9 @@ jobs:
           START="${{ steps.semana.outputs.start }}"
           TOTAL_OK=0; TOTAL_FAIL=0; STALE=0
 
+          # Resolved once and printed to the summary below, never the secret.
+          APP_HOST=$(echo "${{ secrets.APP_URL }}" | sed -E 's#^[a-zA-Z]+://##; s#/.*##')
+
           for OFFSET in 0 1 2 3 4 5 6; do
             ISO=$(date -d "$START + $OFFSET days" +%Y-%m-%d)
             BUSINESS=$(echo $ISO | tr -d '-')
@@ -56,7 +59,10 @@ jobs:
                   -d "{\"storeCode\":$CODE,\"restaurantGuid\":\"$GUID\",\"businessDate\":\"$BUSINESS\",\"isoDate\":\"$ISO\"}")
                 HTTP=$(echo "$RESP" | tail -n1)
                 BODY=$(echo "$RESP" | sed '$d')
-                if [ "$HTTP" = "200" ]; then
+                # A 200 only counts as success if the body agrees, not just
+                # the HTTP status.
+                BODY_OK=$(echo "$BODY" | jq -r '.ok // false' 2>/dev/null || echo false)
+                if [ "$HTTP" = "200" ] && [ "$BODY_OK" = "true" ]; then
                   RM=$(echo "$BODY" | jq -r '.staleRemoved // 0')
                   STALE=$((STALE+RM))
                   [ "$RM" -gt 0 ] && echo "  $CODE limpio $RM turnos viejos"
@@ -66,13 +72,19 @@ jobs:
                 sleep 5
               done
 
-              if [ "$SUCCESS" = "1" ]; then TOTAL_OK=$((TOTAL_OK+1)); else TOTAL_FAIL=$((TOTAL_FAIL+1)); fi
+              if [ "$SUCCESS" = "1" ]; then
+                TOTAL_OK=$((TOTAL_OK+1))
+              else
+                TOTAL_FAIL=$((TOTAL_FAIL+1))
+                echo "::error::Store $CODE failed to reload for $ISO"
+              fi
               sleep 1
             done
             echo "::endgroup::"
           done
 
           echo "### Recarga semanal desde $START" >> $GITHUB_STEP_SUMMARY
+          echo "App host: $APP_HOST" >> $GITHUB_STEP_SUMMARY
           echo "Syncs exitosos: $TOTAL_OK" >> $GITHUB_STEP_SUMMARY
           echo "Syncs fallidos: $TOTAL_FAIL" >> $GITHUB_STEP_SUMMARY
           echo "Turnos viejos eliminados: $STALE" >> $GITHUB_STEP_SUMMARY

@@ -38,6 +38,9 @@ jobs:
           BUSINESS="${{ steps.fecha.outputs.business }}"
           OK=0; FAIL=0; FAILED_LIST=""
 
+          # Resolved once and printed to the summary below, never the secret.
+          APP_HOST=$(echo "${{ secrets.APP_URL }}" | sed -E 's#^[a-zA-Z]+://##; s#/.*##')
+
           for row in $(jq -r '.[] | @base64' stores.json); do
             CODE=$(echo $row | base64 -d | jq -r '.code')
             GUID=$(echo $row | base64 -d | jq -r '.toast_guid')
@@ -49,18 +52,28 @@ jobs:
                 -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
                 -d "{\"storeCode\":$CODE,\"restaurantGuid\":\"$GUID\",\"businessDate\":\"$BUSINESS\",\"isoDate\":\"$ISO\",\"skipKitchen\":true}")
               HTTP=$(echo "$RESP" | tail -n1)
-              if [ "$HTTP" = "200" ]; then SUCCESS=1; break; fi
+              BODY=$(echo "$RESP" | sed '$d')
+              # A 200 only counts as success if the body agrees, not just the
+              # HTTP status.
+              BODY_OK=$(echo "$BODY" | jq -r '.ok // false' 2>/dev/null || echo false)
+              if [ "$HTTP" = "200" ] && [ "$BODY_OK" = "true" ]; then SUCCESS=1; break; fi
               sleep 4
             done
 
-            if [ "$SUCCESS" = "1" ]; then OK=$((OK+1)); else FAIL=$((FAIL+1)); FAILED_LIST="$FAILED_LIST $CODE"; fi
+            if [ "$SUCCESS" = "1" ]; then
+              OK=$((OK+1))
+            else
+              FAIL=$((FAIL+1)); FAILED_LIST="$FAILED_LIST $CODE"
+              echo "::error::Store $CODE failed in the live sync for $ISO"
+            fi
             sleep 1
           done
 
           echo "### Sync en vivo $ISO" >> $GITHUB_STEP_SUMMARY
+          echo "App host: $APP_HOST" >> $GITHUB_STEP_SUMMARY
           echo "Exitosas: $OK · Fallidas: $FAIL" >> $GITHUB_STEP_SUMMARY
           echo "Kitchen: omitido (se sincroniza en el daily y weekly)" >> $GITHUB_STEP_SUMMARY
           if [ "$FAIL" -gt 0 ]; then
             echo "Fallidas:$FAILED_LIST" >> $GITHUB_STEP_SUMMARY
-            echo "::warning::$FAIL tiendas fallaron en el sync en vivo"
+            exit 1
           fi
