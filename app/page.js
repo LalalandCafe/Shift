@@ -167,7 +167,7 @@ export default function ShiftApp() {
     // Auth.js cierra la sesion del lado del servidor y borra su cookie.
     // Limpiar el estado de React aqui no serviria: la cookie de Entra
     // seguiria viva y la siguiente carga volveria a entrar sola.
-    window.location.href = "/api/auth/signout";
+    window.location.href = "/signout";
   }
 
   if (!authChecked) {
@@ -182,7 +182,7 @@ export default function ShiftApp() {
   // antes de que esta pagina se renderice, asi que llegar aqui sin sesion
   // significa que whoami fallo, no que el usuario no haya entrado.
   if (!session) {
-    if (typeof window !== "undefined") window.location.href = "/signin";
+    if (typeof window !== "undefined") window.location.href = "/login";
     return (
       <div className="empty" style={{ minHeight: "100vh" }}>
         <ShiftLogo variant="mark" size={38} crown />

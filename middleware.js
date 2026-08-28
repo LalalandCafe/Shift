@@ -19,6 +19,9 @@ const { auth } = NextAuth(authConfig);
 // Rutas de maquina: se autentican con x-sync-secret DENTRO del handler.
 // Lista explicita y no prefijo a proposito: si fuera "/api/toast/", las
 // rutas debug de ese directorio quedarian abiertas.
+// Reachable while signed out, or /login would redirect to itself forever.
+const PUBLIC_PATHS = ["/login", "/signout"];
+
 const MACHINE = new Set([
   "/api/toast/sync-store",
   "/api/toast/sync",
@@ -35,7 +38,10 @@ export default auth(function middleware(request) {
   // Auth.js maneja su propio ciclo completo bajo /api/auth/. Ninguna de
   // esas peticiones trae sesion por definicion: la del callback llega
   // justo antes de que exista una.
-  if (pathname.startsWith("/api/auth/") || pathname === "/signin") {
+  if (
+    pathname.startsWith("/api/auth/") ||
+    PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
+  ) {
     return NextResponse.next();
   }
 
@@ -51,7 +57,7 @@ export default auth(function middleware(request) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
     }
-    return NextResponse.redirect(new URL("/signin", request.nextUrl));
+    return NextResponse.redirect(new URL("/login", request.nextUrl));
   }
 
   // El nivel regional todavia no tiene forma de expresarse en estas
@@ -62,7 +68,7 @@ export default auth(function middleware(request) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ ok: false, error: "Not allowed" }, { status: 403 });
     }
-    return NextResponse.redirect(new URL("/signin?error=scope", request.nextUrl));
+    return NextResponse.redirect(new URL("/login?error=scope", request.nextUrl));
   }
 
   // Se BORRAN antes de escribirlas. Sin esto, cualquiera podria mandar

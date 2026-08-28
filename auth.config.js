@@ -38,5 +38,9 @@ export default {
     },
   },
 
-  pages: { signIn: "/signin", error: "/signin" },
+  pages: {
+    signIn: "/login",
+    signOut: "/signout",
+    error: "/login",
+  },
 };

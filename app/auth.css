@@ -1,0 +1,264 @@
+/* ==========================================================================
+   SHIFT auth screens (login + signout)
+   Scoped under .auth-* so nothing here leaks into the dashboard,
+   the .wk-legacy WeekView scope, or the daily email markup.
+   ========================================================================== */
+
+.auth-page {
+  --auth-cream: #fff7d2;
+  --auth-gold: #f8e27e;
+  --auth-coffee: #8b6a51;
+  --auth-paper: #fbf7f2;
+  --auth-ink: #3b2a1e;
+  --auth-ink-soft: #7a6553;
+  --auth-line: rgba(139, 106, 81, 0.16);
+  --auth-danger: #a32020;
+  --auth-danger-bg: #fdecec;
+  --auth-radius: 20px;
+
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--auth-paper) 0%, var(--auth-cream) 100%);
+  color: var(--auth-ink);
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.auth-page *,
+.auth-page *::before,
+.auth-page *::after { box-sizing: border-box; }
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid var(--auth-line);
+  border-radius: var(--auth-radius);
+  padding: 40px 36px 28px;
+  box-shadow:
+    0 1px 2px rgba(59, 42, 30, 0.04),
+    0 12px 32px -12px rgba(59, 42, 30, 0.18);
+  animation: auth-card-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes auth-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.auth-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.auth-mark {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--auth-ink);
+}
+
+.auth-mark svg,
+.auth-mark img { height: 100%; width: auto; display: block; }
+
+.auth-wordmark {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+  line-height: 1;
+  color: var(--auth-ink);
+}
+
+.auth-tagline {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--auth-ink-soft);
+}
+
+/* Signature: 24 ticks, one per hour. Trading hours gold, current hour filled.
+   Echoes the hour-by-hour grid the rest of SHIFT is built around. */
+
+.auth-band {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 3px;
+  height: 22px;
+  margin: 26px 0 24px;
+}
+
+.auth-band-tick {
+  flex: 1 1 0;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--auth-line);
+  transform-origin: bottom center;
+  animation: auth-tick-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(160ms + var(--i) * 14ms);
+}
+
+.auth-band-tick.is-open { background: var(--auth-gold); height: 14px; }
+.auth-band-tick.is-now  { background: var(--auth-coffee); height: 22px; }
+
+@keyframes auth-tick-in {
+  from { opacity: 0; transform: scaleY(0.2); }
+  to   { opacity: 1; transform: none; }
+}
+
+.auth-actions { display: flex; flex-direction: column; gap: 10px; }
+
+.auth-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.auth-btn:active { transform: translateY(1px); }
+.auth-btn:focus-visible { outline: 2px solid var(--auth-coffee); outline-offset: 3px; }
+
+.auth-btn-primary { background: var(--auth-ink); color: #fff; }
+.auth-btn-primary:hover { background: #4d3928; }
+
+.auth-btn-secondary {
+  background: #fff;
+  color: var(--auth-ink);
+  border-color: var(--auth-line);
+}
+.auth-btn-secondary:hover { background: var(--auth-paper); border-color: var(--auth-coffee); }
+
+.auth-ms-logo { width: 18px; height: 18px; flex: none; }
+
+.auth-body { text-align: center; margin: 0 0 22px; }
+
+.auth-title {
+  margin: 0 0 8px;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--auth-ink);
+}
+
+.auth-note {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--auth-ink-soft);
+}
+
+.auth-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 12px 14px;
+  margin: 0 0 20px;
+  border: 1px solid var(--auth-line);
+  border-radius: 12px;
+  background: var(--auth-paper);
+}
+
+.auth-avatar {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--auth-gold);
+  color: var(--auth-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.auth-user-text { min-width: 0; display: flex; flex-direction: column; }
+
+.auth-user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--auth-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auth-user-email {
+  font-size: 12.5px;
+  color: var(--auth-ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.auth-error {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  margin: 0 0 18px;
+  border-radius: 12px;
+  background: var(--auth-danger-bg);
+  border: 1px solid rgba(163, 32, 32, 0.18);
+  color: var(--auth-danger);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.auth-error svg { flex: none; margin-top: 1px; }
+
+.auth-foot {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--auth-line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.auth-foot-mark { height: 26px; color: var(--auth-coffee); opacity: 0.85; }
+.auth-foot-mark svg,
+.auth-foot-mark img { height: 100%; width: auto; display: block; }
+
+.auth-foot-text {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--auth-ink-soft);
+}
+
+@media (max-width: 440px) {
+  .auth-card { padding: 32px 22px 24px; border-radius: 16px; }
+  .auth-wordmark { font-size: 29px; }
+  .auth-band { gap: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-card, .auth-band-tick { animation: none; }
+  .auth-btn { transition: none; }
+}
