@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { auth, signOut } from '@/auth';
+import { auth } from '@/auth';
 import AuthShell from '@/components/AuthShell';
+import { endSession } from './actions';
 import '../auth.css';
 
 export const metadata = { title: 'Sign out of SHIFT' };
@@ -21,11 +22,6 @@ export default async function SignOutPage({ searchParams }) {
   // Signed out and not just-signed-out means a stale or bookmarked link.
   if (!session?.user && !isDone) {
     redirect('/login');
-  }
-
-  async function endSession() {
-    'use server';
-    await signOut({ redirectTo: '/signout?done=1' });
   }
 
   if (isDone) {

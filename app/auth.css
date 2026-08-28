@@ -57,6 +57,7 @@
   align-items: center;
   text-align: center;
   gap: 14px;
+  margin-bottom: 32px;
 }
 
 .auth-mark {
@@ -85,36 +86,6 @@
   font-size: 13.5px;
   font-weight: 400;
   color: var(--auth-ink-soft);
-}
-
-/* Signature: 24 ticks, one per hour. Trading hours gold, current hour filled.
-   Echoes the hour-by-hour grid the rest of SHIFT is built around. */
-
-.auth-band {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 3px;
-  height: 22px;
-  margin: 26px 0 24px;
-}
-
-.auth-band-tick {
-  flex: 1 1 0;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--auth-line);
-  transform-origin: bottom center;
-  animation: auth-tick-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(160ms + var(--i) * 14ms);
-}
-
-.auth-band-tick.is-open { background: var(--auth-gold); height: 14px; }
-.auth-band-tick.is-now  { background: var(--auth-coffee); height: 22px; }
-
-@keyframes auth-tick-in {
-  from { opacity: 0; transform: scaleY(0.2); }
-  to   { opacity: 1; transform: none; }
 }
 
 .auth-actions { display: flex; flex-direction: column; gap: 10px; }
@@ -255,10 +226,9 @@
 @media (max-width: 440px) {
   .auth-card { padding: 32px 22px 24px; border-radius: 16px; }
   .auth-wordmark { font-size: 29px; }
-  .auth-band { gap: 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-card, .auth-band-tick { animation: none; }
+  .auth-card { animation: none; }
   .auth-btn { transition: none; }
 }
