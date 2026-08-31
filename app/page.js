@@ -5,7 +5,6 @@ import "./globals.css";
 
 import Icon from "../components/Icon";
 import ShiftLogo from "../components/ShiftLogo";
-import Login from "../components/Login";
 import WeekView from "../components/WeekView";
 import Targets from "../components/Targets";
 import EmailPreview from "../components/EmailPreview";
