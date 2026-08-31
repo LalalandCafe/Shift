@@ -42,8 +42,9 @@ const SORTS = {
  * because that is the window the bonus is paid on. Review count comes first
  * because the count is what tells you whether the rating is worth reading at
  * all. The Bonus column itself has been removed from this table: which tier
- * a rating earns is compensation information, not an operating metric, and it
- * stays on the Leaderboard instead.
+ * a rating earns is compensation information, not an operating metric. It
+ * does not appear anywhere in this app anymore — the Leaderboard dropped it
+ * too, the day after it left this view.
  *
  * The (Over)/Under headers use an explicit <br /> instead of relying on the
  * browser to find a break point. Neither header has a space before the
