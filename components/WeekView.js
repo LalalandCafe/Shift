@@ -4,13 +4,7 @@ import { Fragment, useState } from "react";
 import Icon from "./Icon";
 import { sectionize, money, int, paren, clockTime } from "../lib/ui";
 import { bandForRating, styleOfBand } from "../lib/scale";
-
-/**
- * Reviews below this count are shown but greyed out. Two or three reviews say
- * more about who happened to post than about the store, and rank is not
- * decided on that kind of sample.
- */
-const MIN_REVIEWS = 5;
+import { MIN_REVIEWS_TO_RANK, weightedRating } from "../lib/leaderboard";
 
 /**
  * Sortable columns. Region grouping is the default and is what the daily
@@ -90,7 +84,7 @@ function Flag({ flags }) {
  */
 function ratingCellStyle(rev) {
   if (!rev || rev.rating === null) return undefined;
-  if (rev.count < MIN_REVIEWS) return undefined;
+  if (rev.count < MIN_REVIEWS_TO_RANK) return undefined;
   return styleOfBand(bandForRating(rev.rating));
 }
 
@@ -126,21 +120,20 @@ export default function WeekView({ report, loading, error, groupFilter, search }
       });
     sections = flat.length ? [{ label: null, stores: flat }] : [];
   }
-  const totals = rows.reduce(
+  // Summary tiles must reflect whatever is actually in the table below them,
+  // region filter and search included - not the whole chain regardless of view.
+  const visibleStores = sections.flatMap((sec) => sec.stores);
+  const totals = visibleStores.reduce(
     (a, r) => ({ hours: a.hours + r.day.hours, sales: a.sales + r.day.sales }),
     { hours: 0, sales: 0 }
   );
   const totalSplh = totals.hours > 0 ? Math.round(totals.sales / totals.hours) : 0;
 
   // Chain rating for the period, weighted by review count so a store with
-  // four reviews does not swing the company number.
-  const rated = rows
-    .map((r) => r.reviews?.period)
-    .filter((r) => r && r.rating !== null && r.count > 0);
-  const reviewTotal = rated.reduce((a, r) => a + r.count, 0);
-  const chainRating = reviewTotal
-    ? rated.reduce((a, r) => a + r.rating * r.count, 0) / reviewTotal
-    : null;
+  // four reviews does not swing the company number. Company-wide by design,
+  // not scoped to the region filter - shared with the Leaderboard so the two
+  // never quietly disagree.
+  const { rating: chainRating, count: reviewTotal } = weightedRating(rows, "period");
 
   return (
     <div className="wk-legacy">
@@ -321,7 +314,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                   )}
                   {sec.stores.map((s) => {
                     const rev = s.reviews?.period || null;
-                    const thin = rev && rev.count < MIN_REVIEWS;
+                    const thin = rev && rev.count < MIN_REVIEWS_TO_RANK;
                     return (
                       <tr key={s.code}>
                         <td>
@@ -409,7 +402,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
             {sec.label && <div className="scard-region-head">{sec.label}</div>}
             {sec.stores.map((s) => {
               const rev = s.reviews?.period || null;
-              const thin = rev && rev.count < MIN_REVIEWS;
+              const thin = rev && rev.count < MIN_REVIEWS_TO_RANK;
               return (
                 <div className={"store-card " + (s.day.ok ? "ok" : "bad")} key={s.code}>
                   <div className="store-card-head">

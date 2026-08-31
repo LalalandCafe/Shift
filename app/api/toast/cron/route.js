@@ -84,8 +84,10 @@ async function syncOneStore(storeCode, restaurantGuid, businessDate, isoDate) {
 
 export async function GET(request) {
   try {
+    // Falla cerrado: un CRON_SECRET ausente no puede degradar en "sin
+    // chequeo para nadie", que es como quedaba esto antes.
     const auth = request.headers.get("authorization");
-    if (process.env.CRON_SECRET && auth !== "Bearer " + process.env.CRON_SECRET) {
+    if (!process.env.CRON_SECRET || auth !== "Bearer " + process.env.CRON_SECRET) {
       return Response.json({ ok: false, error: "No autorizado" }, { status: 401 });
     }
 

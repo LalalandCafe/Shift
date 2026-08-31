@@ -40,6 +40,66 @@ function localHour(formatter, date) {
   return Number.isInteger(h) && h >= 0 && h <= 23 ? h : null;
 }
 
+// Convierte una hora de reloj local (en una zona IANA) al instante UTC que
+// representa, con el truco estandar de doble conversion: se adivina un UTC
+// igual al reloj local, se formatea ese UTC EN la zona destino para ver que
+// hora de reloj resulto, y la diferencia es el offset real de esa zona en
+// ese instante. Nunca se le pide resolver las 2am de un cambio de horario
+// (la unica hora ambigua o inexistente en un DST de EE.UU.): startOfLocalDay
+// solo pide medianoche, que nunca cae en esa hora.
+function zonedWallClockToUtcMs(isoDate, timeStr, timeZone) {
+  const guessUtc = new Date(`${isoDate}T${timeStr}.000Z`);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const map = {};
+  fmt.formatToParts(guessUtc).forEach((p) => {
+    if (p.type !== "literal") map[p.type] = p.value;
+  });
+  const asIfUtc = new Date(
+    `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}.000Z`
+  );
+  return guessUtc.getTime() + (guessUtc.getTime() - asIfUtc.getTime());
+}
+
+function addDaysIso(isoDate, n) {
+  const d = new Date(isoDate + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Formatea un instante UTC en milisegundos como lo manda Toast: offset
+// numerico de 4 digitos, no "Z". Mismo valor, mismo formato que Toast ya
+// nos envia en sus propias fechas (ver parseToastDate arriba), para no
+// introducir una forma que nunca se probo contra su API.
+function toToastUtcString(ms) {
+  return new Date(ms).toISOString().replace("Z", "+0000");
+}
+
+// Medianoche a medianoche en la zona real de la tienda, no un offset fijo.
+// -0500 coincidia por casualidad con Texas/Tennessee en verano, pero es 2-3
+// horas incorrecto todo el año para California y Arizona, y se vuelve
+// incorrecto para Texas/Tennessee tambien en cuanto termina el horario de
+// verano. Un turno cerca de medianoche local ya se contaba bien en el
+// reporte (report.js/throughput.js recalculan el dia real de cada turno con
+// la zona de la tienda al leer), pero la ventana que se le pedia a Toast y
+// la que decidia que fila borrar como huerfana no eran esa misma zona.
+function localDayWindowForToast(isoDate, timeZone) {
+  const startMs = zonedWallClockToUtcMs(isoDate, "00:00:00", timeZone);
+  const nextMidnightMs = zonedWallClockToUtcMs(addDaysIso(isoDate, 1), "00:00:00", timeZone);
+  return {
+    startDate: toToastUtcString(startMs),
+    endDate: toToastUtcString(nextMidnightMs - 1000),
+  };
+}
+
 // Cuenta checks cerrados (no orders). Un check = una transaccion real de
 // cliente pagando, misma unidad que usa gross sales. Si se contara por
 // order, una mesa que se divide la cuenta en varios checks se subcontaria.
@@ -219,6 +279,12 @@ export async function POST(request) {
     }
 
     const started = Date.now();
+    // Marca de tiempo de ARRANQUE de esta corrida, capturada antes de tocar
+    // Toast o la base. Se usa mas abajo para decidir que filas de labor son
+    // huerfanas: cualquier fila con synced_at anterior a esta marca no la
+    // toco NINGUNA corrida (ni esta ni una corriendo en paralelo) desde que
+    // esta empezo, asi que es segura de borrar.
+    const runStartedAt = new Date(started).toISOString();
 
     // La zona horaria se lee aqui y no se pide en el body a proposito: asi
     // los dos crons que ya llaman a este endpoint no cambian, y la tienda
@@ -235,8 +301,13 @@ export async function POST(request) {
     // Esta ventana se usa para DOS cosas: pedirle los turnos a Toast y
     // decidir que filas borrar. Tienen que ser identicas, si no se borran
     // turnos legitimos de la jornada anterior.
-    const startDate = isoDate + "T00:00:00.000-0500";
-    const endDate = isoDate + "T23:59:59.000-0500";
+    //
+    // Medianoche a medianoche en la zona REAL de la tienda (ya resuelta
+    // arriba), no un offset fijo. Un -0500 fijo coincidia por casualidad con
+    // Texas/Tennessee en horario de verano, pero es 2-3 horas incorrecto
+    // todo el año para California y Arizona, y se vuelve incorrecto tambien
+    // para Texas/Tennessee en cuanto cambia el horario en noviembre.
+    const { startDate, endDate } = localDayWindowForToast(isoDate, timezone);
 
     const token = await getToastToken();
 
@@ -276,35 +347,38 @@ export async function POST(request) {
       synced_at: new Date().toISOString(),
     }));
 
+    // El upsert va SIEMPRE primero. Con el orden anterior (leer huerfanos ->
+    // borrar -> upsert), un crash entre el borrado y el upsert dejaba a la
+    // tienda sin ninguna fila de labor para ese dia hasta el proximo sync -
+    // perdida real, no solo temporal. Con este orden, el peor caso de un
+    // crash a mitad de camino es una fila vieja que sigue un ciclo mas de lo
+    // necesario: nunca una fila legitima desaparecida.
+    //
+    // La limpieza de huerfanos se decide por synced_at, no por pertenencia
+    // al set que ESTA corrida acaba de traer de Toast. Dos corridas sobre el
+    // mismo dia (un dispatch manual mientras corre el cron, o el daily sync
+    // pisando al weekly reload) siempre escriben con su propio synced_at,
+    // que es >= su propio arranque - asi que ninguna puede borrar lo que la
+    // otra acaba de escribir, sin importar cual arranco primero o cual
+    // termina despues. Comparar solo por ID no daba esa garantia: si la
+    // corrida A no traia un turno que la corrida B si trajo (Toast cambio
+    // entre medio), A podia borrar ese turno pensando que era huerfano.
     let deletedStale = 0;
     if (laborRows.length) {
-      const keepIds = new Set(laborRows.map((r) => r.toast_entry_id));
-
-      const { data: existing, error: exErr } = await supabaseAdmin
-        .from("toast_labor_shifts")
-        .select("toast_entry_id")
-        .eq("store_id", String(storeCode))
-        .gte("clock_in", startDate)
-        .lte("clock_in", endDate);
-      if (exErr) throw new Error("Leer existentes fallo: " + exErr.message);
-
-      const stale = (existing || [])
-        .map((r) => r.toast_entry_id)
-        .filter((id) => !keepIds.has(id));
-
-      if (stale.length) {
-        const { error: delErr } = await supabaseAdmin
-          .from("toast_labor_shifts")
-          .delete()
-          .in("toast_entry_id", stale);
-        if (delErr) throw new Error("Borrar huerfanos fallo: " + delErr.message);
-        deletedStale = stale.length;
-      }
-
       const { error: laborErr } = await supabaseAdmin
         .from("toast_labor_shifts")
         .upsert(laborRows, { onConflict: "toast_entry_id" });
       if (laborErr) throw new Error("Guardar labor fallo: " + laborErr.message);
+
+      const { error: delErr, count: deletedCount } = await supabaseAdmin
+        .from("toast_labor_shifts")
+        .delete({ count: "exact" })
+        .eq("store_id", String(storeCode))
+        .gte("clock_in", startDate)
+        .lte("clock_in", endDate)
+        .lt("synced_at", runStartedAt);
+      if (delErr) throw new Error("Borrar huerfanos fallo: " + delErr.message);
+      deletedStale = deletedCount || 0;
     }
 
     const { error: salesErr } = await supabaseAdmin
@@ -412,8 +486,18 @@ export async function POST(request) {
       }
     }
 
+    // labor y ventas ya son un hecho consumado si llegamos aca: cualquier
+    // falla en esas dos tira un throw mas arriba y corta todo antes de
+    // escribir nada (comportamiento sin cambios). transactions y hourly
+    // SI pueden fallar sin cortar el resto (kitchen tambien, y ademas puede
+    // saltarse a proposito) - pero un ok:true con esos dos en error dejaba
+    // creer que la corrida cubrio esta tienda cuando en realidad faltan
+    // datos que el TPLH y la curva por hora si necesitan. La verificacion de
+    // cobertura en el workflow depende de que este campo sea honesto.
+    const ok = !transactionError && !hourlyError;
+
     return Response.json({
-      ok: true,
+      ok,
       storeCode,
       date: isoDate,
       timezone,
@@ -431,6 +515,18 @@ export async function POST(request) {
       stationCount,
       kitchenSkipped: !!skipKitchen,
       kitchenError,
+      writes: {
+        labor: { ok: true, rowsSynced: laborRows.length, staleRemoved: deletedStale },
+        sales: { ok: true, grossSales },
+        transactions: { ok: !transactionError, count: transactionCount, error: transactionError },
+        hourly: { ok: !hourlyError, rowsWritten: hourlyRowsWritten, error: hourlyError },
+        // Cocina es deliberadamente aparte: opcional desde siempre (se puede
+        // saltar con skipKitchen, o Toast puede no tener nada que devolver),
+        // y su falla nunca tumbo el sync ni debe tumbar "ok" ahora.
+        kitchen: skipKitchen
+          ? { ok: true, skipped: true }
+          : { ok: !kitchenError, skipped: false, stationCount, error: kitchenError },
+      },
     });
   } catch (err) {
     return Response.json({ ok: false, error: err.message }, { status: 500 });

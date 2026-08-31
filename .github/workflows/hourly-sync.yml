@@ -37,6 +37,7 @@ jobs:
           ISO="${{ steps.fecha.outputs.iso }}"
           BUSINESS="${{ steps.fecha.outputs.business }}"
           OK=0; FAIL=0; FAILED_LIST=""
+          : > synced-codes.txt
 
           # Resolved once and printed to the summary below, never the secret.
           APP_HOST=$(echo "${{ secrets.APP_URL }}" | sed -E 's#^[a-zA-Z]+://##; s#/.*##')
@@ -54,7 +55,9 @@ jobs:
               HTTP=$(echo "$RESP" | tail -n1)
               BODY=$(echo "$RESP" | sed '$d')
               # A 200 only counts as success if the body agrees, not just the
-              # HTTP status.
+              # HTTP status. ok now reflects the transactions/hourly writes
+              # too (see app/api/toast/sync-store/route.js), not just labor
+              # and sales, so this check is finally trustworthy end to end.
               BODY_OK=$(echo "$BODY" | jq -r '.ok // false' 2>/dev/null || echo false)
               if [ "$HTTP" = "200" ] && [ "$BODY_OK" = "true" ]; then SUCCESS=1; break; fi
               sleep 4
@@ -62,6 +65,7 @@ jobs:
 
             if [ "$SUCCESS" = "1" ]; then
               OK=$((OK+1))
+              echo "$CODE" >> synced-codes.txt
             else
               FAIL=$((FAIL+1)); FAILED_LIST="$FAILED_LIST $CODE"
               echo "::error::Store $CODE failed in the live sync for $ISO"
@@ -77,3 +81,34 @@ jobs:
             echo "Fallidas:$FAILED_LIST" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+
+      - name: Verificar cobertura completa
+        run: |
+          # La lista de tiendas a intentar (paso "Traer tiendas") ya viene
+          # filtrada por toast_guid: una tienda recien abierta a la que se le
+          # olvido cargar el GUID nunca aparece ahi, nunca falla, y nunca se
+          # nota. Esta verificacion compara contra CADA fila de stores, sin
+          # filtro - la unica fuente de verdad de que tiendas estan abiertas -
+          # para que ese olvido sea un rojo, no un silencio.
+          curl -s "${{ secrets.SUPABASE_URL }}/rest/v1/stores?select=code" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -o all-stores.json
+          jq -r '.[].code' all-stores.json | sort -n > expected-codes.txt
+          sort -n synced-codes.txt | uniq > actual-codes.txt
+          EXPECTED_COUNT=$(wc -l < expected-codes.txt)
+          ACTUAL_COUNT=$(wc -l < actual-codes.txt)
+          MISSING=$(comm -23 expected-codes.txt actual-codes.txt)
+
+          echo "### Cobertura $ISO" >> $GITHUB_STEP_SUMMARY
+          echo "Tiendas en la tabla stores: $EXPECTED_COUNT · Sincronizadas esta corrida: $ACTUAL_COUNT" >> $GITHUB_STEP_SUMMARY
+
+          if [ -n "$MISSING" ]; then
+            MISSING_LIST=$(echo "$MISSING" | tr '\n' ' ')
+            echo "::error::Cobertura incompleta: faltan las tiendas$MISSING_LIST de $EXPECTED_COUNT esperadas"
+            echo "Faltan: $MISSING_LIST" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          echo "Cobertura completa: $ACTUAL_COUNT/$EXPECTED_COUNT tiendas"
+        env:
+          ISO: ${{ steps.fecha.outputs.iso }}
