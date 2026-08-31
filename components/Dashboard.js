@@ -5,7 +5,7 @@ import Icon from "./Icon";
 import CupMedal from "./CupMedal";
 import EfficiencyQuadrant from "./EfficiencyQuadrant";
 import { GROUPS, money, int } from "../lib/ui";
-import { bandForRating, inkOfBand, REVIEW_TIERS, RATING_TARGET } from "../lib/scale";
+import { bandForRating, inkOfBand, REVIEW_TIERS } from "../lib/scale";
 import { scoreStores, weightedRating, MIN_REVIEWS_TO_RANK } from "../lib/leaderboard";
 
 /**
@@ -284,7 +284,7 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
               ? null
               : chain.rating >= TOP_LINE
               ? "pos"
-              : chain.rating >= RATING_TARGET
+              : chain.rating >= REVIEW_TIERS.baseOnly
               ? "warn"
               : "neg"
           }
@@ -479,9 +479,9 @@ export default function Dashboard({ isoDate, report, onNavigate }) {
                     >
                       {rev.rating.toFixed(2)}
                       <span>
-                        {rev.rating >= RATING_TARGET
+                        {rev.rating >= REVIEW_TIERS.baseOnly
                           ? `+${(TOP_LINE - rev.rating).toFixed(2)} to ${TOP_LINE.toFixed(2)}`
-                          : `under ${RATING_TARGET.toFixed(2)}`}
+                          : `under ${REVIEW_TIERS.baseOnly.toFixed(2)}`}
                       </span>
                     </div>
                   </button>

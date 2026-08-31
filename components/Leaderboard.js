@@ -4,11 +4,12 @@ import { useState } from "react";
 import Icon from "./Icon";
 import CupMedal from "./CupMedal";
 import { GROUPS, median } from "../lib/ui";
-import { bandForRating, inkOfBand, reviewLegend, RATING_TARGET } from "../lib/scale";
+import { bandForRating, inkOfBand, reviewLegend } from "../lib/scale";
 import {
   scoreStores,
   rankableRating,
   MIN_REVIEWS_TO_RANK,
+  RATING_TARGET,
 } from "../lib/leaderboard";
 
 /**
