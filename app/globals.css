@@ -1719,6 +1719,9 @@ table.stores tr:hover td {
 .desktop-table {
   display: block;
 }
+.wk-mobile-controls {
+  display: none;
+}
 .mobile-nav {
   display: none;
 }
@@ -3658,6 +3661,15 @@ table.stores tr:hover td {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+/* Week/sync banner - these were inline font-size values (13px/12px);
+   moved here so the mobile override below can target them without
+   !important. Desktop rendering is unchanged, just relocated. */
+.wk-banner-info {
+  font-size: 13px;
+}
+.wk-banner-status {
+  font-size: 12px;
+}
 
 /* ============================================================
    breakpoints
@@ -3693,6 +3705,15 @@ table.stores tr:hover td {
   }
   .mobile-cards {
     display: block;
+  }
+  /* Same breakpoint as .mobile-cards above, so the sort/rating controls
+     appear exactly when the cards they act on do. */
+  .wk-mobile-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
   }
   .content {
     padding: 14px 12px calc(28px + env(safe-area-inset-bottom));
@@ -4151,16 +4172,37 @@ table.stores tr:hover td {
   .wk-legacy .scard-row {
     gap: 5px;
   }
+  /* Label above value (two stacked lines) was the single biggest cost
+     in each card - flexing label+value onto one row cuts each cell's
+     content height roughly in half. Baseline-aligned so the smaller
+     label and larger value sit on a shared text line rather than
+     centering awkwardly. No white-space:nowrap here on purpose: a long
+     label ("(Over)/Under") is allowed to wrap rather than risk
+     overflowing into the next cell the way the Store detail forecast
+     row did before that was fixed. */
   .wk-legacy .scard-cell {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px;
     padding: 6px 5px;
     border-radius: 6px;
   }
   .wk-legacy .scard-cell-lbl {
     font-size: 8px;
-    margin-bottom: 1px;
+    margin-bottom: 0;
   }
   .wk-legacy .scard-cell-val {
     font-size: 12.5px;
+    text-align: right;
+  }
+  /* The "thin sample" rating cell became tap-to-reveal (item 15); the
+     row layout above brought .scard-cell to ~31px, under the 44px
+     floor. Only this one cell needs the extra height - the Reviews
+     Count cell beside it in the same 2-col grid row grows to match,
+     which is fine, that row just ends up a touch taller than the rest. */
+  .wk-legacy .scard-cell-tappable {
+    min-height: 44px;
   }
   .wk-legacy .scard-region-head {
     font-size: 10.5px;
@@ -4168,13 +4210,15 @@ table.stores tr:hover td {
     margin: 12px 0 7px;
     border-radius: 6px;
   }
-  /* The week and sync banner. This selector is positional and needs
-     !important to beat an inline font-size, which makes it fragile:
-     it breaks the moment WeekView.js gains a wrapper div. Give that
-     banner a class (.wk-banner) and this rule can lose both. */
+  /* The week/sync banner's two pieces (.wk-banner-info, .wk-banner-status)
+     now own their font-size outright - it used to be set inline, which is
+     why the old rule needed !important to beat it. Base (desktop) sizes
+     that used to be inline are set unscoped below; this is just the
+     mobile override, no !important or positional selector needed. */
   .wk-legacy .ctx-block,
-  .wk-legacy > div:first-child > div {
-    font-size: 11.5px !important;
+  .wk-banner-info,
+  .wk-banner-status {
+    font-size: 11.5px;
   }
 
   /* ---- mobile nav drawer: the sidebar is display:none below 900px,

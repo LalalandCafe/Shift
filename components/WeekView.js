@@ -92,6 +92,11 @@ function ratingCellStyle(rev) {
 export default function WeekView({ report, loading, error, groupFilter, search }) {
   // null means the original region grouping, untouched.
   const [sort, setSort] = useState(null);
+  // Tracks which store's "thin sample" caveat is expanded on tap - the
+  // desktop table still shows it via the title tooltip (works fine with
+  // a mouse), but tooltips never fire on touch, so the mobile card gets
+  // this as a tap-to-reveal instead. Only one open at a time.
+  const [thinOpen, setThinOpen] = useState(null);
 
   function onSort(key) {
     setSort((cur) => {
@@ -138,14 +143,14 @@ export default function WeekView({ report, loading, error, groupFilter, search }
 
   return (
     <div className="wk-legacy">
-      <div style={{ marginBottom: 17 }}>
+      <div className="wk-banner" style={{ marginBottom: 17 }}>
         <div
+          className="wk-banner-info"
           style={{
             background: "var(--surface-3)",
             color: "var(--text)",
             padding: "8px 16px",
             borderRadius: 10,
-            fontSize: 13,
             display: "inline-block",
             verticalAlign: "top",
           }}
@@ -162,6 +167,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
         </div>
         {report.isLive ? (
           <div
+            className="wk-banner-status"
             style={{
               display: "inline-block",
               marginLeft: 10,
@@ -169,7 +175,6 @@ export default function WeekView({ report, loading, error, groupFilter, search }
               color: "#fff",
               padding: "8px 14px",
               borderRadius: 10,
-              fontSize: 12,
               verticalAlign: "top",
             }}
           >
@@ -182,6 +187,7 @@ export default function WeekView({ report, loading, error, groupFilter, search }
           </div>
         ) : (
           <div
+            className="wk-banner-status"
             style={{
               display: "inline-block",
               marginLeft: 10,
@@ -189,7 +195,6 @@ export default function WeekView({ report, loading, error, groupFilter, search }
               color: "var(--text2)",
               padding: "8px 14px",
               borderRadius: 10,
-              fontSize: 12,
               verticalAlign: "top",
             }}
           >
@@ -397,6 +402,55 @@ export default function WeekView({ report, loading, error, groupFilter, search }
         </div>
       </div>
 
+      {/* Same sort state and rating chip as .thead-tools above, just
+          rendered outside .desktop-table so mobile can reach them too -
+          .desktop-table is display:none at <=900px and there was no
+          mobile equivalent. .mobile-cards below already reflects `sort`
+          (both read from the same `sections`), this just adds the
+          controls to change it. */}
+      <div className="wk-mobile-controls">
+        {chainRating !== null && (
+          <span
+            className="chip"
+            style={{
+              ...styleOfBand(bandForRating(chainRating)),
+              border: "none",
+            }}
+            title={`${reviewTotal} Google and Yelp reviews in period ${report.period}`}
+          >
+            P{report.period} {chainRating.toFixed(2)} ★
+          </span>
+        )}
+        <div className="seg">
+          <button
+            className={"seg-btn" + (!sort ? " active" : "")}
+            onClick={() => setSort(null)}
+          >
+            By region
+          </button>
+          <button
+            className={
+              "seg-btn seg-green" +
+              (sort && sort.key === "gap" && sort.dir === "desc" ? " active" : "")
+            }
+            onClick={() => setSort({ key: "gap", dir: "desc" })}
+          >
+            <span className="seg-dot green" />
+            Green first
+          </button>
+          <button
+            className={
+              "seg-btn seg-red" +
+              (sort && sort.key === "gap" && sort.dir === "asc" ? " active" : "")
+            }
+            onClick={() => setSort({ key: "gap", dir: "asc" })}
+          >
+            <span className="seg-dot red" />
+            Red first
+          </button>
+        </div>
+      </div>
+
       <div className="mobile-cards">
         {sections.map((sec) => (
           <div key={sec.label || "ranked"}>
@@ -509,13 +563,23 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                           <div className="scard-cell-val">{rev.count}</div>
                         </div>
                         <div
-                          className="scard-cell"
-                          style={ratingCellStyle(rev)}
+                          className={"scard-cell" + (thin ? " scard-cell-tappable" : "")}
+                          style={{ ...ratingCellStyle(rev), cursor: thin ? "pointer" : undefined }}
                           title={thin ? `Only ${rev.count} reviews` : undefined}
+                          onClick={
+                            thin
+                              ? () => setThinOpen(thinOpen === s.code ? null : s.code)
+                              : undefined
+                          }
                         >
                           <div className="scard-cell-lbl">PTD Rating</div>
                           <div className="scard-cell-val">{rev.rating.toFixed(2)}</div>
                         </div>
+                      </div>
+                    )}
+                    {thin && thinOpen === s.code && (
+                      <div style={{ fontSize: 10.5, color: "var(--text3)", marginTop: 5 }}>
+                        Only {rev.count} reviews this period - rating may not be reliable yet.
                       </div>
                     )}
                     {rev && rev.unanswered > 0 && (
