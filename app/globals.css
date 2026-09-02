@@ -3990,4 +3990,94 @@ table.stores tr:hover td {
     border-left: none;
     border-top: 1px solid var(--line);
   }
+
+  /* ============================================================
+     mobile density pass
+     Every value here lives on .shift-dense, never on :root, so a
+     component only gets it by opting in (Leaderboard.js, DriveThru.js).
+     WeekView.js/.wk-legacy never carries that class and this whole
+     block is itself gated to <=640px, so desktop and the frozen week
+     view are structurally unreachable from here. The reset below is
+     a second line of defense in case .wk-legacy and .shift-dense are
+     ever nested in the same subtree.
+     ============================================================ */
+  .shift-dense {
+    --d-pad: 10px;
+    --d-gap: 8px;
+    --d-radius: 12px;
+    --d-metric-fs: 19px;
+    --d-label-fs: 9px;
+    --d-label-ls: 0.05em;
+  }
+  .wk-legacy {
+    --d-pad: 16px;
+    --d-gap: 12px;
+    --d-radius: 14px;
+    --d-metric-fs: 25px;
+    --d-label-fs: 9.5px;
+    --d-label-ls: 0.08em;
+  }
+
+  /* ---- metric cards: leaderboard header tiles, drive-thru KPI row ---- */
+  .shift-dense .mc-grid {
+    gap: var(--d-gap);
+  }
+  .shift-dense .mc {
+    padding: var(--d-pad);
+    border-radius: var(--d-radius);
+  }
+  .shift-dense .mc-l {
+    font-size: var(--d-label-fs);
+    letter-spacing: var(--d-label-ls);
+  }
+  .shift-dense .mc-v {
+    font-size: var(--d-metric-fs);
+  }
+
+  /* ---- leaderboard rows
+     The goal bar moves from hidden to tucked under the name (its own
+     grid row, not its own row of vertical space) and the rank badge
+     shrinks, taking the row from ~88px down to ~56px. Still a real
+     tap target: min-height keeps it at 44px or more. */
+  .shift-dense .lb-row {
+    grid-template-columns: 20px minmax(0, 1fr) 50px 34px;
+    grid-template-areas:
+      "rank name rating pct"
+      "rank goal goal goal";
+    row-gap: 3px;
+    column-gap: var(--d-gap);
+    padding: 9px 10px;
+    min-height: 44px;
+  }
+  .shift-dense .lb-rank {
+    grid-area: rank;
+    font-size: 9.5px;
+    padding: 2px 0;
+    border-radius: 5px;
+    align-self: start;
+  }
+  .shift-dense .lb-name {
+    grid-area: name;
+    font-size: 12px;
+  }
+  .shift-dense .lb-meta {
+    font-size: 9.5px;
+  }
+  .shift-dense .lb-rating {
+    grid-area: rating;
+    justify-self: end;
+  }
+  .shift-dense .lb-rating b {
+    font-size: 11px;
+  }
+  .shift-dense .lb-pct {
+    grid-area: pct;
+    font-size: 12.5px;
+  }
+  .shift-dense .lb-row .lb-goal {
+    grid-area: goal;
+    display: block;
+    height: 5px;
+    margin-top: 2px;
+  }
 }

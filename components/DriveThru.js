@@ -229,7 +229,7 @@ export default function DriveThru() {
   const legend = bandLegend(cfg, fmtSeconds);
 
   return (
-    <div>
+    <div className="shift-dense">
       {/* Window selector */}
       <div
         style={{

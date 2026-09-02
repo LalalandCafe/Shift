@@ -218,7 +218,7 @@ export default function Leaderboard({ report }) {
   }
 
   return (
-    <div className="view">
+    <div className="view shift-dense">
       <div className="ctx">
         <div className="ctx-block">
           <div>
