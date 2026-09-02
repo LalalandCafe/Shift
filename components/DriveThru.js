@@ -264,6 +264,7 @@ export default function DriveThru() {
 
       {/* Store cards, click to switch. Fixed order by store number. */}
       <div
+        className="dt-store-grid"
         style={{
           display: "grid",
           gridTemplateColumns: `repeat(${Math.min(summary.stores.length, 4)}, 1fr)`,
@@ -436,7 +437,7 @@ export default function DriveThru() {
             tap any day for the hour by hour
           </span>
         </div>
-        <div style={{ padding: 16, overflowX: "auto" }}>
+        <div className="dt-cal-scroll" style={{ padding: 16, overflowX: "auto" }}>
           <div
             style={{
               display: "grid",
@@ -574,6 +575,7 @@ export default function DriveThru() {
           </span>
           {selectedDay && (
             <button
+              className="dt-back-btn"
               onClick={() => setSelectedDay(null)}
               style={{
                 padding: "4px 12px",

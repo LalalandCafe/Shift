@@ -128,6 +128,7 @@ export default function StoreTrend({ isoDate }) {
             Store
           </label>
           <select
+            className="st-ctrl-select"
             value={code || ""}
             onChange={(e) => setCode(Number(e.target.value))}
             style={{ padding: "9px 13px", borderRadius: 9, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 14, fontWeight: 600, minWidth: 240, background: "#fff" }}
@@ -144,6 +145,7 @@ export default function StoreTrend({ isoDate }) {
               Weeks
             </label>
             <select
+              className="st-ctrl-select"
               value={weeks}
               onChange={(e) => setWeeks(Number(e.target.value))}
               style={{ padding: "9px 13px", borderRadius: 9, border: "1.5px solid var(--border2)", fontFamily: "inherit", fontSize: 14, fontWeight: 600, background: "#fff" }}
@@ -159,6 +161,7 @@ export default function StoreTrend({ isoDate }) {
 
       <div style={{ display: "flex", gap: 7, marginBottom: 18, flexWrap: "wrap" }}>
         <button
+          className="st-ctrl-tab"
           onClick={() => setTab("history")}
           style={{
             padding: "9px 17px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
@@ -183,6 +186,7 @@ export default function StoreTrend({ isoDate }) {
         </button>
         */}
         <button
+          className="st-ctrl-tab"
           onClick={() => setTab("plan")}
           style={{
             padding: "9px 17px", borderRadius: 100, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 600,
@@ -336,16 +340,18 @@ export default function StoreTrend({ isoDate }) {
           </div>
 
           <div className="st-legend">
-            <span style={{ fontWeight: 600 }}>Below target</span>
-            <div className="st-legend-scale">
-              <div className="st-legend-sw" style={{ background: "#c9302c" }} />
-              <div className="st-legend-sw" style={{ background: "#ffc7ce" }} />
-              <div className="st-legend-sw" style={{ background: "#f0f0ec" }} />
-              <div className="st-legend-sw" style={{ background: "#c6efce" }} />
-              <div className="st-legend-sw" style={{ background: "#7ac496" }} />
-              <div className="st-legend-sw" style={{ background: "#1a6630" }} />
+            <div className="st-legend-group">
+              <span style={{ fontWeight: 600 }}>Below target</span>
+              <div className="st-legend-scale">
+                <div className="st-legend-sw" style={{ background: "#c9302c" }} />
+                <div className="st-legend-sw" style={{ background: "#ffc7ce" }} />
+                <div className="st-legend-sw" style={{ background: "#f0f0ec" }} />
+                <div className="st-legend-sw" style={{ background: "#c6efce" }} />
+                <div className="st-legend-sw" style={{ background: "#7ac496" }} />
+                <div className="st-legend-sw" style={{ background: "#1a6630" }} />
+              </div>
+              <span style={{ fontWeight: 600 }}>Above target</span>
             </div>
-            <span style={{ fontWeight: 600 }}>Above target</span>
             <span style={{ marginLeft: "auto" }}>Dashed cell means no data</span>
           </div>
         </div>

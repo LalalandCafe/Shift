@@ -89,6 +89,11 @@ function HourlyCurve({ day, maxStaffCapacity, openFrom, openTo }) {
   const rowLabel = {
     width: GUTTER, flexShrink: 0, fontSize: 10, fontWeight: 700,
     color: "var(--text3)", textTransform: "uppercase", letterSpacing: "0.03em",
+    // Pinned to the left edge of the horizontal scroller below so
+    // "Sales"/"Staff" stay in view once you scroll right to later
+    // hours - background matches the expanded row's own wrapper
+    // (var(--bg2, #fafafa)) so nothing scrolls visibly behind it.
+    position: "sticky", left: 0, zIndex: 1, background: "var(--bg2, #fafafa)",
   };
 
   return (

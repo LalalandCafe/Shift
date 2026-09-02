@@ -20,6 +20,16 @@ const BANDS = {
   slow: { label: "Slow", chip: "chip-neg" },
 };
 
+// Same bands as BANDS above, as ink colors for the mobile card border/
+// figure - this view has no bar-fill helper like TPLH/DriveThru's
+// fillOfBand, so mapped directly from the chip tones already in use.
+const BAND_INK = {
+  fast: "var(--pos)",
+  pace: "var(--accent)",
+  watch: "var(--warn)",
+  slow: "var(--neg)",
+};
+
 function bandOf(store, med, th) {
   const r = store.medianMin / med;
   // Business rule kept from the API: nothing under the noticeable floor is
@@ -275,7 +285,7 @@ export default function ServiceBoard({ isoDate }) {
         </div>
       </div>
 
-      <div className="tcard">
+      <div className="tcard desktop-table">
         <div className="thead">
           <div>
             <div className="ttl">Ticket time by store</div>
@@ -352,6 +362,58 @@ export default function ServiceBoard({ isoDate }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      <div className="mobile-cards">
+        {withBand.map((s, i) => {
+          const ratio = s.medianMin / med;
+          const conf = confidenceOf(s, th);
+          return (
+            <div
+              className="store-card"
+              key={s.code}
+              style={{ "--i": i, borderLeft: `6px solid ${BAND_INK[s.band]}` }}
+            >
+              <div className="store-card-head">
+                <div>
+                  <div className="store-card-code">
+                    #{i + 1} · {s.code}
+                  </div>
+                  <div className="store-card-name">{s.name}</div>
+                  <span className={"chip " + BANDS[s.band].chip} style={{ marginTop: 6 }}>
+                    {BANDS[s.band].label}
+                  </span>
+                </div>
+                <div className="store-card-splh" style={{ color: BAND_INK[s.band] }}>
+                  {dec(s.medianMin, 1)}
+                  <u>MIN</u>
+                </div>
+              </div>
+
+              <div className="scard-block">
+                <div className="scard-block-label">This week</div>
+                <div className="scard-row">
+                  <div className="scard-cell">
+                    <div className="scard-cell-lbl">vs median</div>
+                    <div className="scard-cell-val">{dec(ratio, 2)}×</div>
+                  </div>
+                  <div className="scard-cell">
+                    <div className="scard-cell-lbl">Items</div>
+                    <div className="scard-cell-val">{int(s.itemCount)}</div>
+                  </div>
+                  <div className="scard-cell">
+                    <div className="scard-cell-lbl">Unclosed</div>
+                    <div className="scard-cell-val">{dec(s.stuckRate, 1)}%</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11.5, color: "var(--text3)", marginTop: 2 }} title={conf.why}>
+                Confidence: {conf.level}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {implausible.length > 0 && (

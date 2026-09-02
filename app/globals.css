@@ -2091,6 +2091,18 @@ table.stores tr:hover td {
   font-size: 10.5px;
   color: var(--text3);
 }
+/* Groups "Below target" + the swatch strip + "Above target" as one flex
+   item, so a narrow screen wraps them together as a unit (bracketing
+   the scale) instead of each wrapping independently onto its own line.
+   Only the trailing "Dashed cell..." note is free to drop below on its
+   own. Same 14px gap .st-legend used between these three before, now
+   moved down a level since they're no longer its direct children. */
+.st-legend-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
 .st-legend-scale {
   display: flex;
   align-items: center;
@@ -3745,11 +3757,26 @@ table.stores tr:hover td {
     text-overflow: ellipsis;
   }
   .mobile-logo {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* This is the only way to reach navigation and Sign out on mobile -
+       it was sized to fit the icon (~30px) with no separate tap-target
+       floor. Icon stays visually the same size, just centered in a
+       bigger box. */
+    min-width: 44px;
+    min-height: 44px;
     flex-shrink: 0;
   }
   .field-search input {
     width: 108px;
+  }
+  /* .thead-tools is shared with WeekView.js, but there it only ever
+     renders inside .desktop-table (display:none at this breakpoint), so
+     this is inert for WeekView and only actually reaches Email preview's
+     Excel/Copy buttons - its primary actions, currently 28px tall. */
+  .thead-tools .btn {
+    min-height: 44px;
   }
 
   .mobile-nav {
@@ -3826,6 +3853,14 @@ table.stores tr:hover td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px;
   }
+  /* :nth-child(3):last-child only matches when there are exactly 3 items
+     total, so this only fires for Leaderboard's 3-tile grid - DriveThru's
+     4-tile grid (3rd child isn't also the last) is untouched and still
+     fills a clean 2x2. Otherwise the 3rd tile wraps alone at half width
+     with a dangling gap beside it. */
+  .mc-grid .mc:nth-child(3):last-child {
+    grid-column: 1 / -1;
+  }
   .mc {
     padding: 12px 13px;
   }
@@ -3856,6 +3891,11 @@ table.stores tr:hover td {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 9px;
   }
+  /* Dashboard always renders exactly 3 tiles - same orphan-3rd-tile fix
+     as .mc-grid above. */
+  .db-tiles .db-tile:nth-child(3):last-child {
+    grid-column: 1 / -1;
+  }
   .db-tile {
     padding: 12px 13px 10px;
   }
@@ -3883,20 +3923,29 @@ table.stores tr:hover td {
   .st-verdict-head {
     font-size: 19px;
   }
+  /* Row-header column was "auto", sized to fit its own nowrap content
+     ("W12" / "$45 ·"), which starved the 7 minmax(0,1fr) day columns of
+     width - the value text ("$110") couldn't shrink either, so it spilled
+     past its own cell into the neighbour's colored background. Pinning
+     the header to a fixed, minimal width plus overflow:hidden on the
+     cell as a backstop keeps every value inside its own box. */
   .st-grid {
+    grid-template-columns: 28px repeat(7, minmax(0, 1fr));
     gap: 3px;
   }
   .st-cell {
-    min-height: 36px;
-    font-size: 11px;
+    min-height: 34px;
+    font-size: 10.5px;
     cursor: pointer;
+    overflow: hidden;
   }
   .st-cell small {
     display: none;
   }
   .st-rowhead {
-    font-size: 9.5px;
-    padding-right: 6px;
+    font-size: 9px;
+    padding-right: 3px;
+    white-space: normal;
   }
 
   /* ---- forecast ---- */
@@ -3906,13 +3955,22 @@ table.stores tr:hover td {
   .fc-head {
     font-size: 18px;
   }
+  /* Day cell (toggle button + "Mon"/"Sep 7") needs ~64px to fit without
+     wrapping - the old 42px track was narrower than its own content, so
+     the text spilled into the sales column next to it. Taken from the
+     Hours column (numeric-only, tightest to shrink safely) and the
+     sales column ($ figure fits fine narrower; the range line already
+     wraps on its own regardless of width). */
   .fc-row {
-    grid-template-columns: 42px 1fr 62px 74px;
+    grid-template-columns: 64px 1fr 50px 74px;
     gap: 7px;
     padding: 10px;
   }
   .fc-row .fc-var-col {
     display: none;
+  }
+  .fc-row > div:first-child {
+    min-width: 0;
   }
   .fc-input {
     width: 64px;
@@ -4239,6 +4297,137 @@ table.stores tr:hover td {
   .mobile-drawer-signout:active {
     background: var(--surface-2);
   }
+
+  /* ---- 44px tap targets: several controls were sized for a mouse ---- */
+  /* Leaderboard/StoreTrend panel close button, 28x28. .seg-btn is also
+     used inside WeekView.js's .desktop-table (display:none here, so
+     inert there) - the only live uses at this breakpoint are TPLH's
+     prev/next week arrows and Leaderboard's Window/Board toggles. */
+  .kd-close,
+  .day-panel-close {
+    width: 44px;
+    height: 44px;
+    top: 8px;
+    right: 8px;
+  }
+  /* min-height alone isn't enough here: .seg-btn has no vertical
+     padding and relied on height:28px roughly matching its line-height
+     to look centered. Raising only min-height without also centering
+     the label would leave the text stranded near the top of the taller
+     box. */
+  .seg-btn {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Service times: disclosure row toggle, ~40-43px measured. */
+  .disc-btn {
+    min-height: 44px;
+  }
+  /* Store detail: store/weeks <select>, tab pills - all ~34-35px.
+     <select> centers its own value natively, no flex needed. The tab
+     buttons only have horizontal padding (no vertical), same gap as
+     .seg-btn above - need explicit centering too. */
+  .st-ctrl-select {
+    min-height: 44px;
+  }
+  .st-ctrl-tab {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Service times/TPLH/Targets shared wide-table scroller: had
+     overflow-x:auto with no momentum and no hint it scrolls, unlike the
+     tab bar/region chips fixed earlier. Sits inside .tcard (white
+     surface), so the fade uses --surface, not --canvas. */
+  .scx.tall {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    position: relative;
+  }
+  /* .scx.tall wraps a <table>, not a flex row (unlike the tab bar/chip
+     scrollers), so the fade can't ride along as a sticky flex sibling -
+     it's pinned directly to the container's own non-scrolling box
+     instead, which works regardless of what's inside. */
+  .scx.tall::before,
+  .scx.tall::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .scx.tall::before {
+    left: 0;
+    background: linear-gradient(to right, var(--surface), rgba(255, 255, 255, 0));
+  }
+  .scx.tall::after {
+    right: 0;
+    background: linear-gradient(to left, var(--surface), rgba(255, 255, 255, 0));
+  }
+
+  /* TPLH's mobile cards (.store-card/.scard-*) share the exact same
+     base classes as WeekView's, but TPLH's root carries neither
+     .wk-legacy nor .shift-dense, so on mobile they were rendering at
+     full desktop size - looser than every other card in the app.
+     .shift-dense's tokens are tuned for .mc/.lb-row's shape, not this
+     one, so instead of applying that block untested, this mirrors the
+     exact values already proven for this exact card shape under
+     .wk-legacy. ".view .mobile-cards" is safe and TPLH-exclusive:
+     .view is TPLH's only root class, and WeekView's root is .wk-legacy
+     with no .view, so this can't reach WeekView's cards. */
+  .view .mobile-cards .store-card {
+    padding: 11px;
+    margin-bottom: 9px;
+    border-radius: 10px;
+  }
+  .view .mobile-cards .store-card-head {
+    margin-bottom: 9px;
+    padding-bottom: 8px;
+  }
+  .view .mobile-cards .store-card-name {
+    font-size: 13.5px;
+  }
+  .view .mobile-cards .store-card-code {
+    font-size: 9.5px;
+  }
+  .view .mobile-cards .store-card-splh {
+    font-size: 17px;
+    min-width: 58px;
+    padding: 3px 9px;
+  }
+  .view .mobile-cards .scard-block {
+    margin-bottom: 8px;
+  }
+  .view .mobile-cards .scard-block-label {
+    font-size: 8.5px;
+    margin-bottom: 4px;
+    letter-spacing: 0.07em;
+  }
+  .view .mobile-cards .scard-row {
+    gap: 5px;
+  }
+  .view .mobile-cards .scard-cell {
+    padding: 6px 5px;
+    border-radius: 6px;
+  }
+  .view .mobile-cards .scard-cell-lbl {
+    font-size: 8px;
+    margin-bottom: 1px;
+  }
+  .view .mobile-cards .scard-cell-val {
+    font-size: 12.5px;
+  }
+  .view .mobile-cards .scard-region-head {
+    font-size: 10.5px;
+    padding: 5px 10px;
+    margin: 12px 0 7px;
+    border-radius: 6px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -4348,5 +4537,44 @@ table.stores tr:hover td {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 2px !important;
+  }
+
+  /* Store-selector grid: gridTemplateColumns is set inline to
+     repeat(min(storeCount,4),1fr), so with 3-4 stores each card was
+     squeezed to ~85px wide. !important to win over the inline style. */
+  .shift-dense .dt-store-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* "Back to all days" button, ~24px tall, unclassed/inline-styled. */
+  .shift-dense .dt-back-btn {
+    min-height: 44px;
+  }
+
+  /* Calendar heatmap: plain overflow-x:auto, no momentum, no hint it
+     scrolls - sits inside .tcard (white surface), so the fade uses
+     --surface to match. */
+  .shift-dense .dt-cal-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    position: relative;
+  }
+  .shift-dense .dt-cal-scroll::before,
+  .shift-dense .dt-cal-scroll::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .shift-dense .dt-cal-scroll::before {
+    left: 0;
+    background: linear-gradient(to right, var(--surface), rgba(255, 255, 255, 0));
+  }
+  .shift-dense .dt-cal-scroll::after {
+    right: 0;
+    background: linear-gradient(to left, var(--surface), rgba(255, 255, 255, 0));
   }
 }
