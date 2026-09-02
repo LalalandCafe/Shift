@@ -23,3 +23,4 @@ backfill-hme-done.txt
 backfill-hme-failed.txt
 hme-stores.json
 .env.work
+scratchpad_*
