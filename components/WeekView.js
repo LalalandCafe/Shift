@@ -519,7 +519,10 @@ export default function WeekView({ report, loading, error, groupFilter, search }
                       </div>
                     )}
                     {rev && rev.unanswered > 0 && (
-                      <div style={{ fontSize: 10.5, color: "var(--text3)", marginTop: 5 }}>
+                      <div
+                        className="scard-no-reply"
+                        style={{ fontSize: 10.5, color: "var(--text3)", marginTop: 5 }}
+                      >
                         {rev.unanswered} of {rev.count} still have no reply
                       </div>
                     )}
