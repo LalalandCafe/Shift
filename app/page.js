@@ -427,6 +427,31 @@ export default function ShiftApp() {
           </button>
         </div>
 
+        <div className="mobile-drawer-nav">
+          {NAV_GROUPS.map((g) => {
+            const items = visible.filter((v) => v.group === g);
+            if (!items.length) return null;
+            return (
+              <div key={g}>
+                <div className="nsec">{g}</div>
+                {items.map((v) => (
+                  <button
+                    key={v.key}
+                    className={"nbtn" + (view === v.key ? " active" : "")}
+                    onClick={() => {
+                      setView(v.key);
+                      closeDrawer();
+                    }}
+                  >
+                    <Icon name={v.icon} />
+                    <span className="nbtn-label">{v.label}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+
         <div className="mobile-drawer-spacer" />
 
         <div className="mobile-drawer-account">

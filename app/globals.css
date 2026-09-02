@@ -3661,6 +3661,16 @@ table.stores tr:hover td {
   }
 }
 
+/* The mobile nav drawer's positioning only exists inside the 900px
+   mobile block below, so above that breakpoint it has no display rule
+   at all and falls back to a plain unstyled block in normal flow.
+   Hidden by default here; the mobile block restores each element's
+   current display value. */
+.mobile-drawer,
+.mobile-drawer-scrim {
+  display: none;
+}
+
 @media (max-width: 900px) {
   /* ---- shell ---- */
   .sidebar {
@@ -3680,6 +3690,25 @@ table.stores tr:hover td {
      clearance separate from .content above. */
   .scx.tall {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Card headers (.tcard > .thead): title+subtitle stack in an
+     unclassed wrapper div, the .thead's other possible child is the
+     .db-link action button, so ".thead > div" is a safe, stable
+     selector for it without touching any JSX. Row layout with
+     justify-content:space-between let the title, subtitle, and link
+     all fight for the same line on a narrow card, wrapping into three.
+     Stacking column-wise gives the title+subtitle the full card width,
+     and the link (if any) its own line below rather than squeezing in. */
+  .thead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .tsub {
+    font-size: 10px;
+  }
+  .db-link {
+    align-self: flex-end;
   }
   .topbar {
     padding: 9px 12px;
@@ -3724,7 +3753,10 @@ table.stores tr:hover td {
   }
 
   .mobile-nav {
-    display: flex;
+    /* View switching moved into the drawer (Fix 8) - this bar cost
+       ~50px on every screen and clipped on the right with no room to
+       show every view anyway. */
+    display: none;
     gap: 6px;
     padding: 9px 12px;
     background: var(--surface);
@@ -3928,25 +3960,43 @@ table.stores tr:hover td {
   .lb-chips::-webkit-scrollbar {
     display: none;
   }
+  /* Without flex-shrink:0, .lb-chips's nowrap row compresses each chip
+     below its own text width, and default line-breaking then wraps the
+     squeezed label at spaces/hyphens/ampersands - that's what turned
+     "TX-TN" into two lines and "ATX & NSH & SATX" into a five-line
+     stack. Locking the width is what keeps every chip the same pill
+     shape and the same height regardless of label length. */
+  .lb-chip {
+    flex-shrink: 0;
+    white-space: nowrap;
+    min-height: 44px;
+  }
   .lb-chips::before,
   .lb-chips::after {
     content: "";
     position: sticky;
     top: 0;
     align-self: stretch;
-    width: 16px;
-    flex: 0 0 16px;
+    width: 28px;
+    flex: 0 0 28px;
     pointer-events: none;
   }
+  /* --canvas (#fbfaf5) confirmed as the actual background behind this
+     row in both Dashboard and Leaderboard - neither wraps .lb-chips in
+     a card. Fading to the bare `transparent` keyword interpolates
+     through rgba(0,0,0,0), which drifts the midtone toward black and
+     reads as a faint drawn line right where the fade ends; fading to
+     the same color at zero alpha keeps the hue constant so it reads as
+     canvas fading to nothing, not a seam. */
   .lb-chips::before {
     left: 0;
-    margin-right: -16px;
-    background: linear-gradient(to right, var(--canvas), transparent);
+    margin-right: -28px;
+    background: linear-gradient(to right, var(--canvas) 0%, rgba(251, 250, 245, 0) 100%);
   }
   .lb-chips::after {
     right: 0;
-    margin-left: -16px;
-    background: linear-gradient(to left, var(--canvas), transparent);
+    margin-left: -28px;
+    background: linear-gradient(to left, var(--canvas) 0%, rgba(251, 250, 245, 0) 100%);
   }
   .lb-podium {
     grid-template-columns: 1fr;
@@ -4068,6 +4118,127 @@ table.stores tr:hover td {
   .wk-legacy > div:first-child > div {
     font-size: 11.5px !important;
   }
+
+  /* ---- mobile nav drawer: the sidebar is display:none below 900px,
+     so this is the only place a phone or tablet user can reach Sign
+     out. Lives at the same 900px breakpoint as .sidebar/.mobile-logo
+     above, not the narrower 640px block - otherwise 641-900px gets
+     neither the sidebar nor a styled, reachable drawer. ---- */
+  .mobile-drawer-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(62, 47, 35, 0.48);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .mobile-drawer-scrim.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .mobile-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    max-width: 80vw;
+    background: var(--surface);
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 220ms ease;
+    box-shadow: var(--sh-3);
+  }
+  .mobile-drawer.open {
+    transform: translateX(0);
+  }
+  .mobile-drawer-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mobile-drawer-title {
+    font-weight: 800;
+    font-size: 15px;
+    flex: 1;
+  }
+  /* View nav, reusing the desktop sidebar's own .nsec/.nbtn so active
+     state gets the identical treatment for free. Only the tap target
+     is bumped here - the sidebar's 8px-padding .nbtn is a mouse target,
+     not a 44px one, and this override must not leak back onto it. */
+  .mobile-drawer-nav .nbtn {
+    min-height: 44px;
+  }
+  .mobile-drawer-close {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    color: var(--text2);
+    cursor: pointer;
+  }
+  .mobile-drawer-close:active {
+    background: var(--surface-2);
+  }
+  .mobile-drawer-spacer {
+    flex: 1;
+  }
+  .mobile-drawer-account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 4px;
+    border-top: 1px solid var(--line);
+  }
+  .mobile-drawer-id {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .mobile-drawer-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-drawer-email {
+    font-size: 11px;
+    color: var(--text3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-drawer-signout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 6px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r);
+    background: var(--surface);
+    color: var(--text2);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mobile-drawer-signout:active {
+    background: var(--surface-2);
+  }
 }
 
 @media (max-width: 640px) {
@@ -4177,114 +4348,5 @@ table.stores tr:hover td {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 2px !important;
-  }
-
-  /* ---- mobile nav drawer: the sidebar is display:none below 900px,
-     so this is the only place a phone user can reach Sign out. ---- */
-  .mobile-drawer-scrim {
-    position: fixed;
-    inset: 0;
-    background: rgba(62, 47, 35, 0.48);
-    z-index: 40;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 200ms ease;
-  }
-  .mobile-drawer-scrim.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .mobile-drawer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 260px;
-    max-width: 80vw;
-    background: var(--surface);
-    z-index: 41;
-    display: flex;
-    flex-direction: column;
-    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
-    transform: translateX(-100%);
-    transition: transform 220ms ease;
-    box-shadow: var(--sh-3);
-  }
-  .mobile-drawer.open {
-    transform: translateX(0);
-  }
-  .mobile-drawer-head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .mobile-drawer-title {
-    font-weight: 800;
-    font-size: 15px;
-    flex: 1;
-  }
-  .mobile-drawer-close {
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: none;
-    background: transparent;
-    border-radius: 9px;
-    color: var(--text2);
-    cursor: pointer;
-  }
-  .mobile-drawer-close:active {
-    background: var(--surface-2);
-  }
-  .mobile-drawer-spacer {
-    flex: 1;
-  }
-  .mobile-drawer-account {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 4px;
-    border-top: 1px solid var(--line);
-  }
-  .mobile-drawer-id {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  .mobile-drawer-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .mobile-drawer-email {
-    font-size: 11px;
-    color: var(--text3);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .mobile-drawer-signout {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    width: 100%;
-    min-height: 44px;
-    margin-top: 6px;
-    border: 1px solid var(--line-2);
-    border-radius: var(--r);
-    background: var(--surface);
-    color: var(--text2);
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .mobile-drawer-signout:active {
-    background: var(--surface-2);
   }
 }
