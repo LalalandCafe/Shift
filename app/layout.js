@@ -3,6 +3,10 @@ export const metadata = {
   description: "Labor and sales reporting",
 };
 
+export const viewport = {
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">

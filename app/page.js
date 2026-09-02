@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import "./globals.css";
 
 import Icon from "../components/Icon";
@@ -59,6 +59,9 @@ export default function ShiftApp() {
 
   const [notice, setNotice] = useState(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerRef = useRef(null);
+  const drawerTriggerRef = useRef(null);
 
   const visible = VIEWS.filter((v) => session && v.roles.includes(session.role));
   const cfg = VIEWS.find((v) => v.key === view) || VIEWS[1];
@@ -97,6 +100,46 @@ export default function ShiftApp() {
       return !c;
     });
   }
+
+  function closeDrawer() {
+    setDrawerOpen(false);
+  }
+
+  // The sidebar this replaces on mobile is display:none below 900px, so
+  // there is no other way to reach Sign out on a phone. Escape, a backdrop
+  // tap, and a Tab trap keep it a real modal instead of just an overlay.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const panel = drawerRef.current;
+    if (!panel) return;
+    const focusables = panel.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    first?.focus();
+
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        closeDrawer();
+        return;
+      }
+      if (e.key !== "Tab" || focusables.length === 0) return;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      drawerTriggerRef.current?.focus();
+    };
+  }, [drawerOpen]);
 
   // Una sesion vencida a media manana devuelve 401 en la siguiente peticion.
   // Sin esto, la pantalla se quedaria mostrando "Error: Not signed in" en
@@ -257,7 +300,15 @@ export default function ShiftApp() {
       <div className="main">
         <header className="topbar">
           <div className="topbar-id">
-            <button className="mobile-logo" onClick={toggleNav} title="SHIFT" aria-label="SHIFT">
+            <button
+              ref={drawerTriggerRef}
+              className="mobile-logo"
+              onClick={() => setDrawerOpen(true)}
+              title="Menu"
+              aria-label="Open menu"
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen}
+            >
               <ShiftLogo variant="mark" size={30} crown />
             </button>
             <div>
@@ -354,6 +405,41 @@ export default function ShiftApp() {
             </>
           )}
         </main>
+      </div>
+
+      <div
+        className={"mobile-drawer-scrim" + (drawerOpen ? " open" : "")}
+        onClick={closeDrawer}
+        aria-hidden="true"
+      />
+      <div
+        ref={drawerRef}
+        className={"mobile-drawer" + (drawerOpen ? " open" : "")}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu"
+      >
+        <div className="mobile-drawer-head">
+          <ShiftLogo variant="mark" size={26} crown />
+          <span className="mobile-drawer-title">SHIFT</span>
+          <button className="mobile-drawer-close" onClick={closeDrawer} aria-label="Close menu">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+
+        <div className="mobile-drawer-spacer" />
+
+        <div className="mobile-drawer-account">
+          <span className="ndot on" />
+          <span className="mobile-drawer-id">
+            <span className="mobile-drawer-name">{session.name}</span>
+            <span className="mobile-drawer-email">{session.userId}</span>
+          </span>
+        </div>
+        <button className="mobile-drawer-signout" onClick={logout}>
+          <Icon name="lock" size={16} />
+          Sign out
+        </button>
       </div>
     </div>
   );

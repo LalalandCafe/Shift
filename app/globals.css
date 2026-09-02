@@ -1,4 +1,4 @@
-/* ============================================================
+3/* ============================================================
    SHIFT design system
    La La Land palette, third cut. Quiet chrome.
 
@@ -3673,17 +3673,47 @@ table.stores tr:hover td {
     display: block;
   }
   .content {
-    padding: 14px 12px 28px;
+    padding: 14px 12px calc(28px + env(safe-area-inset-bottom));
+  }
+  /* ServiceBoard/TPLH/Targets scroll their own table internally
+     (max-height, not page scroll), so it needs its own safe-area
+     clearance separate from .content above. */
+  .scx.tall {
+    padding-bottom: env(safe-area-inset-bottom);
   }
   .topbar {
     padding: 9px 12px;
     gap: 8px;
+    /* mobile-nav below is sticky at top: 49px, assuming this exact
+       height. min-height pins it so that offset can't drift out of
+       sync with topbar content and open a seam cards scroll through. */
+    min-height: 49px;
+  }
+  /* Title + meta ("Dashboard" / "Week 36 · Period 09 · 35 stores") sit
+     in an unclassed wrapper div, the second child of .topbar-id after
+     the logo button - div is a safe, stable selector there since the
+     other child is a <button>, not a <div>. Collapsing that wrapper to
+     a single baseline row (instead of its default block/stacked flow)
+     plus truncating .psub is what turns two-to-three wrapped lines
+     into one. */
+  .topbar-id > div {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
   }
   .ptitle {
-    font-size: 15px;
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .psub {
     font-size: 10px;
+    margin-top: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mobile-logo {
     display: block;
@@ -3704,9 +3734,36 @@ table.stores tr:hover td {
     z-index: 19;
     overflow-x: auto;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
   .mobile-nav::-webkit-scrollbar {
     display: none;
+  }
+  /* Edge fades signal there's more to scroll to. These are opaque
+     gradient overlays painted on top of the (already opaque) nav bar,
+     not an alpha mask on the bar itself - masking the bar would punch
+     a see-through hole revealing cards scrolling underneath, the same
+     bug the topbar/nav offset fix above exists to prevent. */
+  .mobile-nav::before,
+  .mobile-nav::after {
+    content: "";
+    position: sticky;
+    top: 0;
+    align-self: stretch;
+    width: 20px;
+    flex: 0 0 20px;
+    pointer-events: none;
+  }
+  .mobile-nav::before {
+    left: 0;
+    margin-right: -20px;
+    background: linear-gradient(to right, var(--surface), transparent);
+  }
+  .mobile-nav::after {
+    right: 0;
+    margin-left: -20px;
+    background: linear-gradient(to left, var(--surface), transparent);
   }
   .mnav-btn {
     flex-shrink: 0;
@@ -3855,13 +3912,41 @@ table.stores tr:hover td {
   .lb-controls {
     margin-bottom: 10px;
   }
+  /* Region/scope pills (Dashboard's .db-scopes and Leaderboard's
+     .lb-controls both use this same class) get the Fix 2 treatment:
+     momentum scroll plus opaque edge fades instead of a hard clip with
+     no hint there's more to swipe to. These sit directly on the page
+     canvas (no card behind them), so the fade uses --canvas, not
+     --surface, to match. */
   .lb-chips {
     overflow-x: auto;
     flex-wrap: nowrap;
     scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
   .lb-chips::-webkit-scrollbar {
     display: none;
+  }
+  .lb-chips::before,
+  .lb-chips::after {
+    content: "";
+    position: sticky;
+    top: 0;
+    align-self: stretch;
+    width: 16px;
+    flex: 0 0 16px;
+    pointer-events: none;
+  }
+  .lb-chips::before {
+    left: 0;
+    margin-right: -16px;
+    background: linear-gradient(to right, var(--canvas), transparent);
+  }
+  .lb-chips::after {
+    right: 0;
+    margin-left: -16px;
+    background: linear-gradient(to left, var(--canvas), transparent);
   }
   .lb-podium {
     grid-template-columns: 1fr;
@@ -4082,5 +4167,124 @@ table.stores tr:hover td {
     display: block;
     height: 5px;
     margin-top: 2px;
+  }
+
+  /* ---- drive-thru store cards: value stacked over "N% at target",
+     instead of side by side, so it doesn't wrap across three lines.
+     The row's display/align-items/gap are set inline on the element,
+     so overriding them from a stylesheet requires !important. */
+  .shift-dense .dt-store-metric {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+  }
+
+  /* ---- mobile nav drawer: the sidebar is display:none below 900px,
+     so this is the only place a phone user can reach Sign out. ---- */
+  .mobile-drawer-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(62, 47, 35, 0.48);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 200ms ease;
+  }
+  .mobile-drawer-scrim.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .mobile-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 260px;
+    max-width: 80vw;
+    background: var(--surface);
+    z-index: 41;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+    transform: translateX(-100%);
+    transition: transform 220ms ease;
+    box-shadow: var(--sh-3);
+  }
+  .mobile-drawer.open {
+    transform: translateX(0);
+  }
+  .mobile-drawer-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .mobile-drawer-title {
+    font-weight: 800;
+    font-size: 15px;
+    flex: 1;
+  }
+  .mobile-drawer-close {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 9px;
+    color: var(--text2);
+    cursor: pointer;
+  }
+  .mobile-drawer-close:active {
+    background: var(--surface-2);
+  }
+  .mobile-drawer-spacer {
+    flex: 1;
+  }
+  .mobile-drawer-account {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 4px;
+    border-top: 1px solid var(--line);
+  }
+  .mobile-drawer-id {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .mobile-drawer-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-drawer-email {
+    font-size: 11px;
+    color: var(--text3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-drawer-signout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 6px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r);
+    background: var(--surface);
+    color: var(--text2);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .mobile-drawer-signout:active {
+    background: var(--surface-2);
   }
 }

@@ -298,7 +298,7 @@ export default function DriveThru() {
                 {s.storeCode}
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>{s.storeName}</div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div className="dt-store-metric" style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                 <span style={{ fontSize: 24, fontWeight: 700, color: bandInk(s.avgWindowTime, cfg) }}>
                   {fmtSeconds(s.avgWindowTime)}
                 </span>
