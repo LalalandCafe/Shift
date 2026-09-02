@@ -1,3 +1,4 @@
+
 export const metadata = {
   title: "SHIFT - Lalaland Cafe",
   description: "Labor and sales reporting",
