@@ -1,0 +1,214 @@
+name: Backfill Sales (manual)
+
+# Manual-only historical backfill for daily_sales / daily_transactions /
+# hourly_sales. Never runs on a schedule - only a human dispatching it.
+#
+# Reuses the exact same secrets and the exact same write path as
+# daily-sync.yml (POST /api/toast/sync-store with x-sync-secret), so a
+# backfilled month is computed identically to a month the daily cron wrote.
+# The one deliberate difference: this always sends skipKitchen:true. That
+# flag is already read by the route (app/api/toast/sync-store/route.js) and
+# only turns off the kitchen/prep-station fetch and writes, which are
+# independent of gross_sales/transactions/hourly_sales (they run in a
+# separate Promise.all branch and write to separate tables). It does not
+# change how sales are computed - it just avoids ~35 x N days of pointless
+# Toast calls for kitchen data nobody asked to backfill.
+#
+# Unlike backfill-toast.sh (which only checks HTTP 200), this checks the
+# response body's "ok" field too, same as daily-sync.yml already does -
+# HTTP 200 with ok:false (a transactionError or hourlyError) does NOT count
+# as success here.
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_date:
+        description: "Start date YYYY-MM-DD (inclusive)"
+        required: true
+      end_date:
+        description: "End date YYYY-MM-DD (inclusive)"
+        required: true
+      store_code:
+        description: "Optional: single store code to backfill. Blank = all active stores."
+        required: false
+        default: ""
+
+concurrency:
+  group: shift-backfill-sales
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Validate inputs
+        id: validate
+        run: |
+          START="${{ github.event.inputs.start_date }}"
+          END="${{ github.event.inputs.end_date }}"
+          STORE="${{ github.event.inputs.store_code }}"
+
+          for d in "$START" "$END"; do
+            if ! [[ "$d" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+              echo "::error::'$d' is not a valid YYYY-MM-DD date"
+              exit 1
+            fi
+            if ! date -d "$d" >/dev/null 2>&1; then
+              echo "::error::'$d' does not parse as a real calendar date"
+              exit 1
+            fi
+          done
+
+          if [ -n "$STORE" ] && ! [[ "$STORE" =~ ^[0-9]+$ ]]; then
+            echo "::error::store_code must be numeric, got '$STORE'"
+            exit 1
+          fi
+
+          START_EPOCH=$(date -d "$START" +%s)
+          END_EPOCH=$(date -d "$END" +%s)
+          if [ "$END_EPOCH" -lt "$START_EPOCH" ]; then
+            echo "::error::end_date ($END) is before start_date ($START)"
+            exit 1
+          fi
+
+          DAYS=$(( (END_EPOCH - START_EPOCH) / 86400 + 1 ))
+          if [ "$DAYS" -gt 45 ]; then
+            echo "::error::Range is $DAYS days, which is over the 45-day guard. Split it into smaller dispatches."
+            exit 1
+          fi
+
+          echo "start=$START" >> "$GITHUB_OUTPUT"
+          echo "end=$END" >> "$GITHUB_OUTPUT"
+          echo "store=$STORE" >> "$GITHUB_OUTPUT"
+          echo "days=$DAYS" >> "$GITHUB_OUTPUT"
+          echo "Rango: $START a $END ($DAYS dias) | tienda: ${STORE:-todas}"
+
+      - name: Traer lista de tiendas
+        run: |
+          curl -sf "${{ secrets.SUPABASE_URL }}/rest/v1/stores?active=eq.true&toast_guid=not.is.null&select=code,toast_guid" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -o stores.json
+
+          STORE="${{ steps.validate.outputs.store }}"
+          if [ -n "$STORE" ]; then
+            jq --argjson c "$STORE" '[.[] | select(.code == $c)]' stores.json > stores.filtered.json
+            mv stores.filtered.json stores.json
+          fi
+
+          STORE_COUNT=$(jq 'length' stores.json)
+          echo "Tiendas a procesar: $STORE_COUNT"
+          if [ "$STORE_COUNT" -lt 1 ]; then
+            echo "::error::Ninguna tienda coincide (revisa active/toast_guid o el store_code pedido)"
+            exit 1
+          fi
+
+      - name: Backfill
+        id: backfill
+        run: |
+          START="${{ steps.validate.outputs.start }}"
+          END="${{ steps.validate.outputs.end }}"
+          PARALLEL=4
+
+          : > full-log.txt
+          : > synced-pairs.txt
+          : > failed-pairs.txt
+
+          sync_one() {
+            local code="$1" guid="$2" iso="$3"
+            local business="${iso//-/}"
+
+            for attempt in 1 2 3; do
+              resp=$(curl -s -m 120 -w "\n%{http_code}" -X POST "${{ secrets.APP_URL }}/api/toast/sync-store" \
+                -H "Content-Type: application/json" \
+                -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}" \
+                -d "{\"storeCode\":$code,\"restaurantGuid\":\"$guid\",\"businessDate\":\"$business\",\"isoDate\":\"$iso\",\"skipKitchen\":true}")
+              http=$(echo "$resp" | tail -n1)
+              body=$(echo "$resp" | sed '$d')
+              body_ok=$(echo "$body" | jq -r '.ok // false' 2>/dev/null || echo false)
+
+              if [ "$http" = "200" ] && [ "$body_ok" = "true" ]; then
+                sales=$(echo "$body" | jq -r '.grossSales // "?"')
+                txns=$(echo "$body" | jq -r '.transactionCount // "?"')
+                hourly=$(echo "$body" | jq -r '.hourlyRowsWritten // "?"')
+                labor=$(echo "$body" | jq -r '.laborEntriesSynced // "?"')
+                echo "OK   $code $iso grossSales=\$$sales transactions=$txns hourlyRows=$hourly laborRows=$labor" >> full-log.txt
+                echo "$code:$iso" >> synced-pairs.txt
+                return 0
+              fi
+
+              reason=$(echo "$body" | jq -r '.error // .transactionError // .hourlyError // "sin detalle"' 2>/dev/null)
+              echo "RETRY $code $iso intento=$attempt http=$http ok=$body_ok razon=$reason" >> full-log.txt
+
+              if [ "$http" = "429" ]; then
+                sleep $(( attempt * 20 ))
+              else
+                sleep $(( attempt * 5 ))
+              fi
+            done
+
+            final_reason=$(echo "$body" | jq -r '.error // .transactionError // .hourlyError // "sin detalle"' 2>/dev/null)
+            echo "FAIL $code $iso http=$http ok=$body_ok razon=$final_reason" >> full-log.txt
+            echo "$code:$iso http=$http reason=$final_reason" >> failed-pairs.txt
+            return 1
+          }
+          export -f sync_one
+
+          DATES=()
+          CUR="$END"
+          while [[ "$CUR" > "$START" || "$CUR" == "$START" ]]; do
+            DATES+=("$CUR")
+            CUR=$(date -d "$CUR -1 day" +%Y-%m-%d)
+          done
+
+          echo "Dias a procesar: ${#DATES[@]}"
+          day_num=0
+          for iso in "${DATES[@]}"; do
+            day_num=$(( day_num + 1 ))
+            echo "[$day_num/${#DATES[@]}] $iso"
+            jq -r '.[] | "\(.code) \(.toast_guid)"' stores.json \
+              | xargs -P "$PARALLEL" -I {} bash -c 'set -- {}; sync_one "$1" "$2" "'"$iso"'"'
+            sleep 2
+          done
+
+          OK_COUNT=$(wc -l < synced-pairs.txt)
+          FAIL_COUNT=$(wc -l < failed-pairs.txt)
+
+          STORE_LABEL="${{ steps.validate.outputs.store }}"
+          [ -z "$STORE_LABEL" ] && STORE_LABEL="todas"
+
+          {
+            echo "### Backfill $START a $END (tienda: $STORE_LABEL)"
+            echo "Exitosos: $OK_COUNT"
+            echo "Fallidos: $FAIL_COUNT"
+            if [ "$FAIL_COUNT" -gt 0 ]; then
+              echo ""
+              echo "Fallidos (revisa failed-pairs.txt en el artifact para reintentar solo esos):"
+              echo '```'
+              cat failed-pairs.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "ok_count=$OK_COUNT" >> "$GITHUB_OUTPUT"
+          echo "fail_count=$FAIL_COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backfill-sales-${{ github.run_id }}
+          path: |
+            full-log.txt
+            synced-pairs.txt
+            failed-pairs.txt
+          retention-days: 30
+
+      - name: Fail job if anything failed
+        if: always()
+        run: |
+          if [ "${{ steps.backfill.outputs.fail_count }}" != "0" ]; then
+            echo "::error::${{ steps.backfill.outputs.fail_count }} store/day pairs failed. See the backfill-sales artifact's failed-pairs.txt."
+            exit 1
+          fi
