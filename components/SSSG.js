@@ -123,24 +123,40 @@ function ChartTooltip({ active, payload }) {
 // end. Direction (left for negative, right for positive) matches which way
 // the bar already points, so the label reads as a continuation of the bar,
 // not a separate annotation.
-function BarValueLabel(props) {
-  const { x, y, width, height, value, payload } = props;
-  const up = value >= 0;
-  const lx = up ? x + width + 8 : x - 8;
-  return (
-    <text
-      x={lx}
-      y={y + height / 2}
-      dy={4}
-      textAnchor={up ? "start" : "end"}
-      fontSize={11.5}
-      fontWeight={700}
-      fill={up ? "var(--pos)" : "var(--neg)"}
-    >
-      {up ? "+" : ""}
-      {value.toFixed(1)}%  {compactMoney(payload.dollar, { signed: true })}
-    </text>
-  );
+//
+// Takes `rows` (the same array passed as the chart's `data`) and returns the
+// actual label-rendering function, closed over that array. This is not
+// stylistic: recharts' <Bar label={fn}> pipeline runs every per-bar entry
+// through svgPropertiesAndEvents() before invoking a custom label content
+// function (node_modules/recharts/es6/util/svgPropertiesAndEvents.js), which
+// keeps only real SVG attributes/data-attrs/events and silently drops
+// anything else - including a custom `payload` field - before the custom
+// label function ever sees its props. `index` is explicitly re-added by
+// LabelList afterward and is always present, so it's the one reliable way
+// to recover the matching data row; reading `props.payload` here is not an
+// edge case to guard with `?.`, it is never populated for this recharts
+// version's Bar label path.
+function makeBarValueLabel(rows) {
+  return function BarValueLabel(props) {
+    const { x, y, width, height, value, index } = props;
+    const row = rows[index];
+    const up = value >= 0;
+    const lx = up ? x + width + 8 : x - 8;
+    return (
+      <text
+        x={lx}
+        y={y + height / 2}
+        dy={4}
+        textAnchor={up ? "start" : "end"}
+        fontSize={11.5}
+        fontWeight={700}
+        fill={up ? "var(--pos)" : "var(--neg)"}
+      >
+        {up ? "+" : ""}
+        {value.toFixed(1)}%  {compactMoney(row ? row.dollar : null, { signed: true })}
+      </text>
+    );
+  };
 }
 
 function StatTile({ label, value, sub, primary, tint }) {
@@ -272,7 +288,15 @@ export default function SSSG() {
 
   const dataExcluded = excluded.filter((r) => r.excludeReason === "incomplete data");
 
-  const compTint = totals.comparable.pctChange >= 0 ? "var(--pos-bg)" : "var(--neg-bg)";
+  // Explicit null check: `null >= 0` is true in JS, which would tint an
+  // undetermined comp (e.g. a region filter with zero comparable stores)
+  // green instead of neutral.
+  const compTint =
+    totals.comparable.pctChange === null
+      ? "var(--surface)"
+      : totals.comparable.pctChange >= 0
+        ? "var(--pos-bg)"
+        : "var(--neg-bg)";
 
   // Reserved margin comes from the widest label on each side of zero, not a
   // guess - see estimateTextWidth. A month with a more extreme outlier than
@@ -410,7 +434,7 @@ export default function SSSG() {
               />
               <ReferenceLine x={0} stroke="var(--text)" strokeWidth={2} />
               <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(43,34,26,.05)" }} />
-              <Bar dataKey="pct" maxBarSize={BAR_THICKNESS} label={BarValueLabel} isAnimationActive={false} activeBar={{ stroke: "var(--text)", strokeWidth: 1 }}>
+              <Bar dataKey="pct" maxBarSize={BAR_THICKNESS} label={makeBarValueLabel(chartRows)} isAnimationActive={false} activeBar={{ stroke: "var(--text)", strokeWidth: 1 }}>
                 {chartRows.map((entry, i) => (
                   <Cell key={i} fill={entry.pct >= 0 ? "var(--pos)" : "var(--neg)"} />
                 ))}
