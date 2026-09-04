@@ -6,18 +6,22 @@ Everything user-facing ships inside one new admin-gated tab, following the
 checkpoint per the execution order.
 
 **SQL you still need to run:**
-- `docs/sql/001-store-managers.sql` (Phase 3) - **checked live, not run
-  yet.** `stores.gm_name` does not exist on the live table as of this
-  update, despite an earlier message saying it had been run.
-- `docs/sql/003-unify-metric-targets.sql` (Phase 4/4b step 1) - new this
-  round, not run.
+- `docs/sql/001-store-managers.sql` (Phase 3) - **ran successfully.**
+  `stores.gm_name`/`stores.area_manager_name` confirmed live.
+- `docs/sql/003-unify-metric-targets.sql` (Phase 4/4b step 1) - **first run
+  failed** (`red_value` NOT NULL violation on the SPLH backfill), confirmed
+  fully rolled back, then fixed in place. Ready to re-run - see below.
 
-**Unrelated, flagged not fixed:** an untracked file
-`docs/sql/002-store-opened-at.sql` appeared in the working directory this
-session did not create - references "Weekly SSSG" and a store-opening-date
-column, not part of any Command Center phase. Left untouched. Worth
-checking what created it (a concurrent session? a different task?) before
-it's lost or accidentally committed by something else.
+**Unrelated, flagged not fixed:** `docs/sql/002-store-opened-at.sql`
+(untracked) and, as of this update, an uncommitted change to `lib/sssg.js`
+adding weekly SSSG / `computeWeekComparison()` / `stores.opened_at` - none
+of this session's doing. `lib/sssg.js`'s change is left exactly as found,
+uncommitted, not staged, not touched - whoever owns that work should
+commit it themselves. Same for the untracked SQL file. Both look like
+real, coherent, in-progress work (the sssg.js change even correctly reuses
+`lib/calendar.js`'s `addDays` from Phase 1) - not something to worry
+about, but worth confirming who's driving it so two sessions don't step on
+each other's commits on this branch.
 
 **Decisions from your last message, applied:**
 1. `lib/leaderboard.js` confirmed in scope for metric reuse (not limited to
@@ -316,11 +320,63 @@ unified `metric_targets` table too (optional, not blocking).
 Drive-thru's `dt_window` target also already exists (150s/165s/120s) but
 stays out of the tab per your deferral decision - not in this table.
 
+### Step 1 revision — 003 failed in production, fixed in place
+
+First run hit `ERROR 23502: null value in column "red_value" violates
+not-null constraint` on the SPLH backfill - confirmed live via PostgREST's
+OpenAPI schema that `red_value` is `NOT NULL` with no default, and the
+backfill correctly never set it (nobody has set SPLH red-lines; inventing
+one was never on the table). Confirmed clean rollback before touching
+anything (Supabase's SQL editor runs the file as one transaction -
+`metric_targets` had only its original PK and zero `migration-003` rows
+afterward).
+
+**Fixed:** added a step 0 to `003-unify-metric-targets.sql` that drops the
+`NOT NULL` constraint on `red_value`. Existing `dt_window`/`expo` rows are
+completely untouched - only new rows may now have a null `red_value`.
+**Ready to re-run.**
+
+**Consumer check, as requested, before changing anything:**
+- `components/KitchenTrend.js` - doesn't read `metric_targets` at all.
+  Not affected.
+- `app/api/drive-thru/route.js` - selects `red_value` but only passes it
+  through untouched to the client. Not affected by a null on a different
+  metric row.
+- **`lib/scale.js`'s `cfgFromTarget()` DOES implicitly assume it's
+  present** - `redLine: Number(row.red_value)` turns `null` into `0`, not
+  `null`. For a higher-is-better metric this would make `bandFor()`'s
+  red-line check almost never fire, silently capping a badly-missed metric
+  at "lightRed" (WATCH) instead of ever reaching "red" (ACTION). **Not
+  fixed - flagged for your approval, since it's shared code outside this
+  migration.** Proposed fix (mirrors the `green_value` line right above
+  it): `redLine: row.red_value == null ? null : Number(row.red_value)`.
+  Not urgent to land with the migration itself - nothing calls
+  `cfgFromTarget()` for the new `splh_*` rows yet, only
+  `app/api/drive-thru/route.js`'s `dt_window` row reaches it today, and
+  that row is untouched.
+- **SQL views - could not fully confirm.** `metric_targets`'s own column
+  comment (read via the same OpenAPI introspection) says it's "read by SQL
+  views" - I can see view names/output columns this way but not their
+  actual SQL definitions (no `information_schema` access from here). Found
+  two plausibly-relevant views (`dt_bands`, `drive_thru_vs_kitchen`) and,
+  unexpectedly, a **third, separate table** - `drive_thru_targets`
+  (`green_seconds=45`/`yellow_seconds=90`, its own single-row config) -
+  that isn't `metric_targets` at all and isn't queried anywhere in this
+  repo's application code. My reasoned (not confirmed) conclusion: existing
+  rows are untouched by `DROP NOT NULL`, and every view/query pattern seen
+  in this repo filters by a specific known `metric` name rather than
+  scanning unscoped, so the new `splh_*` rows likely aren't visible to
+  anything yet - but if you want certainty rather than reasoned confidence,
+  worth a direct look at `dt_bands`'s actual definition in the Supabase
+  dashboard before re-running.
+
 ### Step 3 — goal chip component — blocked on Step 2
 
 Not started. Waiting on your reply for TPLH/SSSG numbers and the kitchen
 confirmation before wiring anything beyond SPLH and (if you want it)
-rating.
+rating. **Design requirement noted for when this starts:** a metric with a
+target but no red-line (null `red_value`) gets on-goal/off-goal only - no
+ACTION state - until a red-line is supplied.
 
 ## Phase 4b — Targets schema unification — not started
 
@@ -341,8 +397,15 @@ rating.
    Phase 3.
 5. `docs(command-center): assess and design unified metric_targets schema`
    — Phase 4/4b step 1.
+6. `fix(command-center): make metric_targets.red_value nullable in 003` —
+   fixes the failed first run, ready to re-run.
 
 Nothing pushed. Nothing merged to `main`.
 
-**SQL pending your review/run:** `docs/sql/001-store-managers.sql`,
-`docs/sql/003-unify-metric-targets.sql`.
+**SQL pending your review/run:** `docs/sql/003-unify-metric-targets.sql`
+(fixed, ready to re-run). `001-store-managers.sql` already ran
+successfully.
+
+**Not mine, left alone:** an uncommitted change to `lib/sssg.js` and an
+untracked `docs/sql/002-store-opened-at.sql`, both from outside this
+session's work.
