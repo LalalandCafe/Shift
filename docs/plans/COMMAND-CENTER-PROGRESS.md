@@ -5,9 +5,19 @@ Everything user-facing ships inside one new admin-gated tab, following the
 `feat/sssg-tab` pattern (now merged into `main`). Updated at every phase
 checkpoint per the execution order.
 
-**SQL you still need to run:** `docs/sql/001-store-managers.sql` (Phase 3,
-adds `stores.gm_name`/`stores.area_manager_name`, additive/reversible, not
-run by me).
+**SQL you still need to run:**
+- `docs/sql/001-store-managers.sql` (Phase 3) - **checked live, not run
+  yet.** `stores.gm_name` does not exist on the live table as of this
+  update, despite an earlier message saying it had been run.
+- `docs/sql/003-unify-metric-targets.sql` (Phase 4/4b step 1) - new this
+  round, not run.
+
+**Unrelated, flagged not fixed:** an untracked file
+`docs/sql/002-store-opened-at.sql` appeared in the working directory this
+session did not create - references "Weekly SSSG" and a store-opening-date
+column, not part of any Command Center phase. Left untouched. Worth
+checking what created it (a concurrent session? a different task?) before
+it's lost or accidentally committed by something else.
 
 **Decisions from your last message, applied:**
 1. `lib/leaderboard.js` confirmed in scope for metric reuse (not limited to
@@ -228,15 +238,89 @@ HME pilot stores today, and extracting its aggregation out of
 `app/api/drive-thru/route.js` isn't worth doing yet. Revisit if/when HME
 coverage expands past the pilot.
 
-## Phase 4 — Goal chips, quick-win pass — not started (scope narrowed)
+## Phase 4 + 4b — merged, in progress
 
-Per your last message: only KPIs with both a real value function *and* a
-real stored target get a chip in this pass. That's SPLH today (`stores.
-weekday_target/weekend_target/ptd_target` via `lib/report.js`/`lib/calc.js`)
-plus whatever `lib/leaderboard.js` exposes with `RATING_TARGET`/review
-tiers. TPLH, SSSG, and kitchen ticket time are explicitly excluded from
-this pass (no invented thresholds) and wait for Phase 4b. Drive-thru is
-excluded per the deferral above.
+Per your last message, Phase 4 (quick-win chips) and 4b (schema
+unification) are merged into one phase, sequenced: (1) schema assessment +
+SQL [done, below], (2) stop and get real target numbers from you for
+TPLH/SSSG/kitchen [done - waiting on your reply], (3) build the goal chip
+component wired to the unified schema [not started, blocked on step 2].
+
+### Step 1 — schema assessment + SQL ✅ done
+
+**File:** `docs/sql/003-unify-metric-targets.sql` (new, not run).
+
+- **Kitchen ticket time revision:** `metric_targets` already has a
+  chain-wide `expo` row live (`target_value: 300s, red_value: 420s,
+  green_value: null`, `updated_by: "migration"`) - confirmed by querying
+  the live table directly, not assumed from the earlier audit/plan
+  research. It is read by nothing in the current codebase (grepped
+  app/lib/components - zero hits). This revises the earlier claim that
+  kitchen ticket time has no stored target: it has one, unwired. See Step
+  2 below - you need to confirm those numbers, not supply new ones.
+- **"Regional weekday/weekend targets" does not exist.** Looked for this
+  specifically (grep + a live spot-check of `stores.weekday_target/
+  weekend_target`, e.g. store 10001 = 75/85/80) - every target is
+  per-store, there is no region-level or grp-level target anywhere in the
+  schema or code today.
+- **Conclusion: `metric_targets` can become the general table** with one
+  additive change (nullable `store_code` - null = chain-wide, set =
+  per-store override) plus compound metric keys for SPLH's three
+  concurrent weekday/weekend/PTD values, rather than a new `variant`
+  column. No structural blocker found.
+- The SQL adds `store_code` + two partial unique indexes (a plain
+  `UNIQUE(metric, store_code)` would not actually prevent duplicate
+  chain-wide rows, since Postgres treats every `NULL` as distinct - this
+  needed spelling out and testing carefully in the file's own comments,
+  since it could not be executed against the live DB to verify).
+- It backfills a **copy** of each store's existing SPLH targets as three
+  new rows (`splh_weekday`/`splh_weekend`/`splh_ptd`). This is copying
+  real, already-live numbers, not new target-setting - explicitly allowed
+  under the "don't invent thresholds" rule.
+- **Does not touch `stores.*` or the live SPLH calc path.**
+  `lib/calc.js`'s `getTarget()`/`getPtdTarget()` - what the live
+  dashboard/email actually call - are unchanged and keep reading from
+  `stores` directly. Zero risk to production numbers from running this
+  file.
+- **Explicitly a mirror, not a merge**, flagged in the file's own
+  comments: editing a target through the existing Targets tab
+  (`components/Targets.js` → `PATCH /api/stores` → `lib/data.js`'s
+  `updateStoreTargets`) will not update this copy until that write path is
+  separately cut over - which this file deliberately does not do, since
+  it's the live production edit path managers use today.
+- One unconfirmed assumption, flagged in the file: the `references
+  stores(code)` foreign key assumes `stores.code` is uniquely constrained.
+  Every part of the app treats it that way (and a live check found zero
+  duplicate codes across 35 rows), but PostgREST doesn't expose
+  `information_schema` for a direct check. If wrong, the `ALTER TABLE`
+  fails cleanly with no damage - not a silent-corruption case.
+
+### Step 2 — target numbers needed from you
+
+**Stop point, per your instruction — no thresholds below were invented.**
+
+| Metric | Current state | Shape questions needing your answer |
+|---|---|---|
+| **TPLH** (`lib/throughput.js`) | No target anywhere - only `vsCompanyPct` (vs. chain average) and rank exist. | Single chain-wide number, or per-store (like SPLH, since store volume/ticket mix varies)? Weekday/weekend split like SPLH, or one number? What's the actual target/red-line value(s)? |
+| **SSSG** (`lib/sssg.js`) | No target anywhere - purely descriptive (prior vs. current $/%.) | Single chain-wide growth % (e.g. "+3% YoY"), or per-region? (Per-store is unusual for this metric - new/renovated stores skew it - but your call.) What's the actual target %? |
+| **Kitchen ticket time** (`expo` in `metric_targets`) | **Already has a value** - chain-wide, `target_value: 300s`, `red_value: 420s`, `green_value: null`. Seeded by `"migration"`, no traceable owner in this codebase. | Not asking for new numbers - **confirm whether 300s/420s are still correct**, or give replacements. Also: stay chain-wide, or move to per-store? |
+
+**Not on your list but relevant, no action needed:** guest rating already
+has a working chain-wide target (`RATING_TARGET = 4.5` in
+`lib/leaderboard.js`, `REVIEW_TIERS` in `lib/scale.js`) - hardcoded JS, not
+DB-backed, but functioning. Since `lib/leaderboard.js` is confirmed in
+scope, Step 3 can wire a rating goal chip off these existing values with
+no new numbers needed from you, unless you'd rather it move into the
+unified `metric_targets` table too (optional, not blocking).
+
+Drive-thru's `dt_window` target also already exists (150s/165s/120s) but
+stays out of the tab per your deferral decision - not in this table.
+
+### Step 3 — goal chip component — blocked on Step 2
+
+Not started. Waiting on your reply for TPLH/SSSG numbers and the kitchen
+confirmation before wiring anything beyond SPLH and (if you want it)
+rating.
 
 ## Phase 4b — Targets schema unification — not started
 
@@ -255,7 +339,10 @@ excluded per the deferral above.
 3. `feat(command-center): tab scaffold + data coverage banner` — Phase 2.
 4. `feat(command-center): accountability columns (GM / area manager)` —
    Phase 3.
+5. `docs(command-center): assess and design unified metric_targets schema`
+   — Phase 4/4b step 1.
 
 Nothing pushed. Nothing merged to `main`.
 
-**SQL pending your review/run:** `docs/sql/001-store-managers.sql`.
+**SQL pending your review/run:** `docs/sql/001-store-managers.sql`,
+`docs/sql/003-unify-metric-targets.sql`.
