@@ -16,17 +16,18 @@ checkpoint per the execution order.
 - `docs/sql/004-sssg-target.sql` (Phase 4/4b step 3, new) - adds the SSSG
   chain-wide target (0%, no red-line). Depends on `003`'s `store_code`
   column and partial unique index - will fail if run first. Not run yet.
+- `docs/sql/005-tplh-store-targets.sql` (Phase 4/4b step 3, new) - adds
+  per-store `tplh_weekday`/`tplh_weekend` targets, each store's own 8-week
+  baseline rounded to the nearest 0.25, no red-line, 10037 excluded. Also
+  depends on `003`. Run order you gave: 003, then 004, then this.
 
 **Unrelated, flagged not fixed:** `docs/sql/002-store-opened-at.sql`
 (untracked), an uncommitted change to `lib/sssg.js` adding weekly SSSG /
-`computeWeekComparison()` / `stores.opened_at`, and now also an untracked
-`scripts/toast-net-sales-probe.js` - none of this session's doing. All left
-exactly as found, uncommitted, not staged, not touched - whoever owns that
-work should commit it themselves. These look like real, coherent,
-in-progress work (the sssg.js change even correctly reuses
-`lib/calendar.js`'s `addDays` from Phase 1) - not something to worry
-about, but worth confirming who's driving it so two sessions don't step on
-each other's commits on this branch.
+`computeWeekComparison()` / `stores.opened_at`, and `scripts/
+toast-net-sales-probe.js` (untracked) - confirmed to be the same
+concurrent session/process across all three files. All three continue to
+be left exactly as found, uncommitted, not staged, not touched, per your
+instruction - whoever owns that work should commit it themselves.
 
 **Decisions from your last message, applied:**
 1. `lib/leaderboard.js` confirmed in scope for metric reuse (not limited to
@@ -474,8 +475,52 @@ browser pass - same standing caution as every phase.
 
 **Still needs your action, in order:** run `003` (unblocks per-store rows
 existing at all, though they still won't have a UI yet), then `004`
-(lights up the `sssg` chip). The `expo` chip already works today without
-either.
+(lights up the `sssg` chip), then `005` (below). The `expo` chip already
+works today without any of these.
+
+### TPLH targets — per-store, derived from each store's own baseline
+
+**Decision:** not hand-set, not chain-wide. Each store's weekday/weekend
+target is that store's own trailing 8-week average TPLH (the same pull
+already given to you in chat), rounded to the nearest 0.25. Rationale, in
+your words: with `r = -0.58` against average ticket, TPLH isn't comparable
+across stores, so the chip should measure a store against itself, not
+against the field.
+
+**File:** `docs/sql/005-tplh-store-targets.sql` (new, not run) - 34 stores
+× 2 metrics (`tplh_weekday`, `tplh_weekend`), no red-line (none was asked
+for, so none was invented - same rule as everywhere else in this schema
+work). Depends on `003`'s `store_code` column/index. Recomputed the 8-week
+average from scratch with a one-off script (same window, same
+`lib/throughput.js` formula, same `lib/calc.js` exclusionReason - not
+reusing the earlier chat table's rounded display values) so the numbers
+written to SQL come from full precision, not from a 2-decimal string.
+
+**10037 (DFW El Dorado) excluded** - no rows for it in either INSERT.
+Per your instruction, it gets no TPLH target until it has a full run of
+normal weeks.
+
+**UI requirement, noted for later, not built yet:** whenever
+`tplh_weekday`/`tplh_weekend` get wired into a chip,
+`app/api/command-center/goals/route.js`'s `currentValueFor()` needs a new
+branch for them (it doesn't have one today - querying these metrics right
+now would report "No current-value source wired for this metric yet"),
+and the chip itself must visibly say it's measuring the store against its
+own baseline, not the chain - per your instruction, that has to be stated
+on the chip, not left implied by the metric name. Flagging this now so
+it isn't lost by the time this actually gets built - **not done in this
+update**, since you asked only for the SQL file this round.
+
+### Kitchen ticket time — flagged for business review, not changed
+
+Per your instruction: the ~78s actual vs. 300s/420s target gap (found
+while building the `expo` chip, see above) is too wide to be a useful
+chip, and is probably measuring something different from whatever the
+300s was originally set for. **The stored value is unchanged** - still
+300s/420s, nothing touched. Noting here, as asked: **this target needs a
+business review** before the `expo` chip is trustworthy as a goal
+indicator. The chip stays live and unchanged meanwhile - it isn't wrong
+code, it's an unreviewed number.
 
 **003 cleared to re-run** - you confirmed both `dt_bands` and
 `drive_thru_vs_kitchen` directly in the Supabase dashboard (see revision
@@ -527,13 +572,18 @@ the read was correct, only the "why" was wrong.
    fixes the failed first run, ready to re-run.
 7. `feat(command-center): goal chip component, SSSG target, scale.js
    null-redLine fix` — Phase 4/4b step 3.
+8. `docs(command-center): per-store TPLH targets from 8-week baseline` —
+   Phase 4/4b step 3 continued (`005-tplh-store-targets.sql`).
 
 Nothing pushed. Nothing merged to `main`.
 
-**SQL pending your review/run:** `docs/sql/003-unify-metric-targets.sql`
-(fixed, cleared, still not run) then `docs/sql/004-sssg-target.sql` (new,
-depends on 003). `001-store-managers.sql` already ran successfully.
+**SQL pending your review/run, in the order you gave:**
+`docs/sql/003-unify-metric-targets.sql` (fixed, cleared, still not run) →
+`docs/sql/004-sssg-target.sql` (depends on 003) →
+`docs/sql/005-tplh-store-targets.sql` (also depends on 003).
+`001-store-managers.sql` already ran successfully.
 
 **Not mine, left alone:** an uncommitted change to `lib/sssg.js`, an
 untracked `docs/sql/002-store-opened-at.sql`, and an untracked
-`scripts/toast-net-sales-probe.js` - all from outside this session's work.
+`scripts/toast-net-sales-probe.js` - all confirmed the same concurrent
+session/process, outside this session's work.
