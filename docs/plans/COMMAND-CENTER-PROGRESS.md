@@ -5,7 +5,31 @@ Everything user-facing ships inside one new admin-gated tab, following the
 `feat/sssg-tab` pattern (now merged into `main`). Updated at every phase
 checkpoint per the execution order.
 
-**SQL you still need to run: none yet.**
+**SQL you still need to run:** `docs/sql/001-store-managers.sql` (Phase 3,
+adds `stores.gm_name`/`stores.area_manager_name`, additive/reversible, not
+run by me).
+
+**Decisions from your last message, applied:**
+1. `lib/leaderboard.js` confirmed in scope for metric reuse (not limited to
+   the four originally-named files). Will use it in Phase 4/5 for
+   leaderboard score / chain-wide rating.
+2. Drive-thru window time deferred - out of the Command Center tab
+   entirely for now. See Phase 4 section below.
+3. TPLH / SSSG / kitchen ticket time get no goal chip in Phase 4 (no
+   stored target to check against, and none invented). They get chips in
+   Phase 4b once the unified targets schema gives them real targets.
+
+**Separately flagged, not fixed (you said don't fix, just locate):**
+`node --check` silently passes broken JSX in this repo - confirmed by
+deliberately breaking a copy of a JSX file and it still exiting 0 (see
+Phase 2's verification notes below for how that was found). **It is not
+used anywhere in this repo as a syntax gate** - grepped every
+`.github/workflows/*.yml`, `package.json`, and the installed git hooks
+(`.git/hooks/{post-checkout,post-commit,post-merge,pre-push}`, which are
+plain Git LFS hooks, unrelated). So nothing is silently broken today
+because of this - there's simply no gate anywhere relying on
+`node --check` to catch a JSX mistake. Flagging only because you asked;
+no location to point you at since none exists.
 
 ---
 
@@ -152,9 +176,67 @@ without `NEXT_PUBLIC_SUPABASE_URL` set, which plain `node --test` doesn't
 load on its own. This is the same operational trade-off as the audit's
 DATA-3 finding, now visible in the test suite too, not just production.
 
-## Phase 3 — Accountability columns — not started
+## Phase 3 — Accountability columns ✅ done
 
-## Phase 4 — Goal chips, quick-win pass — not started
+**Files:** `docs/sql/001-store-managers.sql` (new, not run), `lib/data.js`,
+`app/api/command-center/managers/route.js` (new), `components/CommandCenter.js`,
+`app/page.js`.
+
+**Shipped:**
+
+- `docs/sql/001-store-managers.sql` — additive, reversible (`ADD COLUMN IF
+  NOT EXISTS`, rollback commands included in the file's own comment).
+  **You need to run this** in the Supabase SQL editor for it to take
+  effect; nothing in this codebase runs DDL.
+- `lib/data.js`'s new `updateStoreManagers()` — sibling to the existing
+  `updateStoreTargets()`/`renameStore()`, same file, same pattern.
+- `app/api/command-center/managers/route.js` — GET (reuses
+  `getAllStores()`, unchanged) / PATCH (admin-gated), kept as its own route
+  rather than extending the shared `/api/stores` PATCH, per the tab
+  isolation rule.
+- `<AccountabilityTable/>` inside `components/CommandCenter.js` — inline
+  edit per store, no deploy needed, mirrors `components/Targets.js`'s
+  existing edit-row pattern exactly (dirty tracking, saving/saved states,
+  401/403 handling) rather than inventing a new one.
+- Source of truth: manual mapping, not Toast employee/labor data - per
+  your confirmation and the feature plan's research (no stable per-store
+  manager signal exists in what Toast exposes today).
+
+**Ships safely with or without the migration:** `getAllStores()` does
+`select("*")`, so the tab and its GET work today - `gm_name`/
+`area_manager_name` are just absent keys until the SQL runs, not an error.
+Saving (PATCH) will correctly fail with Postgres's real "column does not
+exist" error until then, surfaced to the UI, not swallowed.
+
+**Verified end-to-end against live (real) data**, working around the
+missing Entra session the same way as Phase 2:
+- `GET /api/command-center/managers` as admin → 200, 35 stores, confirmed
+  column set (no `gm_name`/`area_manager_name` yet, as expected
+  pre-migration).
+- `PATCH` as admin, targeting a nonexistent store code (999999) so no real
+  row could be touched → correctly failed with Postgres's actual
+  "Could not find the 'area_manager_name' column of 'stores' in the
+  schema cache" error, confirming no partial write and honest error
+  surfacing.
+- `PATCH` as non-admin → 403. `PATCH` with no `code` → 400.
+- `npm test` — still 21/21 (no new pure logic to pin here; this phase is
+  CRUD glue over an already-tested data layer, verified live instead).
+
+**Deferred, not built:** drive-thru window time. Per your instruction,
+it's staying out of the Command Center tab entirely - it only covers the 3
+HME pilot stores today, and extracting its aggregation out of
+`app/api/drive-thru/route.js` isn't worth doing yet. Revisit if/when HME
+coverage expands past the pilot.
+
+## Phase 4 — Goal chips, quick-win pass — not started (scope narrowed)
+
+Per your last message: only KPIs with both a real value function *and* a
+real stored target get a chip in this pass. That's SPLH today (`stores.
+weekday_target/weekend_target/ptd_target` via `lib/report.js`/`lib/calc.js`)
+plus whatever `lib/leaderboard.js` exposes with `RATING_TARGET`/review
+tiers. TPLH, SSSG, and kitchen ticket time are explicitly excluded from
+this pass (no invented thresholds) and wait for Phase 4b. Drive-thru is
+excluded per the deferral above.
 
 ## Phase 4b — Targets schema unification — not started
 
@@ -171,5 +253,9 @@ DATA-3 finding, now visible in the test suite too, not just production.
 2. `feat(command-center): weekday-matched comparison helper, consolidate
    billable-hours exclusion` — Phase 1.
 3. `feat(command-center): tab scaffold + data coverage banner` — Phase 2.
+4. `feat(command-center): accountability columns (GM / area manager)` —
+   Phase 3.
 
-Nothing pushed. Nothing merged to `main`. No SQL run or pending.
+Nothing pushed. Nothing merged to `main`.
+
+**SQL pending your review/run:** `docs/sql/001-store-managers.sql`.
