@@ -1,8 +1,73 @@
 -- Command Center Phase 4/4b: assess and prepare metric_targets as the
 -- general targets table.
 --
--- ASSESSMENT FIRST (this is what was actually asked - "assess whether
--- metric_targets can become the general targets table"):
+-- REVISION: first run of this file failed in production -
+--   ERROR 23502: null value in column "red_value" violates not-null
+--   constraint (failing row: splh_weekday, store 10001, red_value null).
+-- Confirmed rolled back cleanly (Supabase's SQL editor runs a file as one
+-- transaction) - metric_targets had only its original PK and zero
+-- migration-003 rows afterward. red_value is NOT NULL with no default on
+-- the live table (confirmed via PostgREST's OpenAPI schema, read-only -
+-- required: [metric, label, target_value, red_value, unit,
+-- lower_is_better, updated_at]), and the SPLH backfill below never set it,
+-- since red-line values for SPLH have not been set by anyone and must not
+-- be invented here. Fixed by dropping the NOT NULL constraint - see the
+-- new step 0 below - rather than inventing a red_value.
+--
+-- CONSUMER CHECK, as requested before changing anything:
+--   - components/KitchenTrend.js: does not read metric_targets at all
+--     (confirmed by grep - zero references). Not affected either way.
+--   - app/api/drive-thru/route.js: selects red_value but only passes it
+--     through untouched to the client (its own comment: "this route does
+--     not know what 105 seconds means and must never decide it"). Not
+--     affected by a null appearing on a DIFFERENT metric row.
+--   - lib/scale.js's cfgFromTarget(row) (the only other consumer of this
+--     column - grepped the whole repo, these are the only two hits):
+--       redLine: Number(row.red_value)
+--     THIS DOES assume red_value is always present, but not by crashing -
+--     Number(null) is 0, not NaN, so a null red_value would silently
+--     become redLine: 0 rather than "no red line." For a higher-is-better
+--     metric like SPLH, bandFor()'s red-line check ("v >= redLine") would
+--     then almost never fire, so a store far below target would land in
+--     lightRed (WATCH) forever instead of ever reaching red (ACTION) -
+--     wrong, but not a crash, and NOT changed by this file. Flagging per
+--     your instruction rather than fixing lib/scale.js myself - the fix
+--     (mirror the green_value line immediately below it: `row.red_value
+--     == null ? null : Number(row.red_value)`) is a one-line change I'm
+--     holding until you say go, since it's shared code outside this SQL
+--     file. Not urgent to land alongside this migration: nothing calls
+--     cfgFromTarget() for the new splh_* rows yet - only
+--     app/api/drive-thru/route.js's dt_window row reaches it today, and
+--     that row's red_value is untouched by this migration.
+--   - SQL VIEWS: metric_targets' own live column comment (also read via
+--     the OpenAPI schema, not assumed) says "Read by SQL views and by
+--     lib/scale.js." I can see view NAMES and OUTPUT COLUMNS through
+--     PostgREST's schema introspection, but not view DEFINITIONS (no
+--     information_schema/pg_catalog access from here). Found two that are
+--     plausibly relevant - dt_bands (columns b_target/b_comfort/b_red/
+--     b_low/b_far, no metric or store_code column, so almost certainly
+--     scoped to one specific metric already, not an unscoped scan) and
+--     drive_thru_vs_kitchen (has store_code + business_date, reads like a
+--     per-store daily rollup, also likely metric-scoped) - plus a THIRD,
+--     unexpected table, drive_thru_targets (green_seconds=45/
+--     yellow_seconds=90, its own separate id=1 config row), which is not
+--     metric_targets at all and isn't queried anywhere in this
+--     repo's application code either. I cannot confirm from here whether
+--     dt_bands is computed from metric_targets, from drive_thru_targets,
+--     or both. Best read of the evidence: existing rows (dt_window, expo)
+--     are completely untouched by this migration (DROP NOT NULL changes
+--     nothing about already-stored values), and any view that filters by
+--     a specific known metric name - which every application-code access
+--     pattern in this repo does, and which dt_bands' shape strongly
+--     suggests - would never even see the new splh_* rows, null red_value
+--     or not. But I can't read the view's SQL, so this is a reasoned
+--     inference, not a confirmed fact - worth a direct look at dt_bands'
+--     definition in the Supabase dashboard before running this if you
+--     want certainty rather than reasoned confidence.
+--
+-- ASSESSMENT (unchanged from the first version - this is what was
+-- actually asked - "assess whether metric_targets can become the general
+-- targets table"):
 --
 -- Checked live, not assumed:
 --   - metric_targets today: 2 rows, both chain-wide (no store scoping at
@@ -35,6 +100,13 @@
 -- column. No structural blocker found.
 --
 -- WHAT THIS FILE DOES:
+--   0. Drops the NOT NULL constraint on red_value. A target-only metric
+--      (a value with no red-line, because nobody has set one yet) is a
+--      real, expected state this table needs to represent - not an error
+--      condition. This is schema-only: it changes nothing about the
+--      EXISTING dt_window/expo rows, which keep their real red_value
+--      exactly as before, and doesn't touch target_value or any other
+--      column's constraints.
 --   1. Adds the store_code column and the two partial unique indexes that
 --      keep "at most one chain-wide row" and "at most one row per store"
 --      each enforceable (a plain UNIQUE(metric, store_code) would NOT do
@@ -43,8 +115,10 @@
 --      the same metric under a naive constraint).
 --   2. Backfills metric_targets with a COPY of each store's existing
 --      weekday/weekend/ptd SPLH targets, as three new metric keys
---      (splh_weekday, splh_weekend, splh_ptd) with store_code set. This
---      copies real, already-live numbers - not new target-setting.
+--      (splh_weekday, splh_weekend, splh_ptd) with store_code set and
+--      red_value left null - nobody has set an SPLH red-line, and this
+--      file must not invent one. This copies real, already-live target
+--      numbers - not new target-setting.
 --
 -- WHAT THIS FILE DELIBERATELY DOES NOT DO:
 --   - It does not touch, drop, or stop populating stores.weekday_target/
@@ -66,16 +140,10 @@
 --     is the live production edit path managers use today and shouldn't
 --     change as a side effect of a schema assessment.
 --
--- ASSUMPTION NOT CONFIRMED: "references stores(code)" below assumes
--- stores.code has a unique or primary key constraint. Every part of this
--- app treats it as the natural business key (BRIEF.md calls it out
--- explicitly), and a live check found zero duplicate codes across all 35
--- rows - but PostgREST's REST API doesn't expose information_schema
--- directly, so this could not be confirmed the way everything else in
--- this file was. If code isn't actually constrained unique, this ALTER
--- fails cleanly with a Postgres error and changes nothing - not a
--- silent-damage case - just drop the "references stores(code)" clause
--- and rerun if that happens.
+-- CONFIRMED (revised from the first version, which flagged this as
+-- unconfirmed): "references stores(code)" below is valid - PostgREST's
+-- OpenAPI schema explicitly marks stores.code as a Primary Key. Read-only
+-- check, not assumed.
 --
 -- To run: paste into the Supabase SQL editor for the production project
 -- and execute. Safe to run more than once (IF NOT EXISTS / ON CONFLICT
@@ -86,6 +154,17 @@
 --   drop index if exists metric_targets_chainwide_uniq;
 --   drop index if exists metric_targets_store_uniq;
 --   alter table metric_targets drop column if exists store_code;
+--   -- red_value is left nullable on rollback rather than restored to NOT
+--   -- NULL - re-adding that constraint would fail immediately on the
+--   -- dt_window/expo rows' own real values only if one of them were ever
+--   -- null, which they aren't, but there's no value in reintroducing a
+--   -- constraint this table's own design (a target with no red-line yet)
+--   -- needs to not have.
+
+-- Step 0: allow a target with no red-line. DROP NOT NULL is a no-op if
+-- already nullable, so this line alone is safe to rerun on its own.
+alter table metric_targets
+  alter column red_value drop not null;
 
 alter table metric_targets
   add column if not exists store_code integer references stores(code);
