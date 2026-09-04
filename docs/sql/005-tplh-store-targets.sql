@@ -35,12 +35,21 @@
 -- source wired for this metric yet" if queried today).
 --
 -- Depends on docs/sql/003-unify-metric-targets.sql having run (adds
--- store_code + the per-store partial unique index this relies on). Run
--- 003, then 004, then this, per your instruction.
+-- store_code + the per-store partial unique index this relies on, and
+-- fixes 003's own second production failure - a leftover single-column
+-- PK that blocked exactly this kind of per-store, repeated-metric insert;
+-- see that file's revision 2 note). Run 003, then 004, then this, per
+-- your instruction.
 --
 -- Idempotent: ON CONFLICT targets the per-store partial unique index from
 -- 003, so re-running this file (e.g. after recomputing a fresher 8-week
 -- window later) updates the same rows instead of duplicating them.
+--
+-- CONSTRAINT NOTE (added after 003's second failure): this file uses
+-- unit = 'ratio', another value this table has never stored before. Same
+-- caveat as 004 - see 003's revision 2 note for what PostgREST's
+-- introspection can and cannot confirm about CHECK constraints, and the
+-- read-only pg_constraint query to run first for certainty.
 
 insert into metric_targets (metric, store_code, label, target_value, red_value, unit, lower_is_better, updated_by)
 values

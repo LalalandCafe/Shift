@@ -522,11 +522,58 @@ business review** before the `expo` chip is trustworthy as a goal
 indicator. The chip stays live and unchanged meanwhile - it isn't wrong
 code, it's an unreviewed number.
 
-**003 cleared to re-run** - you confirmed both `dt_bands` and
-`drive_thru_vs_kitchen` directly in the Supabase dashboard (see revision
-note above). No open items remain on that file. **Still not run as of this
-update** - verified live (`metric_targets` has no `store_code` column,
-still only the original 2 rows) rather than assumed.
+**003 failed a second time in production, different error** -
+`ERROR 23505: duplicate key value violates unique constraint
+"metric_targets_pkey"`. Root cause: the first fix added `store_code` and
+two new partial unique indexes but never dropped the ORIGINAL primary key
+- a single-column PK on `metric` alone, still enforcing "one row per
+metric, period." That old PK fired before the new `ON CONFLICT` clause's
+target index was ever consulted, since they're different constraints.
+Confirmed rolled back cleanly again (same one-transaction behavior,
+nothing landed).
+
+**Fixed, with the constraint check actually done this time, not assumed:**
+confirmed via PostgREST's OpenAPI schema that `metric` is the *only*
+column carrying the primary-key annotation (so the PK is genuinely
+single-column, matching the error), and scanned every other table's schema
+for a foreign key pointing at `metric_targets.metric` (zero hits - safe to
+drop). `003` now drops that PK and replaces it with a surrogate `id`
+identity column as the primary key (a composite PK on `(metric,
+store_code)` doesn't work - PK columns are implicitly NOT NULL, and
+`store_code` has to stay nullable for chain-wide rows). Both the drop and
+the add are guarded (checked via `pg_constraint` in a `DO` block) so the
+file stays safe to run more than once.
+
+**Consumer check, extended to the exact question you asked about
+dt_bands:** found a **real** single-row assumption -
+`app/api/drive-thru/route.js`'s `loadTarget()` does
+`.eq("metric", DT_METRIC).single()`. Not at risk today (this migration
+adds no `dt_window` rows, so there's still exactly one), but the schema
+change makes a future per-store `dt_window` row *possible*, and if one
+ever gets added, this `.single()` throws and breaks the live Drive-Thru
+tab. **Proposed fix, not applied** (same as the `lib/scale.js` finding -
+holding for your go-ahead since it's shared code outside this SQL file):
+add `.is("store_code", null)` before `.single()`. `dt_bands` itself
+doesn't error on multiple rows (plain `WHERE metric = 'dt_window'`, no
+aggregation) - whether anything consuming that view assumes one row is
+unverifiable from here (nothing in this repo queries it directly), so
+that's handed back to you rather than guessed at.
+
+**Honest limit, stated directly this time:** PostgREST's OpenAPI schema
+exposes primary keys and NOT NULL columns, but has no field for CHECK
+constraints or non-PK UNIQUE constraints, and this environment has no
+`pg_catalog`/`information_schema` access and no generic SQL-execution RPC
+(only three unrelated ones exist). I cannot rule out a CHECK constraint -
+e.g. one restricting `unit` to a fixed list, which matters since `004` and
+`005` both introduce unit values (`percent`, `ratio`) this table has never
+stored before (only `seconds` existed prior to this project). Gave you a
+plain read-only `SELECT ... FROM pg_constraint ...` query (in `003`'s own
+header comment) to get the authoritative list yourself before running
+anything, rather than me inferring a third time.
+
+**003 not run as of this update** - verified live again
+(`metric_targets` still has only the original single-column
+`metric_targets_pkey`, no `store_code`, no new indexes).
 
 **Trailing actuals delivered** (plain tables, no proposed targets) so you
 can set TPLH and SSSG thresholds yourself - see chat response. TPLH used
