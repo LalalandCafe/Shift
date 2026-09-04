@@ -166,13 +166,134 @@ export function GoalChips() {
         })}
         {data.chips.length === 0 && <div className="empty">No chain-wide targets yet.</div>}
       </div>
-      {data.perStoreTargetsNotYetWired > 0 && (
-        <div style={{ padding: "0 14px 14px", fontSize: 12, color: "var(--text3)" }}>
-          {data.perStoreTargetsNotYetWired} per-store target row
-          {data.perStoreTargetsNotYetWired === 1 ? "" : "s"} in the targets table
-          {" "}aren't shown here yet (per-store SPLH chips are a follow-up, not built in this phase).
+    </div>
+  );
+}
+
+const PER_STORE_METRIC_ORDER = ["splh_today", "splh_ptd", "tplh_today"];
+
+/**
+ * Per-store SPLH + TPLH goal chips (Command Center Phase 4/4b step 3
+ * continued). Same /api/command-center/goals response as GoalChips above -
+ * one fetch, two views of it - reading the `perStore` field that route
+ * computes from lib/report.js's buildDailyReport() and
+ * lib/throughput.js's buildThroughput() (extended with a single-day
+ * window for this, still the same transactions/hours formula).
+ *
+ * Row order matches AccountabilityTable's sectionize() grouping - never
+ * sorted by chip value. TPLH is explicitly NOT a cross-store comparison
+ * (see the flagLabel note rendered under that column's header): sorting
+ * this table by it would read exactly like the ranking the user asked
+ * this UI to avoid implying.
+ */
+export function PerStoreGoals() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let dead = false;
+    fetch("/api/command-center/goals")
+      .then((r) => r.json())
+      .then((json) => {
+        if (dead) return;
+        if (!json.ok) throw new Error(json.error || "Failed to load goals");
+        setData(json);
+      })
+      .catch((e) => !dead && setError(e.message));
+    return () => {
+      dead = true;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <div className="note note-warn">
+        <Icon name="alert" size={15} />
+        <div>{error}</div>
+      </div>
+    );
+  }
+  if (!data || !data.perStore) return null;
+
+  const tplhNote = data.perStore
+    .flatMap((s) => s.chips)
+    .find((c) => c.metric === "tplh_today")?.flagLabel;
+
+  function cellFor(store, metric) {
+    const chip = store.chips.find((c) => c.metric === metric);
+    if (!chip) return <span style={{ color: "var(--text3)" }}>--</span>;
+    const style = GOAL_STATUS_STYLE[chip.status] || GOAL_STATUS_STYLE.none;
+    const fmt = fmtForUnit(chip.unit);
+    return (
+      <span
+        style={{
+          background: style.fill,
+          color: style.text,
+          borderRadius: 6,
+          padding: "3px 8px",
+          fontWeight: 600,
+          fontSize: 13,
+          display: "inline-block",
+        }}
+        title={chip.target != null ? `target ${fmt(chip.target)}` : ""}
+      >
+        {chip.value === null ? "--" : fmt(chip.value)}
+      </span>
+    );
+  }
+
+  return (
+    <div className="tcard">
+      <div className="thead">
+        <div>
+          <div className="ttl">Store Goals</div>
+          <div className="tsub">
+            SPLH (today, {data.dayName}) and SPLH (period to date) per store.
+            Week-to-date has no chip on purpose - a WTD average checked
+            against one day's target would mix weekday and weekend actuals
+            against a target that only applies to one of them.
+          </div>
         </div>
-      )}
+      </div>
+      <div className="scx tall">
+        <table className="grid">
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th>SPLH (today)</th>
+              <th>SPLH (PTD)</th>
+              <th>
+                TPLH (today)
+                {tplhNote && (
+                  <div style={{ fontWeight: 400, fontSize: 11, color: "var(--text3)" }}>
+                    {tplhNote}
+                  </div>
+                )}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sectionize(data.perStore, { withGroup: true }).map((sec) => (
+              <Fragment key={sec.label}>
+                <tr className="rrow">
+                  <td colSpan={4}>{sec.label}</td>
+                </tr>
+                {sec.stores.map((st) => (
+                  <tr key={st.code}>
+                    <td>
+                      <div className="lc-code">{st.code}</div>
+                      <div className="lc-name">{st.name}</div>
+                    </td>
+                    <td>{cellFor(st, "splh_today")}</td>
+                    <td>{cellFor(st, "splh_ptd")}</td>
+                    <td>{cellFor(st, "tplh_today")}</td>
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -372,6 +493,10 @@ export default function CommandCenter({ onAuthExpired }) {
       </div>
 
       <div style={{ marginTop: 17 }}>
+        <PerStoreGoals />
+      </div>
+
+      <div style={{ marginTop: 17 }}>
         <AccountabilityTable onAuthExpired={onAuthExpired} />
       </div>
 
@@ -382,8 +507,7 @@ export default function CommandCenter({ onAuthExpired }) {
           A metric drill-down is shipping here next - see
           docs/plans/COMMAND-CENTER-PROGRESS.md. Drive-thru window time is
           deferred (pilot-only, see that doc) and won't appear in this tab
-          yet. Per-store SPLH goal chips are also a follow-up, not part of
-          this phase.
+          yet.
         </div>
       </div>
     </div>

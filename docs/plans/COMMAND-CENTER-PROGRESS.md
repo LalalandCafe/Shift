@@ -19,7 +19,14 @@ checkpoint per the execution order.
 - `docs/sql/005-tplh-store-targets.sql` (Phase 4/4b step 3, new) - adds
   per-store `tplh_weekday`/`tplh_weekend` targets, each store's own 8-week
   baseline rounded to the nearest 0.25, no red-line, 10037 excluded. Also
-  depends on `003`. Run order you gave: 003, then 004, then this.
+  depends on `003`. Run order you gave: 003, then 004, then this. **Ran
+  successfully - but see `006` below, its values need correcting.**
+- `docs/sql/006-fix-tplh-weekend-boundary.sql` (new) - `005`'s values used
+  the wrong weekend boundary (calendar Sat/Sun instead of this app's real
+  Friday/Saturday/Sunday) - my mistake, found while building the chips
+  that read these targets. Overwrites all 68 `tplh_weekday`/
+  `tplh_weekend` rows with correctly-computed values. Depends on `003`
+  and `005`. Not run yet.
 
 **Unrelated, flagged not fixed:** `docs/sql/002-store-opened-at.sql`
 (untracked), an uncommitted change to `lib/sssg.js` adding weekly SSSG /
@@ -433,6 +440,114 @@ new one), and returns a chip per row:
 - any row with `store_code` set - explicitly excluded and reported as an
   unwired count, not silently dropped. See the SPLH note below for why.
 
+### Bug found while building the per-store chips: 005's TPLH targets used the wrong weekend boundary
+
+Discovered before writing any mapping code, while checking how "today's"
+target should be picked - **this app does not use calendar Saturday/Sunday
+as "weekend."** `lib/fiscal.js` exports `WEEKEND = new Set(["Friday",
+"Saturday", "Sunday"])`, and `lib/calc.js`'s `getTarget()` - the function
+behind every live SPLH weekday/weekend target - uses exactly that set.
+The one-off script that produced `005`'s `tplh_weekday`/`tplh_weekend`
+values used a plain `getUTCDay() === 0 || 6` check instead - calendar
+Saturday/Sunday only, Friday counted as a weekday. **My mistake, not
+something you asked for or reviewed.**
+
+**Impact, quantified before writing anything:** recomputed the same
+8-week window with the correct Friday/Saturday/Sunday boundary, same
+formula, same exclusion rule, same rounding. Of the 34 stores `005`
+wrote: **9 have a changed `tplh_weekday` target, 18 have a changed
+`tplh_weekend` target** (7 stores are unaffected at 0.25 rounding). This
+is a real shift, not rounding noise - Friday is typically a heavy trading
+day, so moving it from the weekday bucket to the weekend bucket pulls
+weekday averages down and weekend averages up for most stores.
+
+**Not affected by this bug:** the TPLH-vs-ticket correlation check
+(`r = -0.58`) summed each store's whole 8-week window as one total with
+no weekday/weekend split at all - the decision to go per-store instead of
+chain-wide stands unchanged. `003`'s `splh_weekday`/`splh_weekend` rows
+were copied directly from `stores.weekday_target`/`weekend_target`, never
+computed from a day-by-day split, so they were never exposed to this bug
+either. Only `005`'s TPLH values are wrong.
+
+**Fix:** `docs/sql/006-fix-tplh-weekend-boundary.sql` (new, not run) -
+overwrites all 68 `tplh_weekday`/`tplh_weekend` rows with the
+correctly-computed values via the same `ON CONFLICT ... DO UPDATE`
+pattern `005` already uses. Doesn't touch `red_value` (still null),
+`unit`, or which stores are included (10037 still excluded, same reason).
+Depends on `003` and `005` having already run - **run this after both**,
+per the order you're already following.
+
+**Also fixed at the source**, so the next thing built on top of
+"weekday/weekend" doesn't repeat this: the new
+`app/api/command-center/goals/route.js` code (below) picks "today"'s
+target using `lib/fiscal.js`'s real `WEEKEND`/`DAYS` exports, not a
+re-derived day check - said explicitly in that file's own comment,
+pointing at this bug as the reason.
+
+### Step 3 continued - per-store SPLH + TPLH chips ✅ done
+
+**Files:** `lib/throughput.js` (`buildThroughput` extended),
+`app/api/command-center/goals/route.js` (`perStoreChipsFor`, new),
+`components/CommandCenter.js` (`PerStoreGoals`, new).
+
+**Your mapping decision, applied exactly:**
+- **SPLH (today)** - `buildDailyReport()`'s `day.splh`, against whichever
+  of `splh_weekday`/`splh_weekend` matches today's actual day-of-week
+  (Friday/Saturday/Sunday = weekend, per the fix above).
+- **SPLH (period to date)** - `ptd.splh` against `splh_ptd`. Clean 1:1,
+  no day-type question.
+- **WTD gets no chip**, per your instruction - not a gap, a deliberate
+  absence. The live app has never had a WTD target for the same reason
+  you gave: a week-to-date average checked against one day's target
+  would mix weekday and weekend actuals against a target that only
+  applies to one of them.
+- **TPLH (today)** - one chip per store, whichever of
+  `tplh_weekday`/`tplh_weekend` matches today, actual is a **single
+  day's** TPLH (never week-to-date, same reasoning as SPLH's WTD
+  exclusion). Stores with no TPLH target (10037) simply get no TPLH
+  chip - same "no chip without a target" rule as everywhere else.
+- **Labeling requirement, applied visibly, not implied**: every TPLH chip
+  carries a `flagLabel` ("vs. this store's own 8-week baseline - not
+  comparable across stores"), and the table's TPLH column header shows
+  that note directly under the column title in the UI - not a tooltip
+  someone has to discover. The table's row order also never sorts by
+  chip value (same grouping as `AccountabilityTable`), so nothing about
+  this view invites reading it as a ranking.
+
+**`lib/throughput.js`'s `buildThroughput()` extended, not forked** - new
+optional second parameter `opts.singleDay` restricts the whole
+computation to one calendar day instead of the Mon-Sun week. The only
+existing caller (`app/api/throughput/route.js`) passes no second
+argument and is unaffected - verified live, weekly output unchanged
+before and after this change. Same `transactions / hours` formula either
+way; only which days feed it changes.
+
+**Read-from-unified-schema tradeoff, decided and stated, not hidden**:
+SPLH (today)'s target comes from `metric_targets`' `splh_weekday`/
+`splh_weekend` mirror rows, not `stores.weekday_target`/`weekend_target`
+directly, even though the mirror is the one already documented (in `003`)
+as able to drift stale if someone edits a target through the existing
+Targets tab. Chose this so every Command Center chip - SSSG, kitchen,
+SPLH, TPLH - reads through the exact same `cfgFromTarget` +
+`goalStatus` path, per your original "read from the unified schema"
+instruction. The staleness risk is pre-existing and already documented,
+not new here.
+
+**Verification:** `npm test` still 30/30 (no new pure logic to pin here -
+this is live-data wiring, verified against production instead, same as
+Phase 3). Direct route invocation (same no-Entra-session workaround as
+every phase): confirmed chain-wide chips (`sssg`, `expo`) unchanged,
+confirmed `perStore` returns 35 stores each with `splh_today`/`splh_ptd`
+chips and (except 10037) a `tplh_today` chip, confirmed 10037 correctly
+has no `tplh_today` chip, confirmed today (2026-09-03, a Thursday) maps
+to the weekday targets as expected. **Caught and fixed one bug before
+shipping it**: the route's per-store return objects initially omitted
+`grp`, which `sectionize()` requires to group rows - would have silently
+rendered an empty table. Added `grp: storeReport.grp` (already present on
+`buildDailyReport`'s row shape) and re-verified live. JSX/syntax checked
+via Next's bundled SWC compiler on both changed files. **Not done:** an
+actual browser pass - same standing caution as every phase.
+
 **Sanity-check finding, not a bug:** chain-wide kitchen ticket time is
 currently running **~78s** (median, this week) against the 300s target and
 420s red-line - comfortably `onGoal`, not close to either line. Confirmed
@@ -666,14 +781,22 @@ the read was correct, only the "why" was wrong.
    null-redLine fix` — Phase 4/4b step 3.
 8. `docs(command-center): per-store TPLH targets from 8-week baseline` —
    Phase 4/4b step 3 continued (`005-tplh-store-targets.sql`).
+9. `fix(command-center): drop metric_targets' old single-column PK in 003
+   (2nd prod failure)` — the surrogate `id` PK fix.
+10. `fix(command-center): rewrite metric_targets_direction to handle null
+    red_value` — the CHECK-constraint fix, found via the user's own
+    `pg_constraint` query.
+11. `fix(command-center): correct 005's TPLH weekend boundary, wire
+    per-store SPLH/TPLH goal chips` — this update.
 
 Nothing pushed. Nothing merged to `main`.
 
-**SQL pending your review/run, in the order you gave:**
-`docs/sql/003-unify-metric-targets.sql` (fixed, cleared, still not run) →
-`docs/sql/004-sssg-target.sql` (depends on 003) →
-`docs/sql/005-tplh-store-targets.sql` (also depends on 003).
-`001-store-managers.sql` already ran successfully.
+**All three of `003`, `004`, `005` ran successfully** (confirmed by the
+user: `dt_window` 1, `expo` 1, `splh_ptd`/`splh_weekday`/`splh_weekend` 35
+each, `sssg` 1, `tplh_weekday`/`tplh_weekend` 34 each, 10037 correctly
+absent from the TPLH rows). **`006` is the only SQL still pending** -
+corrects the wrong weekend boundary in `005`'s TPLH values (see above).
+Depends on `003` and `005`, both already live.
 
 **Not mine, left alone:** an uncommitted change to `lib/sssg.js`, an
 untracked `docs/sql/002-store-opened-at.sql`, and an untracked
