@@ -96,7 +96,61 @@ and intentional per the "no retrofit" instruction.
 
 ---
 
-## Phase 2 — Tab scaffold + data coverage banner — not started
+## Phase 2 — Tab scaffold + data coverage banner ✅ done
+
+**Files:** `components/CommandCenter.js` (new), `app/page.js`, `components/Icon.js`,
+`lib/coverage.js` (new), `lib/sssg.js`, `app/api/command-center/coverage/route.js` (new),
+`test/coverage.test.mjs` (new).
+
+**Shipped:**
+
+- New admin-gated tab, same pattern as `feat/sssg-tab`: registered in
+  `app/page.js`'s `VIEWS` array (`roles: ["admin"]`, under "Today"),
+  server-side enforcement via `requireAdmin()` in the new route, not just
+  client-side nav hiding.
+- `lib/coverage.js` — extracted `monthStoreCount`, `comparabilityReason`,
+  `monthLabel`, `MIN_COMPARABLE_STORES` out of `lib/sssg.js` verbatim.
+  `lib/sssg.js` now imports these instead of keeping its own copies — one
+  definition of "comparable" for both SSSG and the new banner, per the
+  feature plan's recommendation.
+- `app/api/command-center/coverage/route.js` — `GET ?months=YYYY-MM,...`,
+  defaults to [this month, same month last year] when omitted. Admin-gated.
+- `<CoverageBanner months={...}/>` in `components/CommandCenter.js` —
+  reusable (later phases pass their own comparison window), fails quiet on
+  error so a broken coverage check never blocks the rest of the tab.
+- One new `Icon.js` glyph (`layers`) — nothing existing fit the nav entry.
+
+**Verification (no real Entra session available in this environment, so
+verified differently at each layer):**
+- `npm test` — 21/21 passing (8 new, covering `lib/coverage.js`'s pure
+  logic: month bounds, leap years, the comparability-reason wording).
+- **Live read-only smoke test** of `lib/sssg.js`'s `getComparableMonths()`
+  against production Supabase, before and after the extraction — confirmed
+  identical output (e.g. August 2026 vs August 2025 correctly comparable;
+  September 2026 vs September 2025 correctly flagged, since only August
+  2025 was ever backfilled).
+- **JSX syntax** verified via Next's own bundled SWC compiler
+  (`next/dist/build/swc`) directly, since plain `node --check` silently
+  passes broken JSX in this project (confirmed by deliberately breaking a
+  test copy — it still exited 0). No ESLint config was added; `next lint`
+  wanted to scaffold one interactively and was cancelled immediately with
+  nothing written.
+- **Route logic** exercised end-to-end (admin default, admin explicit
+  months, non-admin → 403, malformed input → 400) by invoking the route
+  handler directly against live read-only data, working around the `@/`
+  import alias plain Node doesn't resolve. All four cases behaved
+  correctly.
+- **Not done:** an actual browser pass signed in through Entra ID. Please
+  do one manual smoke test of the Command Center tab after this ships —
+  the "no staging" caution from the audit applies here same as anywhere
+  else.
+
+**`package.json` change:** `test` script now runs
+`node --env-file=.env.local --test` — needed because `lib/coverage.js`
+(like every file that imports `lib/supabase.js`) throws at import time
+without `NEXT_PUBLIC_SUPABASE_URL` set, which plain `node --test` doesn't
+load on its own. This is the same operational trade-off as the audit's
+DATA-3 finding, now visible in the test suite too, not just production.
 
 ## Phase 3 — Accountability columns — not started
 
@@ -116,5 +170,6 @@ and intentional per the "no retrofit" instruction.
    baseline docs (also picked up the Phase 0 spike doc; see note above).
 2. `feat(command-center): weekday-matched comparison helper, consolidate
    billable-hours exclusion` — Phase 1.
+3. `feat(command-center): tab scaffold + data coverage banner` — Phase 2.
 
 Nothing pushed. Nothing merged to `main`. No SQL run or pending.
