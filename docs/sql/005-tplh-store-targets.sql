@@ -45,11 +45,13 @@
 -- 003, so re-running this file (e.g. after recomputing a fresher 8-week
 -- window later) updates the same rows instead of duplicating them.
 --
--- CONSTRAINT NOTE (added after 003's second failure): this file uses
--- unit = 'ratio', another value this table has never stored before. Same
--- caveat as 004 - see 003's revision 2 note for what PostgREST's
--- introspection can and cannot confirm about CHECK constraints, and the
--- read-only pg_constraint query to run first for certainty.
+-- CONSTRAINT NOTE, resolved: same as 004 - the pg_constraint query 003
+-- asked for came back with no CHECK on `unit`, so unit = 'ratio' here is
+-- fine. Every row in this file has red_value = null (no red-line was
+-- asked for), which only passes 003's rewritten metric_targets_direction
+-- (its null case, added in 003's revision 3) - the ORIGINAL constraint
+-- would have let these through too, but only by accident (three-valued
+-- logic), not by design. Run 003 first.
 
 insert into metric_targets (metric, store_code, label, target_value, red_value, unit, lower_is_better, updated_by)
 values

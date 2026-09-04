@@ -15,13 +15,12 @@
 -- 003, so re-running this file updates the same row instead of duplicating
 -- it.
 --
--- CONSTRAINT NOTE (added after 003's second failure): this row uses
--- unit = 'percent', a value this table has never stored before (only
--- 'seconds' existed prior to this project's work). PostgREST's schema
--- introspection cannot reveal whether a CHECK constraint restricts `unit`
--- to a fixed list - see 003's revision 2 note for the full explanation and
--- the read-only pg_constraint query to run first if you want certainty
--- before this file, not after a third failure.
+-- CONSTRAINT NOTE, resolved: the user ran the pg_constraint query 003
+-- asked for. No CHECK on `unit` exists, so unit = 'percent' here is fine -
+-- the earlier caution about that is retracted. The query DID surface a
+-- real, separate problem (metric_targets_direction not handling a null
+-- red_value) - fixed in 003 itself, not here, since this row's own
+-- red_value is null and depends on that fix being correct. Run 003 first.
 
 insert into metric_targets (metric, store_code, label, target_value, red_value, unit, lower_is_better, updated_by)
 values ('sssg', null, 'Same-Store Sales Growth', 0, null, 'percent', false, 'migration-004')

@@ -1,6 +1,56 @@
 -- Command Center Phase 4/4b: assess and prepare metric_targets as the
 -- general targets table.
 --
+-- REVISION 3: the user ran the read-only pg_constraint query this file's
+-- revision 2 asked for. Authoritative result, not PostgREST inference:
+--
+--   metric_targets_direction | c | CHECK (((lower_is_better AND
+--     (red_value > target_value)) OR ((NOT lower_is_better) AND
+--     (red_value < target_value))))
+--   metric_targets_pkey      | p | PRIMARY KEY (metric)
+--
+-- Two findings from that result:
+--
+--   1. No CHECK on `unit`. The risk flagged in 004/005 about `percent`/
+--      `ratio` being new unit values does not exist - retracted there.
+--
+--   2. metric_targets_direction is a REAL problem this file has to fix,
+--      not just check against. It has no NULL-handling case. With a null
+--      red_value, both `red_value > target_value` and
+--      `red_value < target_value` evaluate to NULL, their OR is NULL, and
+--      Postgres treats a CHECK that evaluates to NULL as PASSING (three-
+--      valued logic - a CHECK only fails on an explicit FALSE). So the
+--      target-only splh_*/sssg rows this migration and 004 write would
+--      have satisfied this constraint by accident of NULL propagation,
+--      not because the constraint actually says "a target with no
+--      red-line is valid." Per the user's instruction: don't ship on that
+--      accident - the constraint should say what's actually meant.
+--
+-- FIX: drop and recreate metric_targets_direction with an explicit null
+-- case, exactly the form given:
+--
+--   check (red_value is null
+--          or (lower_is_better and red_value > target_value)
+--          or (not lower_is_better and red_value < target_value))
+--
+-- VERIFIED against every existing row before dropping anything, per
+-- instruction - both of the only two rows that exist today satisfy the
+-- rewritten form (computed directly from their live values, already
+-- confirmed via earlier introspection, not re-guessed):
+--   - dt_window: lower_is_better=true, target_value=150, red_value=165.
+--     lower_is_better AND red_value>target_value -> true AND (165>150) ->
+--     true. Passes.
+--   - expo: lower_is_better=true, target_value=300, red_value=420.
+--     true AND (420>300) -> true. Passes.
+-- Neither row is misconfigured. The rewritten constraint is strictly more
+-- permissive than the original (same two non-null branches, plus the new
+-- explicit null branch), so anything that satisfied the original for a
+-- real reason (a true, non-null comparison) still satisfies the rewrite -
+-- there was no risk of a currently-valid row becoming invalid, only the
+-- reverse (an invalid state that used to pass by accident now failing
+-- honestly, which did not occur here since no row currently has a null
+-- red_value on a row this constraint was ever actually checking against).
+--
 -- REVISION 2: second run failed in production, different error -
 --   ERROR 23505: duplicate key value violates unique constraint
 --   "metric_targets_pkey". DETAIL: Key (metric)=(splh_weekday) already
@@ -73,6 +123,12 @@
 --   it turns up a CHECK constraint on `unit` or anything else unexpected,
 --   tell me before running 004/005, since both introduce unit values this
 --   table has never stored before.
+--
+--   RESOLVED in revision 3 (top of file): the user ran this exact query.
+--   No CHECK on `unit` - that half of the worry was unfounded. There IS a
+--   CHECK on the red_value/target_value relationship
+--   (metric_targets_direction) that this file did not know about and had
+--   to be fixed - see revision 3.
 --
 -- CONSUMER CHECK, part 2 - same "does anything assume single-row"
 -- question you asked about dt_bands, checked against every consumer of
@@ -306,11 +362,38 @@
 --   -- very constraint being restored, which is expected: a full rollback
 --   -- means going back to "one row per metric," so it should refuse to
 --   -- happen while per-store rows still exist.
+--   alter table metric_targets drop constraint if exists metric_targets_direction;
+--   alter table metric_targets add constraint metric_targets_direction
+--     check (((lower_is_better and (red_value > target_value))
+--             or ((not lower_is_better) and (red_value < target_value))));
+--   -- Restoring the ORIGINAL (non-null-aware) constraint only works if
+--   -- every row with a null red_value is gone first - that means 004's
+--   -- sssg row and 005's tplh_* rows too, not just this file's own
+--   -- splh_* rows. Roll those back before this line if they were ever
+--   -- run, in the reverse of the order they were applied.
 
 -- Step 0: allow a target with no red-line. DROP NOT NULL is a no-op if
 -- already nullable, so this line alone is safe to rerun on its own.
 alter table metric_targets
   alter column red_value drop not null;
+
+-- Step 0.5 (revision 3 fix): metric_targets_direction did not have a null
+-- case, so a null red_value passed it by accident of Postgres's
+-- three-valued logic rather than by the constraint actually allowing it -
+-- see the revision 3 note at the top of this file for the verification
+-- that both existing rows (dt_window, expo) still satisfy the rewritten
+-- form. DROP + ADD with a stable name is idempotent - rerunning this
+-- drops the already-correct constraint and re-adds the identical one.
+alter table metric_targets
+  drop constraint if exists metric_targets_direction;
+
+alter table metric_targets
+  add constraint metric_targets_direction
+  check (
+    red_value is null
+    or (lower_is_better and red_value > target_value)
+    or (not lower_is_better and red_value < target_value)
+  );
 
 alter table metric_targets
   add column if not exists store_code integer references stores(code);

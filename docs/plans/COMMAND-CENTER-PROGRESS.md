@@ -575,6 +575,51 @@ anything, rather than me inferring a third time.
 (`metric_targets` still has only the original single-column
 `metric_targets_pkey`, no `store_code`, no new indexes).
 
+### 003, revision 3 - the pg_constraint results came back, and they mattered
+
+The user ran the read-only query revision 2 asked for. Two findings:
+
+1. **No CHECK on `unit`.** The risk flagged for `004`/`005` (unit values
+   `percent`/`ratio` never stored before) doesn't exist - retracted in
+   both files.
+2. **`metric_targets_direction` is real, and it's not null-safe.** Its
+   definition - `(lower_is_better AND red_value > target_value) OR
+   (NOT lower_is_better AND red_value < target_value)` - has no branch for
+   a null `red_value`. Both comparisons against a null evaluate to NULL,
+   their OR is NULL, and Postgres treats a CHECK evaluating to NULL as
+   passing (only an explicit FALSE fails a CHECK). So every target-only
+   row this project has written or planned to write (`003`'s splh_*,
+   `004`'s sssg, `005`'s tplh_*) would have satisfied this constraint by
+   accident of three-valued logic, not because it actually permits a
+   target with no red-line. Per the user's instruction - don't ship on
+   that accident - rewrote it to say what's meant:
+   `red_value IS NULL OR (lower_is_better AND red_value > target_value)
+   OR (NOT lower_is_better AND red_value < target_value)`.
+
+**Verified against both existing rows before writing the drop/recreate**,
+per instruction - neither is misconfigured:
+- `dt_window`: `lower_is_better=true, target=150, red=165` →
+  `165 > 150` → true. Passes.
+- `expo`: `lower_is_better=true, target=300, red=420` → `420 > 300` →
+  true. Passes.
+
+Added as a new "Step 0.5" in `003`, right after the `red_value` NOT NULL
+drop (same theme - both are about making a null `red_value` a real,
+correctly-handled state instead of an incidental one). Idempotent via
+DROP-then-ADD with a stable constraint name. Rollback section updated to
+reverse it too, with a note that restoring the *original* (non-null-aware)
+version only works if every null-`red_value` row from `003`/`004`/`005`
+is gone first.
+
+**`003` now fixes three separate things found across two failed runs:**
+the `red_value` NOT NULL constraint (failure 1), the leftover
+single-column PK (failure 2), and `metric_targets_direction`'s null gap
+(found via the user's own pg_constraint check, before a third failure).
+**Ready to re-run** - telling the user directly this time rather than
+inferring: the constraint list is now the authoritative one from
+`pg_catalog`, not PostgREST's bounded schema view, so there's no known
+remaining gap the way there was going into revision 2.
+
 **Trailing actuals delivered** (plain tables, no proposed targets) so you
 can set TPLH and SSSG thresholds yourself - see chat response. TPLH used
 `lib/calc.js`'s `exclusionReason()` and `lib/throughput.js`'s exact
