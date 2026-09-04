@@ -405,7 +405,7 @@ export default function ShiftApp() {
               {view === "tplh" && <TPLH />}
               {view === "drivethru" && <DriveThru />}
               {view === "sssg" && <SSSG />}
-              {view === "commandcenter" && <CommandCenter />}
+              {view === "commandcenter" && <CommandCenter onAuthExpired={expired} />}
               {view === "email" && <EmailPreview isoDate={isoDate} groupFilter={region} />}
               {view === "targets" && <Targets onAuthExpired={expired} />}
             </>
