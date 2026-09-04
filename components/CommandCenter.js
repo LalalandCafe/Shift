@@ -18,6 +18,7 @@
 import { Fragment, useEffect, useState } from "react";
 import Icon from "./Icon";
 import { sectionize } from "../lib/ui";
+import { fmtForUnit } from "../lib/scale";
 
 /**
  * Warns when a comparison is about to span a month daily_sales doesn't
@@ -69,6 +70,109 @@ export function CoverageBanner({ months }) {
         This comparison includes {gapText} - not enough synced data to trust
         a comparison against {gaps.length === 1 ? "it" : "them"}.
       </div>
+    </div>
+  );
+}
+
+// Maps goalStatus()'s three states onto the same green/red family every
+// other tab already uses - lib/scale.js's own rule is "the chain reads red
+// or green, never orange," so "offGoal" (a target-only metric that hasn't
+// hit its number but has no red-line to call it a crisis) gets the soft
+// red, not an amber that would break that rule.
+const GOAL_STATUS_STYLE = {
+  onGoal: { fill: "var(--band-green)", text: "#fff", label: "On goal" },
+  offGoal: { fill: "var(--band-red-soft)", text: "var(--band-red)", label: "Off goal" },
+  action: { fill: "var(--band-red)", text: "#fff", label: "Action" },
+  none: { fill: "transparent", text: "var(--text3)", label: "No data" },
+};
+
+/**
+ * Chain-wide goal chips (Command Center Phase 4/4b step 3) - one chip per
+ * metric_targets row that both (a) is chain-wide and (b) this tab's API
+ * route knows how to compute a current value for from existing calc
+ * functions (see app/api/command-center/goals/route.js's currentValueFor).
+ * Adding a new chain-wide target row lights up a new chip automatically;
+ * nothing here recomputes SSSG, kitchen ticket time, or any other number -
+ * it only reads what that route already computed and applies
+ * lib/scale.js's goalStatus() to it.
+ */
+export function GoalChips() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let dead = false;
+    fetch("/api/command-center/goals")
+      .then((r) => r.json())
+      .then((json) => {
+        if (dead) return;
+        if (!json.ok) throw new Error(json.error || "Failed to load goals");
+        setData(json);
+      })
+      .catch((e) => !dead && setError(e.message));
+    return () => {
+      dead = true;
+    };
+  }, []);
+
+  if (error) {
+    return (
+      <div className="note note-warn">
+        <Icon name="alert" size={15} />
+        <div>{error}</div>
+      </div>
+    );
+  }
+  if (!data) return null;
+
+  return (
+    <div className="tcard">
+      <div className="thead">
+        <div>
+          <div className="ttl">Goals</div>
+          <div className="tsub">
+            Chain-wide targets from the unified targets table. A metric with
+            a target but no red-line yet reads On goal / Off goal only.
+          </div>
+        </div>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, padding: "4px 14px 14px" }}>
+        {data.chips.map((c) => {
+          const style = GOAL_STATUS_STYLE[c.status] || GOAL_STATUS_STYLE.none;
+          const fmt = fmtForUnit(c.unit);
+          return (
+            <div
+              key={c.metric}
+              style={{
+                background: style.fill,
+                color: style.text,
+                borderRadius: 10,
+                padding: "10px 14px",
+                minWidth: 160,
+                border: c.status === "none" ? "1px solid var(--border)" : "none",
+              }}
+              title={c.note || ""}
+            >
+              <div style={{ fontSize: 12, opacity: 0.85 }}>{c.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>
+                {c.value === null ? "--" : fmt(c.value)}
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.85 }}>
+                {style.label}
+                {c.target != null ? ` · target ${fmt(c.target)}` : ""}
+              </div>
+            </div>
+          );
+        })}
+        {data.chips.length === 0 && <div className="empty">No chain-wide targets yet.</div>}
+      </div>
+      {data.perStoreTargetsNotYetWired > 0 && (
+        <div style={{ padding: "0 14px 14px", fontSize: 12, color: "var(--text3)" }}>
+          {data.perStoreTargetsNotYetWired} per-store target row
+          {data.perStoreTargetsNotYetWired === 1 ? "" : "s"} in the targets table
+          {" "}aren't shown here yet (per-store SPLH chips are a follow-up, not built in this phase).
+        </div>
+      )}
     </div>
   );
 }
@@ -264,6 +368,10 @@ export default function CommandCenter({ onAuthExpired }) {
       <CoverageBanner />
 
       <div style={{ marginTop: 17 }}>
+        <GoalChips />
+      </div>
+
+      <div style={{ marginTop: 17 }}>
         <AccountabilityTable onAuthExpired={onAuthExpired} />
       </div>
 
@@ -271,10 +379,11 @@ export default function CommandCenter({ onAuthExpired }) {
         <Icon name="layers" size={22} />
         <div className="empty-title">More on the way</div>
         <div>
-          Goal chips and a metric drill-down are shipping here phase by
-          phase - see docs/plans/COMMAND-CENTER-PROGRESS.md. Drive-thru
-          window time is deferred (pilot-only, see that doc) and won't
-          appear in this tab yet.
+          A metric drill-down is shipping here next - see
+          docs/plans/COMMAND-CENTER-PROGRESS.md. Drive-thru window time is
+          deferred (pilot-only, see that doc) and won't appear in this tab
+          yet. Per-store SPLH goal chips are also a follow-up, not part of
+          this phase.
         </div>
       </div>
     </div>

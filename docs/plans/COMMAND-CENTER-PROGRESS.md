@@ -10,15 +10,20 @@ checkpoint per the execution order.
   `stores.gm_name`/`stores.area_manager_name` confirmed live.
 - `docs/sql/003-unify-metric-targets.sql` (Phase 4/4b step 1) - **first run
   failed** (`red_value` NOT NULL violation on the SPLH backfill), confirmed
-  fully rolled back, then fixed in place. Ready to re-run - see below.
+  fully rolled back, then fixed in place. Cleared to re-run (you confirmed
+  the two SQL views directly) - **still not run as of this update**,
+  verified live, not assumed. Run this before `004`.
+- `docs/sql/004-sssg-target.sql` (Phase 4/4b step 3, new) - adds the SSSG
+  chain-wide target (0%, no red-line). Depends on `003`'s `store_code`
+  column and partial unique index - will fail if run first. Not run yet.
 
 **Unrelated, flagged not fixed:** `docs/sql/002-store-opened-at.sql`
-(untracked) and, as of this update, an uncommitted change to `lib/sssg.js`
-adding weekly SSSG / `computeWeekComparison()` / `stores.opened_at` - none
-of this session's doing. `lib/sssg.js`'s change is left exactly as found,
-uncommitted, not staged, not touched - whoever owns that work should
-commit it themselves. Same for the untracked SQL file. Both look like
-real, coherent, in-progress work (the sssg.js change even correctly reuses
+(untracked), an uncommitted change to `lib/sssg.js` adding weekly SSSG /
+`computeWeekComparison()` / `stores.opened_at`, and now also an untracked
+`scripts/toast-net-sales-probe.js` - none of this session's doing. All left
+exactly as found, uncommitted, not staged, not touched - whoever owns that
+work should commit it themselves. These look like real, coherent,
+in-progress work (the sssg.js change even correctly reuses
 `lib/calendar.js`'s `addDays` from Phase 1) - not something to worry
 about, but worth confirming who's driving it so two sessions don't step on
 each other's commits on this branch.
@@ -354,29 +359,150 @@ completely untouched - only new rows may now have a null `red_value`.
   `cfgFromTarget()` for the new `splh_*` rows yet, only
   `app/api/drive-thru/route.js`'s `dt_window` row reaches it today, and
   that row is untouched.
-- **SQL views - could not fully confirm.** `metric_targets`'s own column
-  comment (read via the same OpenAPI introspection) says it's "read by SQL
-  views" - I can see view names/output columns this way but not their
-  actual SQL definitions (no `information_schema` access from here). Found
-  two plausibly-relevant views (`dt_bands`, `drive_thru_vs_kitchen`) and,
-  unexpectedly, a **third, separate table** - `drive_thru_targets`
-  (`green_seconds=45`/`yellow_seconds=90`, its own single-row config) -
-  that isn't `metric_targets` at all and isn't queried anywhere in this
-  repo's application code. My reasoned (not confirmed) conclusion: existing
-  rows are untouched by `DROP NOT NULL`, and every view/query pattern seen
-  in this repo filters by a specific known `metric` name rather than
-  scanning unscoped, so the new `splh_*` rows likely aren't visible to
-  anything yet - but if you want certainty rather than reasoned confidence,
-  worth a direct look at `dt_bands`'s actual definition in the Supabase
-  dashboard before re-running.
+- **SQL views - confirmed, no longer just inference.** You checked both
+  view definitions directly in the Supabase dashboard:
+  - `dt_bands` filters `where metric = 'dt_window'` and already does
+    `coalesce(green_value, target_value * 0.85)` - meaning `green_value`
+    being nullable with a fallback was already the rule this table lived
+    by, and `red_value` being `NOT NULL` was the actual inconsistency, not
+    the other way around. The new `splh_*` rows are filtered out by the
+    `where metric = 'dt_window'` clause regardless of `red_value`. Even in
+    a hypothetical case where it did see a null `red_value`, `b_red`/`b_far`
+    would come back null, not zero - no silent misbehavior.
+  - `drive_thru_vs_kitchen` doesn't reference `metric_targets` at all - it
+    only joins `drive_thru_daily`, `kitchen_metrics`, and
+    `daily_transactions`.
+  Both views are confirmed unaffected. No open item remains on this file.
 
-### Step 3 — goal chip component — blocked on Step 2
+### Step 3 — goal chip component ✅ done
 
-Not started. Waiting on your reply for TPLH/SSSG numbers and the kitchen
-confirmation before wiring anything beyond SPLH and (if you want it)
-rating. **Design requirement noted for when this starts:** a metric with a
-target but no red-line (null `red_value`) gets on-goal/off-goal only - no
-ACTION state - until a red-line is supplied.
+**Files:** `lib/scale.js` (`goalStatus()`, `fmtForUnit()` extended, the
+`cfgFromTarget` fix), `app/api/command-center/goals/route.js` (new),
+`components/CommandCenter.js` (`GoalChips`), `test/goal-status.test.mjs`
+(new), `docs/sql/004-sssg-target.sql` (new, not run).
+
+**Threshold decisions, applied:**
+1. Kitchen ticket time: kept at 300s/420s, no change.
+2. SSSG: target 0% (the growing/shrinking boundary, not invented), no
+   red-line, chain-wide only - one comparable month is not a basis for a
+   regional split. Written to `docs/sql/004-sssg-target.sql`, not run yet.
+3. TPLH: correlation check run (below) - result was "they correlate," so
+   per your own rule this needs per-store targets, which you're setting
+   separately. No chain-wide 5.75/6.25 row was written, and no per-store
+   numbers were invented.
+4. 10037 (DFW El Dorado) excluded from the TPLH correlation check and from
+   all target-setting - soft opening, gets its own target later.
+5. `lib/scale.js`'s null-coercion bug - **fixed**: `cfgFromTarget()` now
+   keeps `red_value == null` as `null` instead of `Number(null) → 0`. Only
+   consumer is `DriveThru.js`, whose `dt_window` row always has a real
+   `red_value` - confirmed unaffected, `npm test` still green (30/30 now).
+
+**TPLH vs. average ticket correlation** (same 8-week window as the
+trailing-actuals pull, 10037 excluded): **Pearson r = −0.58** across the 34
+remaining stores - a moderate-to-strong negative correlation (r² ≈ 0.34).
+Reused the exact same formulas as `lib/throughput.js`
+(`transactions / hours` for TPLH, `sales / transactions` for average
+ticket) and `lib/calc.js`'s `exclusionReason()`, aggregated as one 8-week
+total per store rather than per-week, then correlated - one-off script,
+not committed, deleted after use. Full per-store table was given in chat,
+not reproduced here.
+
+**`goalStatus()` (new, `lib/scale.js`)** - the actual new logic this step
+adds, kept separate from the existing four-band `bandFor()` (which still
+needs a `redLine` to classify anything, per the WeekView/DriveThru
+contract that was already in place). Three states: `onGoal`, `offGoal`,
+`action` - `action` only reachable when `redLine` is non-null, so a
+target-only metric (SSSG right now) can never show a false ACTION alarm.
+Colors reuse the existing green/red-soft/red tokens - no amber, per
+`lib/scale.js`'s own standing rule ("the chain reads red or green, never
+orange"). 9 new pure-logic tests in `test/goal-status.test.mjs`, `npm test`
+30/30.
+
+**`app/api/command-center/goals/route.js` (new, admin-gated)** - reads
+every **chain-wide** row (`store_code is null`) from `metric_targets`,
+computes each one's current value from an existing calc function (never a
+new one), and returns a chip per row:
+- `sssg` → `lib/sssg.js`'s `getComparableMonths()` +
+  `computeMonthComparison()` on the latest comparable month, verbatim.
+- `expo` (kitchen ticket time) → `lib/report.js`'s `buildKitchenWeek()`,
+  verbatim - its `companyMedianMin` (chain-wide, weighted by item volume,
+  week to date) × 60 for seconds, to match `expo`'s stored unit.
+- `dt_window` (drive-thru) - explicitly excluded, same deferral as
+  everywhere else in this tab.
+- any row with `store_code` set - explicitly excluded and reported as an
+  unwired count, not silently dropped. See the SPLH note below for why.
+
+**Sanity-check finding, not a bug:** chain-wide kitchen ticket time is
+currently running **~78s** (median, this week) against the 300s target and
+420s red-line - comfortably `onGoal`, not close to either line. Confirmed
+this is a real number, not a mismatch in my wiring (`buildKitchenWeek`'s
+own `NOTICEABLE_FLOOR_MIN` is 4 minutes/240s - the function itself doesn't
+start flagging anything below that, which lines up with a normal baseline
+sitting well under it). Flagging only so the first time you see this chip
+you know why it reads so far from the line - not asking you to revisit the
+300s/420s decision, which you already made.
+
+**Per-store SPLH chips (`splh_weekday`/`splh_weekend`/`splh_ptd`) -
+explicitly NOT wired in this step**, for two reasons, not one: (1)
+`docs/sql/003-unify-metric-targets.sql` hasn't run yet - live-verified
+just before building this (`metric_targets.store_code does not exist`),
+so there are no per-store rows to read yet regardless. (2) Wiring them
+needs a design decision this step didn't make unilaterally: `lib/report.js`'s
+`buildDailyReport()` returns `day`/`wtd`/`ptd` SPLH per store, but which of
+those should be checked against `splh_weekday` vs. `splh_weekend` isn't a
+1:1 mapping the way `expo`/`sssg` were - and the `metric_targets` copy is
+already documented (in 003's own comments) as a mirror that drifts stale
+the moment someone edits a target through the existing Targets tab, since
+that write path was deliberately left untouched. Flagging this rather than
+guessing at the mapping. The `GoalChips` UI already reports how many
+per-store rows exist so this isn't invisible once 003 runs.
+
+**Verification:** `npm test` (30/30). JSX/syntax checked via Next's bundled
+SWC compiler (`components/CommandCenter.js`, the new route,
+`lib/scale.js`). Route logic exercised directly (no Entra session
+available, same workaround as every other phase): admin header → correctly
+surfaced `metric_targets.store_code does not exist` (003 hasn't run - an
+honest failure, not swallowed, same pattern as `AccountabilityTable`'s
+pre-migration PATCH failure); no header → 401. The `expo`/`sssg`
+`currentValueFor()` branches were verified separately, live, working around
+the same missing `store_code` column by querying `metric_targets` without
+it - `expo` came back exactly as shown above; `sssg` couldn't be verified
+end-to-end yet since its row doesn't exist until `004` runs, but
+`getComparableMonths()`/`computeMonthComparison()` were already proven
+correct live during the trailing-actuals pull. **Not done:** an actual
+browser pass - same standing caution as every phase.
+
+**Still needs your action, in order:** run `003` (unblocks per-store rows
+existing at all, though they still won't have a UI yet), then `004`
+(lights up the `sssg` chip). The `expo` chip already works today without
+either.
+
+**003 cleared to re-run** - you confirmed both `dt_bands` and
+`drive_thru_vs_kitchen` directly in the Supabase dashboard (see revision
+note above). No open items remain on that file. **Still not run as of this
+update** - verified live (`metric_targets` has no `store_code` column,
+still only the original 2 rows) rather than assumed.
+
+**Trailing actuals delivered** (plain tables, no proposed targets) so you
+can set TPLH and SSSG thresholds yourself - see chat response. TPLH used
+`lib/calc.js`'s `exclusionReason()` and `lib/throughput.js`'s exact
+`transactions / hours` formula, applied per-day and bucketed into
+weekday/weekend instead of a full week (no existing function does that
+split - the formula itself is unchanged). SSSG used
+`lib/sssg.js`'s `getComparableMonths()`/`computeMonthComparison()`
+verbatim, with region rollups computed as a plain re-sum of its own
+per-store `comparable` rows. Both pulls were one-off ad hoc scripts run
+directly against production (read-only), not added to the app or
+committed - deleted after use.
+
+**Correction (was wrong above):** the July 2024 rows for store 10001 in
+`daily_sales` are **not** stray demo/seed data - per your correction,
+that's the original pilot for that store, real documented history. Not
+flagged for cleanup. It still doesn't affect the SSSG output above -
+`getComparableMonths()`'s `MIN_COMPARABLE_STORES` rule excludes both July
+and August 2024 for having only 1 store's data either way, so August 2026
+vs August 2025 remains the only comparable month right now - that part of
+the read was correct, only the "why" was wrong.
 
 ## Phase 4b — Targets schema unification — not started
 
@@ -399,13 +525,15 @@ ACTION state - until a red-line is supplied.
    — Phase 4/4b step 1.
 6. `fix(command-center): make metric_targets.red_value nullable in 003` —
    fixes the failed first run, ready to re-run.
+7. `feat(command-center): goal chip component, SSSG target, scale.js
+   null-redLine fix` — Phase 4/4b step 3.
 
 Nothing pushed. Nothing merged to `main`.
 
 **SQL pending your review/run:** `docs/sql/003-unify-metric-targets.sql`
-(fixed, ready to re-run). `001-store-managers.sql` already ran
-successfully.
+(fixed, cleared, still not run) then `docs/sql/004-sssg-target.sql` (new,
+depends on 003). `001-store-managers.sql` already ran successfully.
 
-**Not mine, left alone:** an uncommitted change to `lib/sssg.js` and an
-untracked `docs/sql/002-store-opened-at.sql`, both from outside this
-session's work.
+**Not mine, left alone:** an uncommitted change to `lib/sssg.js`, an
+untracked `docs/sql/002-store-opened-at.sql`, and an untracked
+`scripts/toast-net-sales-probe.js` - all from outside this session's work.
