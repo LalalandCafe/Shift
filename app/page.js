@@ -15,6 +15,7 @@ import ServiceBoard from "../components/ServiceBoard";
 import TPLH from "../components/TPLH";
 import DriveThru from "../components/DriveThru";
 import SSSG from "../components/SSSG";
+import SSSGWeekly from "../components/SSSGWeekly";
 import { yesterdayISO } from "../lib/ui";
 
 /**
@@ -35,6 +36,7 @@ const VIEWS = [
   { key: "storetrend",  label: "Store detail",  short: "Store",     icon: "search",    group: "Stores",     roles: ALL, date: true },
   { key: "leaderboard", label: "Leaderboard",   short: "Board",     icon: "rank",      group: "Stores",     roles: ALL, date: true },
   { key: "sssg",        label: "SSSG",          short: "SSSG",      icon: "gauge",     group: "Stores",     roles: ["admin"] },
+  { key: "sssg-weekly", label: "Weekly SSSG",   short: "Wk SSSG",   icon: "gauge",     group: "Stores",     roles: ["admin"] },
   { key: "service",     label: "Service times", short: "Service",   icon: "timer",     group: "Operations", roles: ["admin"], date: true },
   { key: "tplh",        label: "TPLH",          short: "TPLH",      icon: "activity",  group: "Operations", roles: ["admin"] },
   { key: "drivethru",   label: "Drive-thru",    short: "Drive",     icon: "car",       group: "Operations", roles: ["admin"] },
@@ -403,6 +405,7 @@ export default function ShiftApp() {
               {view === "tplh" && <TPLH />}
               {view === "drivethru" && <DriveThru />}
               {view === "sssg" && <SSSG />}
+              {view === "sssg-weekly" && <SSSGWeekly />}
               {view === "email" && <EmailPreview isoDate={isoDate} groupFilter={region} />}
               {view === "targets" && <Targets onAuthExpired={expired} />}
             </>

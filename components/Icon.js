@@ -27,6 +27,7 @@ const PATHS = {
   calendar: "M4 6h16v14H4z|M4 10.5h16|M8.5 3v4|M15.5 3v4",
   menu: "M4 7h16|M4 12h16|M4 17h16",
   gauge: "M4.5 18a8.5 8.5 0 1 1 15 0|M12 18l4-5",
+  funnel: "M4 4.5h16l-6 7.5v6l-4 2v-8z",
 };
 
 export default function Icon({ name, size = 16, strokeWidth = 1.6, className = "" }) {
