@@ -1,4 +1,4 @@
-import { getToastToken, getTimeEntries } from "@/lib/toast";
+import { getToastToken, getTimeEntries, isOrderExcluded, grossSalesForCheck } from "@/lib/toast";
 import { translateTimeEntries } from "@/lib/toast-labels";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -142,7 +142,7 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
     if (!Array.isArray(orders) || orders.length === 0) break;
 
     orders.forEach((order) => {
-      if (!order || order.voided || order.deleted || order.excessFood) return;
+      if (isOrderExcluded(order)) return;
 
       const orderDate =
         parseToastDate(order.openedDate) ||
@@ -161,13 +161,7 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
         if (hour === null) unattributedTxns += 1;
         else hourlyTxns[hour] += 1;
 
-        let checkSales = 0;
-        (check.selections || []).forEach((sel) => {
-          if (sel.voided) return;
-          if (sel.deferred) return;
-          checkSales += (sel.preDiscountPrice || 0);
-        });
-
+        const checkSales = grossSalesForCheck(check);
         grossSales += checkSales;
         if (hour === null) unattributedSales += checkSales;
         else hourlySales[hour] += checkSales;

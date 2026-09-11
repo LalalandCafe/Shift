@@ -1,0 +1,119 @@
+name: Toast Net Sales Probe (manual)
+
+# One-off investigation tool for the net_sales SSSG decision - see
+# app/api/toast/net-sales-probe/route.js's header for what this is and
+# why that route should be deleted once the investigation concludes.
+#
+# Same secrets, same call pattern as backfill-sales.yml: POST/GET to our
+# own app via APP_URL + SYNC_SECRET. Toast credentials are never handed to
+# GitHub Actions - they stay in Vercel, exactly like every other sync
+# workflow in this repo. No new secret is introduced here.
+#
+# Manual-only, never scheduled - this reads raw (redacted) Toast orders
+# and nobody should be able to trigger that automatically.
+
+on:
+  workflow_dispatch:
+    inputs:
+      store_code:
+        description: "Store code"
+        required: true
+        default: "10001"
+      business_date:
+        description: "Business date YYYY-MM-DD"
+        required: true
+        default: "2026-08-24"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Call the probe route
+        id: probe
+        run: |
+          STORE="${{ github.event.inputs.store_code }}"
+          DATE="${{ github.event.inputs.business_date }}"
+
+          if ! [[ "$STORE" =~ ^[0-9]+$ ]]; then
+            echo "::error::store_code must be numeric, got '$STORE'"
+            exit 1
+          fi
+          if ! [[ "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "::error::business_date must be YYYY-MM-DD, got '$DATE'"
+            exit 1
+          fi
+
+          # -o writes the response body straight to probe-response.json, so
+          # stdout carries ONLY the -w output below - no leading "\n" here,
+          # unlike the body+status-on-one-stream trick backfill-sales.yml
+          # uses, or command substitution keeps that newline and every
+          # string comparison against "200" below silently fails forever.
+          HTTP=$(curl -s -m 90 -w "%{http_code}" -o probe-response.json \
+            -X GET "${{ secrets.APP_URL }}/api/toast/net-sales-probe?storeCode=$STORE&businessDate=$DATE" \
+            -H "x-sync-secret: ${{ secrets.SYNC_SECRET }}")
+
+          echo "http_status=$HTTP" >> "$GITHUB_OUTPUT"
+
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Probe route returned HTTP $HTTP"
+            cat probe-response.json
+            exit 1
+          fi
+
+          OK=$(jq -r '.ok' probe-response.json)
+          if [ "$OK" != "true" ]; then
+            echo "::error::Probe route responded ok:false"
+            jq -r '.error' probe-response.json
+            exit 1
+          fi
+
+          STORE_NAME=$(jq -r '.storeName' probe-response.json)
+          ORDER_COUNT=$(jq -r '.orderCount' probe-response.json)
+          GROSS_COMPUTED=$(jq -r '.grossComputedFromToastJustNow' probe-response.json)
+          GROSS_STORED=$(jq -r '.grossStoredInDailySales' probe-response.json)
+          MATCHES=$(jq -r '.grossMatchesStored' probe-response.json)
+
+          {
+            echo "### Toast Net Sales Probe - $STORE_NAME ($STORE), $DATE"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Orders fetched | $ORDER_COUNT |"
+            echo "| Gross computed just now from Toast | \`$GROSS_COMPUTED\` |"
+            echo "| Gross stored in daily_sales | \`$GROSS_STORED\` |"
+            echo "| Match | $MATCHES |"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo ""
+          echo "=== GROSS CHECK ==="
+          echo "computed: $GROSS_COMPUTED   stored: $GROSS_STORED   matches: $MATCHES"
+
+          if [ "$MATCHES" != "true" ]; then
+            echo "::error::GROSS MISMATCH - computed ($GROSS_COMPUTED) does not match daily_sales ($GROSS_STORED) for store $STORE on $DATE. This means the problem is NOT net-vs-gross. Stop before touching net_sales."
+            jq -r '.grossMismatchWarning' probe-response.json
+            {
+              echo "**GROSS MISMATCH - see job log. Do not proceed with the net_sales work until this is explained.**"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo ""
+          echo "=== DISCOUNT-SHAPED FIELDS (path, day sum, occurrence count) ==="
+          jq -r '.discountFields[] | "\(.path)\tsum=\(.sum)\tn=\(.count)"' probe-response.json
+
+          {
+            echo "#### Discount-shaped fields"
+            echo '```'
+            jq -r '.discountFields[] | "\(.path)\tsum=\(.sum)\tn=\(.count)"' probe-response.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload probe output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toast-net-sales-probe-${{ github.run_id }}
+          path: probe-response.json
+          retention-days: 1
