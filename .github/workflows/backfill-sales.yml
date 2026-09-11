@@ -14,10 +14,34 @@ name: Backfill Sales (manual)
 # change how sales are computed - it just avoids ~35 x N days of pointless
 # Toast calls for kitchen data nobody asked to backfill.
 #
+# daily_transactions is NOT a separate load: computeSalesTransactionsAndHours
+# in the sync route computes gross sales AND transaction count from the same
+# single ordersBulk pass, and the route writes both tables (in their own
+# try/catch each) from that one call. This workflow gets daily_transactions
+# for free from every store/day pair it already syncs.
+#
 # Unlike backfill-toast.sh (which only checks HTTP 200), this checks the
 # response body's "ok" field too, same as daily-sync.yml already does -
 # HTTP 200 with ok:false (a transactionError or hourlyError) does NOT count
 # as success here.
+#
+# Chunking: start_date/end_date can span any range. They're split
+# internally into sequential chunks of at most CHUNK_DAYS days each (the
+# old 45-day limit no longer rejects the dispatch - it's now a per-chunk
+# size, enforced by construction when the chunk plan is built, not a
+# validation that can fail). Chunks run one after another, never in
+# parallel - only the per-day, per-store fan-out within a chunk is
+# parallel, unchanged from before. A chunk with failed pairs does not stop
+# the run: the outer chunk loop and the per-day sync loop are both
+# deliberately insulated from a failing pair's exit code (see the `|| true`
+# on the xargs pipeline below) so this script's own `set -e` (the GitHub
+# Actions bash default) can't kill a 300-day run because one store had one
+# bad day. Every failure is still recorded in failed-pairs.txt and in the
+# final summary - nothing is silently swallowed, just not fatal.
+#
+# dry_run: prints the chunk plan (and nothing else - no store list fetch,
+# no Toast calls, no artifact) and exits 0. Use it to sanity-check a large
+# range's chunk boundaries before actually running it.
 
 on:
   workflow_dispatch:
@@ -32,6 +56,11 @@ on:
         description: "Optional: single store code to backfill. Blank = all active stores."
         required: false
         default: ""
+      dry_run:
+        description: "Print the chunk plan and exit without calling Toast"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: shift-backfill-sales
@@ -42,12 +71,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     steps:
-      - name: Validate inputs
+      # Runs first, unconditionally, before anything else has a chance to
+      # fail. This is the actual fix for the artifact upload reporting "No
+      # files were found": previously these three files were only created
+      # inside the "Backfill" step, so if "Validate inputs" or "Traer lista
+      # de tiendas" failed first, "Backfill" never ran, the files never
+      # existed, and "Upload logs" (which does run on failure, via
+      # if: always()) had nothing to find. Creating them here means every
+      # later failure, no matter how early, still leaves something real to
+      # upload.
+      - name: Prepare log files
+        run: |
+          : > full-log.txt
+          : > synced-pairs.txt
+          : > failed-pairs.txt
+
+      - name: Validate inputs and plan chunks
         id: validate
         run: |
           START="${{ github.event.inputs.start_date }}"
           END="${{ github.event.inputs.end_date }}"
           STORE="${{ github.event.inputs.store_code }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+          CHUNK_DAYS=45
 
           for d in "$START" "$END"; do
             if ! [[ "$d" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
@@ -71,20 +117,46 @@ jobs:
             echo "::error::end_date ($END) is before start_date ($START)"
             exit 1
           fi
+          TOTAL_DAYS=$(( (END_EPOCH - START_EPOCH) / 86400 + 1 ))
 
-          DAYS=$(( (END_EPOCH - START_EPOCH) / 86400 + 1 ))
-          if [ "$DAYS" -gt 45 ]; then
-            echo "::error::Range is $DAYS days, which is over the 45-day guard. Split it into smaller dispatches."
-            exit 1
-          fi
+          # Split [START, END] into consecutive, non-overlapping windows of
+          # at most CHUNK_DAYS days each, oldest first. The 45-day guard is
+          # now this construction itself - every chunk this loop produces
+          # is <= CHUNK_DAYS by definition, so there's nothing left to
+          # reject a big dispatch for.
+          CHUNKS="[]"
+          CURSOR="$START"
+          while [[ "$CURSOR" < "$END" || "$CURSOR" == "$END" ]]; do
+            CHUNK_END_EPOCH=$(( $(date -d "$CURSOR" +%s) + (CHUNK_DAYS - 1) * 86400 ))
+            CHUNK_END=$(date -d "@$CHUNK_END_EPOCH" +%Y-%m-%d)
+            if [[ "$CHUNK_END" > "$END" ]]; then CHUNK_END="$END"; fi
+            DAYS=$(( ( $(date -d "$CHUNK_END" +%s) - $(date -d "$CURSOR" +%s) ) / 86400 + 1 ))
+            CHUNKS=$(echo "$CHUNKS" | jq -c --arg s "$CURSOR" --arg e "$CHUNK_END" --argjson d "$DAYS" \
+              '. + [{start: $s, end: $e, days: $d}]')
+            CURSOR=$(date -d "$CHUNK_END +1 day" +%Y-%m-%d)
+          done
 
-          echo "start=$START" >> "$GITHUB_OUTPUT"
-          echo "end=$END" >> "$GITHUB_OUTPUT"
+          CHUNK_COUNT=$(echo "$CHUNKS" | jq 'length')
+
+          echo "Rango total: $START a $END ($TOTAL_DAYS dias) | tienda: ${STORE:-todas} | dry_run: $DRY_RUN"
+          echo "Plan: $CHUNK_COUNT chunk(s) de hasta $CHUNK_DAYS dias cada uno"
+          echo "$CHUNKS" | jq -r 'to_entries[] | "  chunk \(.key + 1) of '"$CHUNK_COUNT"': \(.value.start) a \(.value.end) (\(.value.days) dias)"'
+
+          {
+            echo "### Backfill plan: $START a $END ($TOTAL_DAYS dias total)"
+            echo "Tienda: ${STORE:-todas} | dry_run: $DRY_RUN"
+            echo ""
+            echo "| Chunk | Start | End | Days |"
+            echo "|---|---|---|---|"
+            echo "$CHUNKS" | jq -r 'to_entries[] | "| \(.key + 1) | \(.value.start) | \(.value.end) | \(.value.days) |"'
+          } >> "$GITHUB_STEP_SUMMARY"
+
           echo "store=$STORE" >> "$GITHUB_OUTPUT"
-          echo "days=$DAYS" >> "$GITHUB_OUTPUT"
-          echo "Rango: $START a $END ($DAYS dias) | tienda: ${STORE:-todas}"
+          echo "chunks_json=$CHUNKS" >> "$GITHUB_OUTPUT"
+          echo "chunk_count=$CHUNK_COUNT" >> "$GITHUB_OUTPUT"
 
       - name: Traer lista de tiendas
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
           curl -sf "${{ secrets.SUPABASE_URL }}/rest/v1/stores?active=eq.true&toast_guid=not.is.null&select=code,toast_guid" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
@@ -106,14 +178,11 @@ jobs:
 
       - name: Backfill
         id: backfill
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
-          START="${{ steps.validate.outputs.start }}"
-          END="${{ steps.validate.outputs.end }}"
+          CHUNKS_JSON='${{ steps.validate.outputs.chunks_json }}'
+          CHUNK_COUNT="${{ steps.validate.outputs.chunk_count }}"
           PARALLEL=4
-
-          : > full-log.txt
-          : > synced-pairs.txt
-          : > failed-pairs.txt
 
           sync_one() {
             local code="$1" guid="$2" iso="$3"
@@ -155,22 +224,64 @@ jobs:
           }
           export -f sync_one
 
-          DATES=()
-          CUR="$END"
-          while [[ "$CUR" > "$START" || "$CUR" == "$START" ]]; do
-            DATES+=("$CUR")
-            CUR=$(date -d "$CUR -1 day" +%Y-%m-%d)
-          done
+          CHUNK_NUM=0
+          CHUNKS_OK=0
+          CHUNKS_WITH_FAILURES=0
 
-          echo "Dias a procesar: ${#DATES[@]}"
-          day_num=0
-          for iso in "${DATES[@]}"; do
-            day_num=$(( day_num + 1 ))
-            echo "[$day_num/${#DATES[@]}] $iso"
-            jq -r '.[] | "\(.code) \(.toast_guid)"' stores.json \
-              | xargs -P "$PARALLEL" -I {} bash -c 'set -- {}; sync_one "$1" "$2" "'"$iso"'"'
-            sleep 2
-          done
+          # Process substitution (< <(...)), not a `| while` pipe, so
+          # CHUNK_NUM/CHUNKS_OK/etc set inside this loop are still visible
+          # after it ends - a piped while would run in a subshell and lose
+          # them.
+          while IFS= read -r chunk; do
+            CHUNK_NUM=$(( CHUNK_NUM + 1 ))
+            CSTART=$(echo "$chunk" | jq -r '.start')
+            CEND=$(echo "$chunk" | jq -r '.end')
+
+            echo ""
+            echo "================================================"
+            echo "Chunk $CHUNK_NUM of $CHUNK_COUNT: $CSTART to $CEND"
+            echo "================================================"
+            {
+              echo ""
+              echo "=== Chunk $CHUNK_NUM of $CHUNK_COUNT: $CSTART to $CEND ==="
+            } >> full-log.txt
+
+            FAIL_BEFORE=$(wc -l < failed-pairs.txt)
+
+            DATES=()
+            CUR="$CEND"
+            while [[ "$CUR" > "$CSTART" || "$CUR" == "$CSTART" ]]; do
+              DATES+=("$CUR")
+              CUR=$(date -d "$CUR -1 day" +%Y-%m-%d)
+            done
+
+            day_num=0
+            for iso in "${DATES[@]}"; do
+              day_num=$(( day_num + 1 ))
+              echo "[chunk $CHUNK_NUM/$CHUNK_COUNT day $day_num/${#DATES[@]}] $iso"
+              # `|| true`: a store/day pair failing all 3 retries makes
+              # sync_one return 1, which makes xargs exit 123. Without this
+              # guard, GitHub Actions' default `bash -e -o pipefail` would
+              # kill this whole step - and every remaining chunk - the
+              # first time any single pair permanently fails. The failure
+              # is still fully recorded in full-log.txt/failed-pairs.txt by
+              # sync_one itself; this only stops that failure from being
+              # fatal to the script.
+              jq -r '.[] | "\(.code) \(.toast_guid)"' stores.json \
+                | xargs -P "$PARALLEL" -I {} bash -c 'set -- {}; sync_one "$1" "$2" "'"$iso"'"' \
+                || true
+              sleep 2
+            done
+
+            FAIL_AFTER=$(wc -l < failed-pairs.txt)
+            if [ "$FAIL_AFTER" -gt "$FAIL_BEFORE" ]; then
+              CHUNKS_WITH_FAILURES=$(( CHUNKS_WITH_FAILURES + 1 ))
+              echo "Chunk $CHUNK_NUM finished with $(( FAIL_AFTER - FAIL_BEFORE )) failed pair(s)"
+            else
+              CHUNKS_OK=$(( CHUNKS_OK + 1 ))
+              echo "Chunk $CHUNK_NUM finished clean"
+            fi
+          done < <(echo "$CHUNKS_JSON" | jq -c '.[]')
 
           OK_COUNT=$(wc -l < synced-pairs.txt)
           FAIL_COUNT=$(wc -l < failed-pairs.txt)
@@ -179,9 +290,13 @@ jobs:
           [ -z "$STORE_LABEL" ] && STORE_LABEL="todas"
 
           {
-            echo "### Backfill $START a $END (tienda: $STORE_LABEL)"
-            echo "Exitosos: $OK_COUNT"
-            echo "Fallidos: $FAIL_COUNT"
+            echo ""
+            echo "### Backfill summary (tienda: $STORE_LABEL)"
+            echo "Chunks attempted: $CHUNK_COUNT"
+            echo "Chunks succeeded (zero failed pairs): $CHUNKS_OK"
+            echo "Chunks with at least one failure: $CHUNKS_WITH_FAILURES"
+            echo "Store/day pairs written: $OK_COUNT"
+            echo "Store/day pairs failed: $FAIL_COUNT"
             if [ "$FAIL_COUNT" -gt 0 ]; then
               echo ""
               echo "Fallidos (revisa failed-pairs.txt en el artifact para reintentar solo esos):"
@@ -193,10 +308,17 @@ jobs:
 
           echo "ok_count=$OK_COUNT" >> "$GITHUB_OUTPUT"
           echo "fail_count=$FAIL_COUNT" >> "$GITHUB_OUTPUT"
+          echo "chunks_with_failures=$CHUNKS_WITH_FAILURES" >> "$GITHUB_OUTPUT"
 
+      # v6: v4 is stuck on Node 20, which GitHub Actions stopped running by
+      # default after the June 2026 Node 24 cutover - v4 runs were starting
+      # to fail purely on that, unrelated to anything this workflow does.
+      # v6 (like v5) runs on Node 24. No input/output shape changed across
+      # this bump (name/path/retention-days/if-no-files-found are the same
+      # keys v4 already used) - only the action's own runtime moved.
       - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: ${{ always() && github.event.inputs.dry_run != 'true' }}
+        uses: actions/upload-artifact@v6
         with:
           name: backfill-sales-${{ github.run_id }}
           path: |
@@ -204,11 +326,12 @@ jobs:
             synced-pairs.txt
             failed-pairs.txt
           retention-days: 30
+          if-no-files-found: error
 
       - name: Fail job if anything failed
-        if: always()
+        if: ${{ always() && github.event.inputs.dry_run != 'true' }}
         run: |
           if [ "${{ steps.backfill.outputs.fail_count }}" != "0" ]; then
-            echo "::error::${{ steps.backfill.outputs.fail_count }} store/day pairs failed. See the backfill-sales artifact's failed-pairs.txt."
+            echo "::error::${{ steps.backfill.outputs.fail_count }} store/day pairs failed across ${{ steps.backfill.outputs.chunks_with_failures }} chunk(s) of ${{ steps.backfill.outputs.chunk_count }}. See the backfill-sales artifact's failed-pairs.txt."
             exit 1
           fi
