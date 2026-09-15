@@ -30,6 +30,40 @@
 // minus transaction growth) is computed correctly in lib/sssg.js and
 // returned by the API, but this pass doesn't surface it in the UI either -
 // only the three summary blocks that were actually asked for.
+//
+// ===========================================================================
+// DO NOT MERGE THIS TAB YET. TWO BLOCKERS, BOTH UNBUILT.
+// ===========================================================================
+//
+// This tab renders GROSS sales under an SSSG label. lib/sssg.js's
+// computeWeekComparison sums daily_sales.gross_sales - verified, the strings
+// "net_sales"/"netSales" appear zero times in that file - and
+// classifyStoreWeekly has no net-completeness check. The net_sales column
+// exists (docs/sql/007, applied 2026-09-15) but is NULL on all 3,385 rows
+// until the backfill runs.
+//
+// So shipping this today does not render empty. It renders plausible
+// numbers that are gross, roughly 3.4% above the figure finance uses, in a
+// tab labelled SSSG, in front of admins, with nothing on screen saying so.
+// That is worse than rendering nothing, because it survives review.
+//
+// Before this tab can merge, BOTH of these have to exist:
+//
+//   1. computeWeekComparison reads net_sales instead of gross_sales.
+//      fetchDailySalesRange currently selects only gross_sales.
+//
+//   2. classifyStoreWeekly gains the completeness gate: a store missing
+//      net_sales on any day of either week is not comparable, reported with
+//      its own exclusion reason, following the pattern its partial-week
+//      checks already use. Without this, a week straddling backfilled and
+//      un-backfilled data would blend gross and net dollars into one total,
+//      which is silently wrong in an uncontrolled direction.
+//
+// Both were designed but never built. The write path that populates the
+// components ships separately on feat/net-sales-write-path, and must be
+// merged, deployed, gate-validated against Toast, and backfilled before
+// either blocker above can even be worked on.
+// ===========================================================================
 
 "use client";
 
