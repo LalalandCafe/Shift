@@ -18,6 +18,24 @@
 //      amount could not be read. Coercing that to 0 loses real money quietly.
 //   3. string coercion - "10.00" must not be counted. JS would happily add it
 //      to a number and produce a string-concatenated total.
+//
+// WHAT A GREEN RUN OF THIS FILE DOES NOT PROVE. Every payload below is
+// CONSTRUCTED - hand-built objects shaped the way Toast's documentation says
+// its orders are shaped. These tests prove the arithmetic and the defensive
+// behavior are correct GIVEN that shape. They do not prove Toast's real
+// responses have that shape.
+//
+// In particular, the two "gate target" tests below reproduce figures taken
+// from Toast's own Sales Summary, which makes them look like validation
+// against Toast. They are not. They only show that if a check arrives shaped
+// like the fixture, the math lands on Toast's number. Whether a real check
+// carries refundAmount as a positive magnitude, whether refundBusinessDate is
+// populated, whether discounts really do appear at both levels - none of that
+// is settled here. Only a live sync compared against Toast's own report
+// settles it.
+//
+// Necessary, not sufficient. Do not read a green suite as "net_sales is
+// validated."
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
