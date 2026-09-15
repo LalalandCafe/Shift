@@ -26,23 +26,23 @@ import { discountsForCheck, refundsForCheck } from "../lib/toast.js";
 // --- the three that would otherwise never be caught -------------------------
 
 test("refunds: tipRefundAmount sitting next to refundAmount is NOT counted", () => {
-  const check = { guid: "c1", payments: [{ refund: { refundAmount: 10.0, tipRefundAmount: 5.0 } }] };
-  const { amount, anomalies } = refundsForCheck(check);
+  const check = { guid: "c1", payments: [{ refund: { refundAmount: 10.0, tipRefundAmount: 5.0, refundBusinessDate: 20260828 } }] };
+  const { amount, anomalies } = refundsForCheck(check, "20260828");
   assert.equal(amount, 10.0, "only refundAmount may be counted, never the tip refund");
   assert.equal(anomalies.length, 0, "a well-formed refund with a tip refund beside it is not an anomaly");
 });
 
 test("refunds: a refund object with no refundAmount is an anomaly, NOT a silent zero", () => {
-  const check = { guid: "c2", payments: [{ refund: { tipRefundAmount: 5.0 } }] };
-  const { amount, anomalies } = refundsForCheck(check);
+  const check = { guid: "c2", payments: [{ refund: { tipRefundAmount: 5.0, refundBusinessDate: 20260828 } }] };
+  const { amount, anomalies } = refundsForCheck(check, "20260828");
   assert.equal(amount, 0);
   assert.equal(anomalies.length, 1);
   assert.match(anomalies[0], /has no refundAmount/);
 });
 
 test("refunds: a string refundAmount is not coerced, it is an anomaly", () => {
-  const check = { guid: "c3", payments: [{ refund: { refundAmount: "10.00" } }] };
-  const { amount, anomalies } = refundsForCheck(check);
+  const check = { guid: "c3", payments: [{ refund: { refundAmount: "10.00", refundBusinessDate: 20260828 } }] };
+  const { amount, anomalies } = refundsForCheck(check, "20260828");
   assert.equal(amount, 0, "a string must not be added to the total");
   assert.equal(anomalies.length, 1);
   assert.match(anomalies[0], /expected finite number/);
@@ -51,7 +51,7 @@ test("refunds: a string refundAmount is not coerced, it is an anomaly", () => {
 // --- refunds, everything else ----------------------------------------------
 
 test("refunds: no refund on a payment is normal, not an anomaly", () => {
-  const { amount, anomalies } = refundsForCheck({ guid: "c4", payments: [{ amount: 20 }] });
+  const { amount, anomalies } = refundsForCheck({ guid: "c4", payments: [{ amount: 20 }] }, "20260828");
   assert.equal(amount, 0);
   assert.equal(anomalies.length, 0);
 });
@@ -59,34 +59,142 @@ test("refunds: no refund on a payment is normal, not an anomaly", () => {
 test("refunds: multiple payments each carrying a refund are summed", () => {
   const check = {
     guid: "c5",
-    payments: [{ refund: { refundAmount: 4.25 } }, { amount: 10 }, { refund: { refundAmount: 1.5 } }],
+    payments: [
+      { refund: { refundAmount: 4.25, refundBusinessDate: 20260828 } },
+      { amount: 10 },
+      { refund: { refundAmount: 1.5, refundBusinessDate: 20260828 } },
+    ],
   };
-  assert.equal(refundsForCheck(check).amount, 5.75);
+  assert.equal(refundsForCheck(check, "20260828").amount, 5.75);
 });
 
 test("refunds: a voided or deleted check contributes nothing", () => {
-  const payments = [{ refund: { refundAmount: 50 } }];
-  assert.equal(refundsForCheck({ voided: true, payments }).amount, 0);
-  assert.equal(refundsForCheck({ deleted: true, payments }).amount, 0);
+  const payments = [{ refund: { refundAmount: 50, refundBusinessDate: 20260828 } }];
+  assert.equal(refundsForCheck({ voided: true, payments }, "20260828").amount, 0);
+  assert.equal(refundsForCheck({ deleted: true, payments }, "20260828").amount, 0);
 });
 
 test("refunds: a negative refundAmount is counted as-is AND flagged", () => {
-  const check = { guid: "c6", payments: [{ refund: { refundAmount: -3.0 } }] };
-  const { amount, anomalies } = refundsForCheck(check);
+  const check = { guid: "c6", payments: [{ refund: { refundAmount: -3.0, refundBusinessDate: 20260828 } }] };
+  const { amount, anomalies } = refundsForCheck(check, "20260828");
   assert.equal(amount, -3.0, "dropping it silently would hide the problem");
   assert.equal(anomalies.length, 1);
   assert.match(anomalies[0], /negative/);
 });
 
 test("refunds: payments that is not an array is an anomaly, not a crash", () => {
-  const { amount, anomalies } = refundsForCheck({ guid: "c7", payments: "nope" });
+  const { amount, anomalies } = refundsForCheck({ guid: "c7", payments: "nope" }, "20260828");
   assert.equal(amount, 0);
   assert.equal(anomalies.length, 1);
   assert.match(anomalies[0], /expected array/);
 });
 
 test("refunds: missing payments entirely is silent and safe", () => {
-  assert.deepEqual(refundsForCheck({ guid: "c8" }), { amount: 0, anomalies: [] });
+  const r = refundsForCheck({ guid: "c8" }, "20260828");
+  assert.equal(r.amount, 0);
+  assert.deepEqual(r.anomalies, []);
+  assert.deepEqual(r.skippedOtherDate, { count: 0, amount: 0 });
+});
+
+// --- refund date attribution ------------------------------------------------
+//
+// Toast attributes a refund to the day the REFUND was issued, not the day of
+// the original order: "Refunds do not affect financial data on the day of the
+// original order. Refunds only affect financial data on the day of the
+// refund." Orders are pulled by the ORDER's business date, so a check
+// returned for day X can carry a refund issued on a different day. Counting
+// it against X would put money on the wrong date.
+
+test("refunds: a refund from a DIFFERENT business date is NOT counted", () => {
+  // order belongs to 08-28, refund was issued 09-02
+  const check = { guid: "x1", payments: [{ refund: { refundAmount: 9.2, refundBusinessDate: 20260902 } }] };
+  const { amount, skippedOtherDate } = refundsForCheck(check, "20260828");
+  assert.equal(amount, 0, "a refund issued on another day must not land on this day");
+  assert.equal(skippedOtherDate.count, 1);
+  assert.equal(skippedOtherDate.amount, 9.2);
+});
+
+test("refunds: a same-day refund IS counted and is not reported as skipped", () => {
+  const check = { guid: "x2", payments: [{ refund: { refundAmount: 9.2, refundBusinessDate: 20260828 } }] };
+  const { amount, skippedOtherDate } = refundsForCheck(check, "20260828");
+  assert.equal(amount, 9.2);
+  assert.deepEqual(skippedOtherDate, { count: 0, amount: 0 });
+});
+
+test("refunds: same-day and other-day refunds on one check are separated", () => {
+  const check = {
+    guid: "x3",
+    payments: [
+      { refund: { refundAmount: 5.0, refundBusinessDate: 20260828 } },
+      { refund: { refundAmount: 3.0, refundBusinessDate: 20260901 } },
+      { refund: { refundAmount: 1.25, refundBusinessDate: 20260828 } },
+    ],
+  };
+  const { amount, skippedOtherDate } = refundsForCheck(check, "20260828");
+  assert.equal(amount, 6.25, "only the two issued on 08-28");
+  assert.equal(skippedOtherDate.count, 1);
+  assert.equal(skippedOtherDate.amount, 3.0);
+});
+
+test("refunds: skipping an other-day refund is NOT an anomaly (it is expected)", () => {
+  const check = { guid: "x4", payments: [{ refund: { refundAmount: 9.2, refundBusinessDate: 20260902 } }] };
+  assert.deepEqual(refundsForCheck(check, "20260828").anomalies, [], "must not drown real anomalies in expected noise");
+});
+
+test("refunds: integer and string business dates compare equal", () => {
+  // the route passes a string; Toast types refundBusinessDate as an integer
+  const check = { guid: "x5", payments: [{ refund: { refundAmount: 4.0, refundBusinessDate: 20260828 } }] };
+  assert.equal(refundsForCheck(check, "20260828").amount, 4.0);
+  assert.equal(refundsForCheck(check, 20260828).amount, 4.0);
+});
+
+test("refunds: a refund with no readable refundBusinessDate is an anomaly, not counted", () => {
+  const check = { guid: "x6", payments: [{ refund: { refundAmount: 9.2 } }] };
+  const { amount, anomalies, skippedOtherDate } = refundsForCheck(check, "20260828");
+  assert.equal(amount, 0, "cannot attribute it to a day, so it must not be counted");
+  assert.equal(skippedOtherDate.count, 0, "unattributable is not the same as belonging to another day");
+  assert.equal(anomalies.length, 1);
+  assert.match(anomalies[0], /no readable refundBusinessDate/);
+});
+
+test("refunds: a missing business date argument throws rather than counting everything", () => {
+  const check = { guid: "x7", payments: [{ refund: { refundAmount: 9.2, refundBusinessDate: 20260828 } }] };
+  assert.throws(() => refundsForCheck(check), TypeError);
+  assert.throws(() => refundsForCheck(check, "not-a-date"), TypeError);
+  assert.throws(() => refundsForCheck(check, "2026-08-28"), TypeError, "yyyyMMdd only, not ISO");
+});
+
+test("refunds: the negative-sign anomaly spells out the 2x consequence", () => {
+  const check = { guid: "x8", payments: [{ refund: { refundAmount: -9.2, refundBusinessDate: 20260828 } }] };
+  const { anomalies } = refundsForCheck(check, "20260828");
+  assert.equal(anomalies.length, 1);
+  assert.match(anomalies[0], /SIGN CHECK/);
+  assert.match(anomalies[0], /too HIGH by 2x/);
+  assert.match(anomalies[0], /18\.4/, "states the actual dollar consequence, not just the rule");
+});
+
+// --- gate target 2, the real non-zero refund --------------------------------
+
+test("gate target 2: 10037 on 2026-08-28 reproduces Toast's Sales Summary", () => {
+  // Toast's own figures: gross 13364.95 - discounts 840.84 - refunds 9.20
+  //                    = net 12514.91
+  // This is the one that exercises refundsForCheck against a real non-zero
+  // answer; the 10001 anchor sums an empty array and would pass even if
+  // refundsForCheck were completely broken.
+  const GROSS = 13364.95;
+  const check = {
+    guid: "gate2",
+    appliedDiscounts: [{ discountAmount: 840.84 }],
+    payments: [{ refund: { refundAmount: 9.2, refundBusinessDate: 20260828 } }],
+  };
+
+  const discounts = discountsForCheck(check);
+  const refunds = refundsForCheck(check, "20260828");
+
+  assert.equal(discounts.amount, 840.84);
+  assert.equal(refunds.amount, 9.2, "positive magnitude, subtracted by the caller");
+  assert.equal(refunds.anomalies.length, 0);
+  assert.equal(Math.round((GROSS - discounts.amount - refunds.amount) * 100) / 100, 12514.91);
 });
 
 // --- discounts --------------------------------------------------------------
@@ -155,7 +263,7 @@ test("anchor: 10001 on 2026-09-14 reproduces Toast's own Sales Summary", () => {
   };
 
   const discounts = discountsForCheck(check);
-  const refunds = refundsForCheck(check);
+  const refunds = refundsForCheck(check, "20260914");
 
   assert.equal(discounts.amount, 316.9);
   assert.equal(refunds.amount, 0);

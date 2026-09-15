@@ -136,6 +136,15 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
   let fieldAnomalyCount = 0;
   const MAX_REPORTED_ANOMALIES = 20;
 
+  // Reembolsos que existen pero pertenecen a OTRO dia (Toast los atribuye al
+  // dia en que se emitio el reembolso, no al dia de la orden). No se cuentan
+  // aqui - y tampoco se cuentan el dia que les toca, porque ese dia el pull
+  // de ordersBulk trae ordenes por fecha de ORDEN y esta orden no es de ese
+  // dia. Es un sesgo de una sola direccion: net siempre queda alto, nunca
+  // bajo. Se mide en vez de asumirse. Ver lib/toast.js.
+  let refundsSkippedOtherDateCount = 0;
+  let refundsSkippedOtherDateAmount = 0;
+
   // Ventas que no se pudieron ubicar en una hora porque el check y la
   // order venian sin ninguna fecha usable. Se reporta en la respuesta en
   // vez de esconderse: si esto crece, el query de reconciliacion lo marca.
@@ -218,9 +227,14 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
         // voided/deferred, checks voided/deleted), asi que los tres numeros
         // hablan del mismo conjunto de lineas.
         const discounts = discountsForCheck(check);
-        const refunds = refundsForCheck(check);
+        // businessDate es obligatorio: sin el, un reembolso no se puede
+        // atribuir al dia correcto y refundsForCheck tira. Es el mismo
+        // yyyyMMdd que se le pide a ordersBulk arriba.
+        const refunds = refundsForCheck(check, businessDate);
         discountsTotal += discounts.amount;
         refundsTotal += refunds.amount;
+        refundsSkippedOtherDateCount += refunds.skippedOtherDate.count;
+        refundsSkippedOtherDateAmount += refunds.skippedOtherDate.amount;
 
         const anomalies = discounts.anomalies.concat(refunds.anomalies);
         if (anomalies.length) {
@@ -241,6 +255,8 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
     transactionCount,
     discountsTotal: Math.round(discountsTotal * 100) / 100,
     refundsTotal: Math.round(refundsTotal * 100) / 100,
+    refundsSkippedOtherDateCount,
+    refundsSkippedOtherDateAmount: Math.round(refundsSkippedOtherDateAmount * 100) / 100,
     fieldAnomalies,
     fieldAnomalyCount,
     hourlySales: hourlySales.map((v) => Math.round(v * 100) / 100),
@@ -392,6 +408,8 @@ export async function POST(request) {
       transactionCount,
       discountsTotal,
       refundsTotal,
+      refundsSkippedOtherDateCount,
+      refundsSkippedOtherDateAmount,
       fieldAnomalies,
       fieldAnomalyCount,
       hourlySales,
@@ -593,6 +611,8 @@ export async function POST(request) {
       transactionCount,
       discountsTotal,
       refundsTotal,
+      refundsSkippedOtherDateCount,
+      refundsSkippedOtherDateAmount,
       // Solo informativo, para el log del workflow y para poder comparar
       // contra el Sales Summary de Toast sin ir a la base. La columna real
       // la calcula Postgres; esto es el mismo numero, no su fuente.
@@ -610,7 +630,15 @@ export async function POST(request) {
       kitchenError,
       writes: {
         labor: { ok: true, rowsSynced: laborRows.length, staleRemoved: deletedStale },
-        sales: { ok: true, grossSales, discountsTotal, refundsTotal, fieldAnomalyCount },
+        sales: {
+          ok: true,
+          grossSales,
+          discountsTotal,
+          refundsTotal,
+          refundsSkippedOtherDateCount,
+          refundsSkippedOtherDateAmount,
+          fieldAnomalyCount,
+        },
         transactions: { ok: !transactionError, count: transactionCount, error: transactionError },
         hourly: { ok: !hourlyError, rowsWritten: hourlyRowsWritten, error: hourlyError },
         // Cocina es deliberadamente aparte: opcional desde siempre (se puede
