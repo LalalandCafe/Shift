@@ -177,6 +177,31 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
         if (hour === null) unattributedTxns += 1;
         else hourlyTxns[hour] += 1;
 
+        // SUPUESTO NO ESCRITO HASTA AHORA - service charges.
+        //
+        // La definicion de "gross sales" que Toast muestra en su propia UI es:
+        // el precio regular de todos los items no diferidos Y TODOS LOS
+        // SERVICE CHARGES de la orden, sin impuesto ni propina.
+        //
+        // Esto de abajo NO lee check.appliedServiceCharges. Solo suma
+        // selections. Es decir: SHIFT omite los service charges que la
+        // definicion de Toast si incluye (los no-gratuity; la propina y la
+        // gratuity automatica quedan fuera en ambas definiciones).
+        //
+        // Verificado inofensivo al 2026-09-15: el gross de SHIFT coincidio
+        // EXACTO AL CENTAVO con el export de Toast en las 35 tiendas para
+        // 2026-08-24..2026-09-13, 735 pares tienda/dia. O sea, hoy estas
+        // tiendas no cobran ningun service charge. Por eso esto no se cambia:
+        // la matematica actual esta validada contra la fuente.
+        //
+        // PERO el dia que CUALQUIER tienda empiece a cobrar uno - fee de
+        // catering, cargo por grupo grande, fee de delivery - el gross de
+        // SHIFT se queda corto por ese monto, en silencio, sin que nada lo
+        // marque. No hay alerta para esto. Si aparece una diferencia
+        // inexplicable entre el gross de SHIFT y el de Toast, ESTE es el
+        // primer lugar donde mirar: revisar si algun check trae
+        // appliedServiceCharges con gratuity=false, que es justo lo que este
+        // bucle no mira.
         let checkSales = 0;
         (check.selections || []).forEach((sel) => {
           if (sel.voided) return;
