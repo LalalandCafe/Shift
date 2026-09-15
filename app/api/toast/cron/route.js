@@ -71,6 +71,23 @@ async function syncOneStore(storeCode, restaurantGuid, businessDate, isoDate) {
   }
 
   const grossSales = await computeGrossSales(businessDate, restaurantGuid);
+  // ESCRITOR NO CANONICO - incompleto desde docs/sql/007.
+  //
+  // app/api/toast/sync-store/route.js es el unico escritor canonico de
+  // daily_sales, y es el unico que llaman los workflows (daily-sync,
+  // hourly-sync, weekly-reload, backfill-sales). Esta ruta no la llama
+  // ninguno hoy.
+  //
+  // Este upsert escribe gross_sales pero NO discounts_amount ni
+  // refunds_amount, asi que toda fila que escriba queda con net_sales en
+  // NULL - net_sales es GENERATED y solo se resuelve cuando los dos
+  // componentes existen. Eso es correcto por diseno (NULL = "sin
+  // backfillear" y no puede pasar por neta), pero significa que revivir
+  // esta ruta produce filas incompletas en silencio.
+  //
+  // Si vas a revivirla: copia el calculo de descuentos/reembolsos de
+  // sync-store (discountsForCheck/refundsForCheck en lib/toast.js) antes,
+  // o acepta explicitamente que estas filas no van a tener net.
   const { error: salesErr } = await supabaseAdmin
     .from("daily_sales")
     .upsert(
