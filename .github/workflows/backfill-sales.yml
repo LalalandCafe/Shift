@@ -85,6 +85,7 @@ jobs:
           : > full-log.txt
           : > synced-pairs.txt
           : > failed-pairs.txt
+          : > anomaly-pairs.txt
 
       - name: Validate inputs and plan chunks
         id: validate
@@ -214,8 +215,26 @@ jobs:
                 txns=$(echo "$body" | jq -r '.transactionCount // "?"')
                 hourly=$(echo "$body" | jq -r '.hourlyRowsWritten // "?"')
                 labor=$(echo "$body" | jq -r '.laborEntriesSynced // "?"')
-                echo "OK   $code $iso grossSales=\$$sales transactions=$txns hourlyRows=$hourly laborRows=$labor" >> full-log.txt
+                # Componentes de net sales. El route los calcula en el mismo
+                # recorrido que gross (no cuesta una llamada extra a Toast) -
+                # ver lib/toast.js. net es informativo: la columna real la
+                # genera Postgres a partir de los dos componentes.
+                disc=$(echo "$body" | jq -r '.discountsTotal // "?"')
+                refu=$(echo "$body" | jq -r '.refundsTotal // "?"')
+                net=$(echo "$body" | jq -r '.netSales // "?"')
+                anom=$(echo "$body" | jq -r '.fieldAnomalyCount // 0')
+                echo "OK   $code $iso grossSales=\$$sales discounts=\$$disc refunds=\$$refu net=\$$net transactions=$txns hourlyRows=$hourly laborRows=$labor anomalies=$anom" >> full-log.txt
                 echo "$code:$iso" >> synced-pairs.txt
+
+                # Un campo con forma inesperada (un refund sin refundAmount,
+                # por ejemplo) NO tumba el par - seria absurdo que una
+                # variacion benigna del schema de Toast reventara un backfill
+                # de un año entero. Pero tampoco puede quedar enterrado a
+                # mitad del log: se anota aparte para el resumen final.
+                if [ "$anom" != "0" ] && [ "$anom" != "null" ]; then
+                  echo "$code:$iso count=$anom" >> anomaly-pairs.txt
+                  echo "$body" | jq -r '.fieldAnomalies[]? | "     ANOMALY '"$code $iso"': \(.)"' >> full-log.txt
+                fi
                 return 0
               fi
 
@@ -310,6 +329,14 @@ jobs:
           OK_COUNT=$(wc -l < synced-pairs.txt)
           FAIL_COUNT=$(wc -l < failed-pairs.txt)
 
+          # Anomalias de campo: pares afectados y total de hallazgos. Se
+          # reportan SIEMPRE al final, incluso en cero - el silencio no puede
+          # ser ambiguo. Un backfill de un año escribe ~12.000 lineas y nadie
+          # las scrollea, asi que 4.000 anomalias enterradas a mitad del log
+          # serian invisibles en la practica.
+          ANOMALY_PAIRS=$(wc -l < anomaly-pairs.txt)
+          ANOMALY_TOTAL=$(awk -F'count=' '{s += $2} END {print s+0}' anomaly-pairs.txt)
+
           STORE_LABEL="${{ steps.validate.outputs.store }}"
           [ -z "$STORE_LABEL" ] && STORE_LABEL="todas"
 
@@ -328,11 +355,38 @@ jobs:
               cat failed-pairs.txt
               echo '```'
             fi
+
+            echo ""
+            if [ "$ANOMALY_PAIRS" -eq 0 ]; then
+              echo "**0 field anomalies across the whole run.** Every discount and refund"
+              echo "field Toast returned had the expected shape."
+            else
+              echo "**$ANOMALY_TOTAL field anomalies across $ANOMALY_PAIRS store/day pair(s).**"
+              echo ""
+              echo "These did NOT fail their pair - the sync wrote, and gross/transactions"
+              echo "are unaffected. But discounts or refunds on these pairs may be"
+              echo "understated, which moves net_sales by amounts too small to notice on a"
+              echo "dashboard. Grep full-log.txt for ANOMALY in the artifact for the detail."
+              echo ""
+              echo '```'
+              cat anomaly-pairs.txt
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+          echo ""
+          if [ "$ANOMALY_PAIRS" -eq 0 ]; then
+            echo "=== 0 field anomalies across the whole run ==="
+          else
+            echo "=== $ANOMALY_TOTAL field anomalies across $ANOMALY_PAIRS store/day pair(s) - see anomaly-pairs.txt ==="
+            cat anomaly-pairs.txt
+          fi
 
           echo "ok_count=$OK_COUNT" >> "$GITHUB_OUTPUT"
           echo "fail_count=$FAIL_COUNT" >> "$GITHUB_OUTPUT"
           echo "chunks_with_failures=$CHUNKS_WITH_FAILURES" >> "$GITHUB_OUTPUT"
+          echo "anomaly_pairs=$ANOMALY_PAIRS" >> "$GITHUB_OUTPUT"
+          echo "anomaly_total=$ANOMALY_TOTAL" >> "$GITHUB_OUTPUT"
 
       # v6: v4 is stuck on Node 20, which GitHub Actions stopped running by
       # default after the June 2026 Node 24 cutover - v4 runs were starting
@@ -349,6 +403,7 @@ jobs:
             full-log.txt
             synced-pairs.txt
             failed-pairs.txt
+            anomaly-pairs.txt
           retention-days: 30
           if-no-files-found: error
 
