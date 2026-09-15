@@ -1,0 +1,107 @@
+-- Weekly SSSG: net sales columns on daily_sales.
+--
+-- Additive and reversible, same pattern as docs/sql/002-store-opened-at.sql.
+-- Adds discounts_amount and refunds_amount as nullable numerics (no
+-- default), plus net_sales as a STORED GENERATED column computed from
+-- gross_sales/discounts_amount/refunds_amount. Existing rows are untouched:
+-- gross_sales keeps its already-validated values (confirmed exact to the
+-- cent against Toast's own export across all 35 stores, 2026-08-24 to
+-- 2026-09-13, 735 store-days), and the three new columns start NULL for
+-- every row that predates this migration.
+--
+-- On the file number: docs/sql/ numbering is a shared namespace across
+-- branches that all eventually land in main, and 003 is already contested -
+-- feat/command-center has 003-unify-metric-targets.sql (plus 004, 005, 006
+-- that depend on it), and a 003-store-opened-at-backfill.sql exists in the
+-- author's working copy and has been executed in production, though it is
+-- not committed to this repo as of this writing. 007 is the first number no
+-- file on any branch has claimed. See docs/sql/README.md (if present) for
+-- the authoritative run-order and run-status ledger; the number in a
+-- filename here records intent, not what has actually been applied.
+--
+-- Why net_sales is GENERATED, not a plain written column: Postgres computes
+-- and enforces it from its own stored inputs, so it can never drift out of
+-- sync the way an independently-written fourth value could (someone updates
+-- discounts_amount later, forgets to recompute net). Toast's own Sales
+-- Summary reports Gross, Discounts, Refunds, and Net as four separate
+-- figures - storing all four (gross already exists) matches that shape
+-- instead of collapsing it, so a future discrepancy can be audited the same
+-- way the last one was, instead of requiring another multi-day
+-- reconstruction against an external export.
+--
+-- CRITICAL: no COALESCE in the generated expression. An earlier draft
+-- wrapped discounts_amount/refunds_amount in COALESCE(...,0), which would
+-- have made net_sales resolve to gross_sales for every un-backfilled row
+-- (NULL components -> subtract zero) instead of NULL - silently making
+-- gross masquerade as net, and permanently breaking any comparability check
+-- that gates on "net_sales is present." Postgres NULL-propagation is what
+-- makes this column self-gating: it reads NULL until BOTH discounts_amount
+-- and refunds_amount are actually populated by a sync, and a genuine
+-- no-discount/no-refund day writes 0 (a real value the sync route always
+-- computes), not NULL - so "nothing to subtract" and "not backfilled yet"
+-- stay distinguishable. Do not add COALESCE back in without re-deriving why
+-- it was removed.
+--
+-- IMPLEMENTATION CONSTRAINT for app/api/toast/sync-store/route.js: a stored
+-- generated column CANNOT be written to. The daily_sales upsert must send
+-- discounts_amount and refunds_amount ONLY, never net_sales, or every write
+-- fails with: ERROR: column "net_sales" can only be updated to DEFAULT.
+-- Verified against PostgreSQL 16.15, not assumed.
+--
+-- Verified behavior (PostgreSQL 15.19, 16.15 and 17.11, in a throwaway
+-- container, before this file was finalized):
+--   * The single-statement form - creating net_sales in the SAME ALTER
+--     TABLE that adds the columns its expression references - is ACCEPTED
+--     on all three versions. It was split into two statements below anyway:
+--     it costs nothing, removes any doubt about parse-time resolution
+--     order, and makes the dependency between the two statements explicit
+--     to a human reading them.
+--   * NULL components -> net_sales IS NULL (the self-gating property above).
+--   * discounts_amount=316.90, refunds_amount=0.00 against gross_sales
+--     4483.40 -> net_sales 4166.50, matching the 10001 / 2026-09-14 ground
+--     truth anchor from Toast's own Sales Summary exactly.
+--   * Dropping a component column while net_sales exists FAILS with
+--     "cannot drop column ... because other objects depend on it", hinting
+--     at CASCADE - hence the rollback order below.
+--
+-- Rewrite cost: ADD COLUMN ... GENERATED ALWAYS AS (...) STORED forces a
+-- full table rewrite under an ACCESS EXCLUSIVE lock (unlike a plain
+-- nullable ADD COLUMN, which is metadata-only in Postgres 11+) - Postgres
+-- has to materialize a determinate value for every existing row rather than
+-- defer to a virtual NULL. Checked live before writing this file:
+-- daily_sales is 3,385 rows (2024-07-01 to 2026-09-15). At that size the
+-- rewrite is sub-second; even after the full 2025 backfill this runs
+-- against, row count stays in the low tens of thousands, not a scale where
+-- this lock is a real operational concern.
+--
+-- Values are NOT backfilled here. This migration only adds the columns.
+-- Per the agreed order of operations: this migration runs first, then the
+-- sync-store route change ships to main (so it can write the two component
+-- fields), then the full 2025 backfill populates them for existing history
+-- in one Toast pull per store/day - the same ordersBulk response already
+-- fetched for gross_sales also carries the discount/refund fields, so
+-- backfilling gross and net separately would mean pulling all of Toast
+-- twice for no reason.
+--
+-- To run: paste into the Supabase SQL editor for the production project
+-- (epklybaeqzmocmaiekcx per BRIEF.md) and execute. Safe to run more than
+-- once (IF NOT EXISTS guards each column).
+--
+-- To roll back, if ever needed, in this order:
+--   alter table daily_sales drop column if exists net_sales;
+--   alter table daily_sales drop column if exists discounts_amount;
+--   alter table daily_sales drop column if exists refunds_amount;
+-- net_sales must drop FIRST - verified above, Postgres refuses to drop a
+-- column a generated column depends on and tells you to use CASCADE.
+
+-- Step 1: the two component columns. Plain nullable adds, metadata-only,
+-- no table rewrite.
+alter table daily_sales
+  add column if not exists discounts_amount numeric,
+  add column if not exists refunds_amount numeric;
+
+-- Step 2: the generated column, in its own statement so its dependency on
+-- step 1 is explicit. This is the statement that rewrites the table.
+alter table daily_sales
+  add column if not exists net_sales numeric
+    generated always as (gross_sales - discounts_amount - refunds_amount) stored;
