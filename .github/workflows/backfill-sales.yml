@@ -86,6 +86,7 @@ jobs:
           : > synced-pairs.txt
           : > failed-pairs.txt
           : > anomaly-pairs.txt
+          : > skipped-refunds.txt
 
       - name: Validate inputs and plan chunks
         id: validate
@@ -223,7 +224,13 @@ jobs:
                 refu=$(echo "$body" | jq -r '.refundsTotal // "?"')
                 net=$(echo "$body" | jq -r '.netSales // "?"')
                 anom=$(echo "$body" | jq -r '.fieldAnomalyCount // 0')
-                echo "OK   $code $iso grossSales=\$$sales discounts=\$$disc refunds=\$$refu net=\$$net transactions=$txns hourlyRows=$hourly laborRows=$labor anomalies=$anom" >> full-log.txt
+                # Reembolsos que Toast atribuye a OTRO dia. No entran en el
+                # net de este dia (correcto), pero tampoco entran en el del
+                # dia que les toca, porque ese pull trae ordenes por fecha de
+                # ORDEN. Sesgo de una sola direccion: net siempre alto.
+                skipn=$(echo "$body" | jq -r '.refundsSkippedOtherDateCount // 0')
+                skipa=$(echo "$body" | jq -r '.refundsSkippedOtherDateAmount // 0')
+                echo "OK   $code $iso grossSales=\$$sales discounts=\$$disc refunds=\$$refu net=\$$net transactions=$txns hourlyRows=$hourly laborRows=$labor anomalies=$anom skippedRefunds=$skipn/\$$skipa" >> full-log.txt
                 echo "$code:$iso" >> synced-pairs.txt
 
                 # Un campo con forma inesperada (un refund sin refundAmount,
@@ -234,6 +241,10 @@ jobs:
                 if [ "$anom" != "0" ] && [ "$anom" != "null" ]; then
                   echo "$code:$iso count=$anom" >> anomaly-pairs.txt
                   echo "$body" | jq -r '.fieldAnomalies[]? | "     ANOMALY '"$code $iso"': \(.)"' >> full-log.txt
+                fi
+
+                if [ "$skipn" != "0" ] && [ "$skipn" != "null" ]; then
+                  echo "$code:$iso count=$skipn amount=$skipa" >> skipped-refunds.txt
                 fi
                 return 0
               fi
@@ -337,6 +348,15 @@ jobs:
           ANOMALY_PAIRS=$(wc -l < anomaly-pairs.txt)
           ANOMALY_TOTAL=$(awk -F'count=' '{s += $2} END {print s+0}' anomaly-pairs.txt)
 
+          # Reembolsos saltados por pertenecer a otro dia. Mismo trato que las
+          # anomalias: se reportan SIEMPRE al final, incluso en cero. Esto no
+          # es un error - es el sesgo conocido de una sola direccion, y este
+          # es el instrumento que lo mide en dolares en vez de estimarlo
+          # restando contra un export de Toast.
+          SKIPPED_PAIRS=$(wc -l < skipped-refunds.txt)
+          SKIPPED_COUNT=$(awk -F'count=' '{split($2,a," "); s += a[1]} END {print s+0}' skipped-refunds.txt)
+          SKIPPED_AMOUNT=$(awk -F'amount=' '{s += $2} END {printf "%.2f", s+0}' skipped-refunds.txt)
+
           STORE_LABEL="${{ steps.validate.outputs.store }}"
           [ -z "$STORE_LABEL" ] && STORE_LABEL="todas"
 
@@ -372,6 +392,28 @@ jobs:
               cat anomaly-pairs.txt
               echo '```'
             fi
+
+            echo ""
+            if [ "$SKIPPED_PAIRS" -eq 0 ]; then
+              echo "**0 refunds skipped for belonging to another business date.**"
+              echo "Every refund Toast returned was issued on the same day as its order."
+            else
+              echo "**$SKIPPED_COUNT refund(s) totalling \$$SKIPPED_AMOUNT skipped across $SKIPPED_PAIRS store/day pair(s)**"
+              echo "because Toast attributes them to a different business date than their order."
+              echo ""
+              echo "This is NOT a failure and NOT malformed data. Toast attributes a refund to"
+              echo "the day it was issued, not the day of the original order, so these correctly"
+              echo "do not count toward this day. But they are not counted on their own day"
+              echo "either - that day's pull returns orders by ORDER date, and these orders"
+              echo "belong to other days. So they are missing from net_sales entirely, which"
+              echo "always overstates net and never understates it."
+              echo ""
+              echo "\$$SKIPPED_AMOUNT is the measured size of that bias for this run."
+              echo ""
+              echo '```'
+              cat skipped-refunds.txt
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           echo ""
@@ -382,11 +424,22 @@ jobs:
             cat anomaly-pairs.txt
           fi
 
+          if [ "$SKIPPED_PAIRS" -eq 0 ]; then
+            echo "=== 0 refunds skipped for belonging to another business date ==="
+          else
+            echo "=== $SKIPPED_COUNT refund(s) totalling \$$SKIPPED_AMOUNT skipped as belonging to another business date, across $SKIPPED_PAIRS pair(s) ==="
+            echo "    (known one-directional bias: these are missing from net entirely, so net runs high by this amount)"
+            cat skipped-refunds.txt
+          fi
+
           echo "ok_count=$OK_COUNT" >> "$GITHUB_OUTPUT"
           echo "fail_count=$FAIL_COUNT" >> "$GITHUB_OUTPUT"
           echo "chunks_with_failures=$CHUNKS_WITH_FAILURES" >> "$GITHUB_OUTPUT"
           echo "anomaly_pairs=$ANOMALY_PAIRS" >> "$GITHUB_OUTPUT"
           echo "anomaly_total=$ANOMALY_TOTAL" >> "$GITHUB_OUTPUT"
+          echo "skipped_refund_pairs=$SKIPPED_PAIRS" >> "$GITHUB_OUTPUT"
+          echo "skipped_refund_count=$SKIPPED_COUNT" >> "$GITHUB_OUTPUT"
+          echo "skipped_refund_amount=$SKIPPED_AMOUNT" >> "$GITHUB_OUTPUT"
 
       # v6: v4 is stuck on Node 20, which GitHub Actions stopped running by
       # default after the June 2026 Node 24 cutover - v4 runs were starting
@@ -404,6 +457,7 @@ jobs:
             synced-pairs.txt
             failed-pairs.txt
             anomaly-pairs.txt
+            skipped-refunds.txt
           retention-days: 30
           if-no-files-found: error
 
