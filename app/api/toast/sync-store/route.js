@@ -1,4 +1,4 @@
-import { getToastToken, getTimeEntries } from "@/lib/toast";
+import { getToastToken, getTimeEntries, discountsForCheck, refundsForCheck } from "@/lib/toast";
 import { translateTimeEntries } from "@/lib/toast-labels";
 import { supabaseAdmin } from "@/lib/supabase";
 
@@ -120,6 +120,22 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
   const hourlySales = new Array(24).fill(0);
   const hourlyTxns = new Array(24).fill(0);
 
+  // Componentes de net sales (Net = Gross - Discounts - Refunds, la propia
+  // definicion de Toast). Se acumulan en el MISMO recorrido que gross: la
+  // respuesta de ordersBulk ya trae estos campos, asi que esto no agrega ni
+  // una sola llamada a Toast.
+  let discountsTotal = 0;
+  let refundsTotal = 0;
+
+  // Campos con forma inesperada (un refund sin refundAmount, un
+  // discountAmount que no es numero). No se convierten en 0 en silencio -
+  // ver lib/toast.js. Se reportan en la respuesta para que aterricen en el
+  // log del workflow, porque un error aqui mueve net_sales por milesimas de
+  // punto porcentual y no lo cacharia nadie mirando un dashboard.
+  const fieldAnomalies = [];
+  let fieldAnomalyCount = 0;
+  const MAX_REPORTED_ANOMALIES = 20;
+
   // Ventas que no se pudieron ubicar en una hora porque el check y la
   // order venian sin ninguna fecha usable. Se reporta en la respuesta en
   // vez de esconderse: si esto crece, el query de reconciliacion lo marca.
@@ -171,6 +187,23 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
         grossSales += checkSales;
         if (hour === null) unattributedSales += checkSales;
         else hourlySales[hour] += checkSales;
+
+        // Descuentos y reembolsos del mismo check. Las dos funciones saltan
+        // exactamente lo que salta el calculo de gross de arriba (selections
+        // voided/deferred, checks voided/deleted), asi que los tres numeros
+        // hablan del mismo conjunto de lineas.
+        const discounts = discountsForCheck(check);
+        const refunds = refundsForCheck(check);
+        discountsTotal += discounts.amount;
+        refundsTotal += refunds.amount;
+
+        const anomalies = discounts.anomalies.concat(refunds.anomalies);
+        if (anomalies.length) {
+          fieldAnomalyCount += anomalies.length;
+          for (const a of anomalies) {
+            if (fieldAnomalies.length < MAX_REPORTED_ANOMALIES) fieldAnomalies.push(a);
+          }
+        }
       });
     });
 
@@ -181,6 +214,10 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
   return {
     grossSales: Math.round(grossSales * 100) / 100,
     transactionCount,
+    discountsTotal: Math.round(discountsTotal * 100) / 100,
+    refundsTotal: Math.round(refundsTotal * 100) / 100,
+    fieldAnomalies,
+    fieldAnomalyCount,
     hourlySales: hourlySales.map((v) => Math.round(v * 100) / 100),
     hourlyTxns,
     unattributedSales: Math.round(unattributedSales * 100) / 100,
@@ -328,6 +365,10 @@ export async function POST(request) {
     const {
       grossSales,
       transactionCount,
+      discountsTotal,
+      refundsTotal,
+      fieldAnomalies,
+      fieldAnomalyCount,
       hourlySales,
       hourlyTxns,
       unattributedSales,
@@ -381,10 +422,29 @@ export async function POST(request) {
       deletedStale = deletedCount || 0;
     }
 
+    // ¡NUNCA escribir net_sales aqui! daily_sales.net_sales es una columna
+    // GENERATED ALWAYS AS (gross_sales - discounts_amount - refunds_amount)
+    // STORED (docs/sql/007-daily-sales-net-sales.sql). Postgres la calcula
+    // sola y RECHAZA cualquier escritura:
+    //
+    //   ERROR: column "net_sales" can only be updated to DEFAULT
+    //
+    // Incluirla aqui no romperia solo el backfill: tumbaria TODOS los syncs,
+    // incluido el cron diario en produccion, en el primer upsert. Se mandan
+    // unicamente los dos componentes; net_sales se deriva de ellos y queda
+    // NULL mientras alguno de los dos sea NULL (a proposito - asi una fila
+    // sin backfillear no puede pasar por neta).
     const { error: salesErr } = await supabaseAdmin
       .from("daily_sales")
       .upsert(
-        [{ store_code: storeCode, business_date: isoDate, gross_sales: grossSales, synced_at: new Date().toISOString() }],
+        [{
+          store_code: storeCode,
+          business_date: isoDate,
+          gross_sales: grossSales,
+          discounts_amount: discountsTotal,
+          refunds_amount: refundsTotal,
+          synced_at: new Date().toISOString(),
+        }],
         { onConflict: "store_code,business_date" }
       );
     if (salesErr) throw new Error("Guardar ventas fallo: " + salesErr.message);
@@ -506,6 +566,14 @@ export async function POST(request) {
       staleRemoved: deletedStale,
       grossSales,
       transactionCount,
+      discountsTotal,
+      refundsTotal,
+      // Solo informativo, para el log del workflow y para poder comparar
+      // contra el Sales Summary de Toast sin ir a la base. La columna real
+      // la calcula Postgres; esto es el mismo numero, no su fuente.
+      netSales: Math.round((grossSales - discountsTotal - refundsTotal) * 100) / 100,
+      fieldAnomalyCount,
+      fieldAnomalies,
       transactionError,
       hourlyRowsWritten,
       hourlyError,
@@ -517,7 +585,7 @@ export async function POST(request) {
       kitchenError,
       writes: {
         labor: { ok: true, rowsSynced: laborRows.length, staleRemoved: deletedStale },
-        sales: { ok: true, grossSales },
+        sales: { ok: true, grossSales, discountsTotal, refundsTotal, fieldAnomalyCount },
         transactions: { ok: !transactionError, count: transactionCount, error: transactionError },
         hourly: { ok: !hourlyError, rowsWritten: hourlyRowsWritten, error: hourlyError },
         // Cocina es deliberadamente aparte: opcional desde siempre (se puede
