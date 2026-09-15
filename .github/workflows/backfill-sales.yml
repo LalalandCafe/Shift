@@ -158,7 +158,19 @@ jobs:
       - name: Traer lista de tiendas
         if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
-          curl -sf "${{ secrets.SUPABASE_URL }}/rest/v1/stores?active=eq.true&toast_guid=not.is.null&select=code,toast_guid" \
+          # opened_at comes along here (not just code/toast_guid) so the
+          # per-day loop below can skip a store on any date before it
+          # actually opened - see the Backfill step's jq filter.
+          # Backfilling a store for dates before it opened isn't just
+          # pointless: Toast returns zero orders for that date, and the
+          # sync route's daily_sales/daily_transactions upserts are
+          # unconditional, so it writes a real $0 row that then has to be
+          # filtered back out by the weekly SSSG comparability rule
+          # instead of never existing. Confirmed live: run 33800079982
+          # (Backfill Sales, 2025-08-01..2025-08-31, all stores, run before
+          # this fix existed) left exactly 391 such rows across 12 stores
+          # that hadn't opened yet during that range.
+          curl -sf "${{ secrets.SUPABASE_URL }}/rest/v1/stores?active=eq.true&toast_guid=not.is.null&select=code,toast_guid,opened_at" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -o stores.json
@@ -258,7 +270,19 @@ jobs:
             day_num=0
             for iso in "${DATES[@]}"; do
               day_num=$(( day_num + 1 ))
-              echo "[chunk $CHUNK_NUM/$CHUNK_COUNT day $day_num/${#DATES[@]}] $iso"
+
+              # A store with no opened_at, or one that opens after this
+              # day, is skipped entirely for this date - never synced,
+              # never written. Prevents the exact phantom-$0-row pattern
+              # found in run 33800079982: syncing a store for a date
+              # before it existed just gets a real zero from Toast, which
+              # then has to be excluded by hand downstream instead of
+              # never existing.
+              TODAY_STORES=$(jq -c --arg d "$iso" '[.[] | select(.opened_at != null and .opened_at <= $d)]' stores.json)
+              SKIPPED=$(( $(jq 'length' stores.json) - $(echo "$TODAY_STORES" | jq 'length') ))
+
+              echo "[chunk $CHUNK_NUM/$CHUNK_COUNT day $day_num/${#DATES[@]}] $iso ($SKIPPED not yet open, skipped)"
+
               # `|| true`: a store/day pair failing all 3 retries makes
               # sync_one return 1, which makes xargs exit 123. Without this
               # guard, GitHub Actions' default `bash -e -o pipefail` would
@@ -267,7 +291,7 @@ jobs:
               # is still fully recorded in full-log.txt/failed-pairs.txt by
               # sync_one itself; this only stops that failure from being
               # fatal to the script.
-              jq -r '.[] | "\(.code) \(.toast_guid)"' stores.json \
+              echo "$TODAY_STORES" | jq -r '.[] | "\(.code) \(.toast_guid)"' \
                 | xargs -P "$PARALLEL" -I {} bash -c 'set -- {}; sync_one "$1" "$2" "'"$iso"'"' \
                 || true
               sleep 2
