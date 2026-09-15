@@ -1,0 +1,33 @@
+-- Weekly SSSG: store opening dates.
+--
+-- Additive and reversible. opened_at is a nullable date with no default,
+-- so this does not touch, backfill, or reinterpret any existing row, and
+-- every existing select("*") on stores (lib/data.js's getAllStores,
+-- lib/report.js, lib/throughput.js, lib/sssg.js, lib/forecast.js) picks
+-- this up automatically the moment this runs - no code deploy needed on
+-- the read side, same reasoning as docs/sql/001-store-managers.sql.
+--
+-- Why this exists: weekly SSSG comparability is defined by how long a
+-- store has been open (>= 15 months / 65 fiscal weeks before a
+-- comparison week's start), not by MIN(business_date) in daily_sales -
+-- sales history is incomplete (live sync only since 2026-07-13, prior-
+-- year backfill only covers 2025-08-01..2025-08-31; see the Phase 0
+-- coverage report). opened_at is the actual business fact and must be
+-- supplied by hand, never inferred from sales data.
+--
+-- Values are NOT included here. This migration only adds the column;
+-- see docs/sql/003-store-opened-at-backfill.sql (to follow once real
+-- per-store opening dates are supplied) for the UPDATE statements that
+-- fill it in - same schema-change/data-change split as everywhere else
+-- in this app, since there's still no migrations runner (see lib/sssg.js
+-- header comment).
+--
+-- To run: paste into the Supabase SQL editor for the production project
+-- (epklybaeqzmocmaiekcx per BRIEF.md) and execute. Safe to run more than
+-- once (IF NOT EXISTS guards the column).
+--
+-- To roll back, if ever needed:
+--   alter table stores drop column if exists opened_at;
+
+alter table stores
+  add column if not exists opened_at date;
