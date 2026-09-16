@@ -127,9 +127,12 @@ three fiscal weeks, so the export is week-aligned.
 The PY column is assumed to cover 2025-08-25 .. 2025-09-14, the same 21
 days shifted back 364 days. That is the calendar-equivalent window, not a
 measured one: the cumulative-sum test above cannot be run for 2025 because
-`daily_sales` holds only 245 rows across P9 2025 (7 stores of 35, the rest
-not yet backfilled). Re-pin it the same way once the 2025 backfill lands,
-before trusting any CY/PY comparison built on it.
+`daily_sales` covers only the first 7 days of P9 2025. All 35 stores are
+present, but only for 2025-08-25..2025-08-31 - 245 rows of the 1,225 a full
+period needs. September 2025 has **zero** rows (verified with count:exact,
+2026-09-16; a plain select silently caps at 1,000 on this table). Re-pin the
+PY window the same way once the 2025 backfill lands, before trusting any
+CY/PY comparison built on it.
 
 Do not compare these against a full P9 2026, and do not annualize them.
 Comparing them against a full P8 2026 is what produced the earlier estimate
