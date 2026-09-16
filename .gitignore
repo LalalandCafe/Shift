@@ -32,3 +32,6 @@ mobile-audit.md
 batch-*-report.md
 mobile-audit.md
 backfill-report.md
+
+# Finance source data (sales figures, not for version control)
+docs/finance/
