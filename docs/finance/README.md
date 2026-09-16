@@ -56,15 +56,26 @@ not evidence that SHIFT is wrong - there is nothing on the sheet to check it
 against. Per-store figures on those sheets are still real; it is the total
 that was typed.
 
-**One discrepancy, unresolved, flagged rather than smoothed over.** An
-earlier note in this file said "P12 2025 through P8 2026 are hardcoded" - an
-inclusive range, which also sweeps in **P1 2026**. Finance's list above skips
-P1 2026. Both claims are recorded because the source workbook
-(`Trailing_SSSG.xlsx`) is not tracked in git and nothing in this repo can
-settle it: the extracted CSVs carry values, not formulas, and
-`layout_report.json` records parse status, not whether a cell held a formula.
-Treat P1 2026 as unknown until someone opens the workbook and looks. The
-other eight are not in doubt.
+**P1 2026 is NOT in that set - settled from the workbook 2026-09-16.** An
+earlier note here said "P12 2025 through P8 2026 are hardcoded", an inclusive
+range that wrongly swept in P1 2026. That range was wrong; the list of eight
+above is right. `Sales Summary P1 26` carries real formulas with correct
+methodology on total row 38:
+
+    E38 = (SUM(C4:C19)-SUM(D4:D19))/SUM(D4:D19)   => 0.32409
+    H38 = (SUM(F4:F19)-SUM(G4:G19))/SUM(G4:G19)   => 0.27005
+    I38 = E38-H38
+
+so its comp set is recoverable as rows 4:19, sixteen stores. Its layout
+differs from every other sheet - net sales in C/D, transactions in F/G, and
+no market column - which is why the extractor flagged it separately. Read it
+by position via `layout_report.json`, like the rest.
+
+**P2 2026 carries an orphaned formula**: `J39 = F39-I39` computes a ticket
+figure from two cells that are themselves pasted values. It does not change
+P2 2026's status - it is still in the hardcoded set - it just confirms that
+values were pasted over formulas on that sheet rather than the sheet having
+been built without them.
 
 **What SHIFT does instead.** Nothing special. SSSG is computed uniformly for
 every period from `daily_sales`, with no per-period branch anywhere in
