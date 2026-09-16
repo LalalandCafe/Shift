@@ -145,6 +145,15 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
   let refundsSkippedOtherDateCount = 0;
   let refundsSkippedOtherDateAmount = 0;
 
+  // Descuentos que Toast YA QUITO (processingState VOID / PENDING_VOID) y que
+  // por lo tanto no entran en discounts_amount. Se miden en vez de
+  // descartarse en silencio, igual que los reembolsos de otro dia: hasta el
+  // 2026-09-16 estos se estaban SUMANDO, y eran exactamente la diferencia
+  // contra el Sales Summary de Toast (7.05 en 10001/09-14, 7.32 en
+  // 10037/08-28). Si este numero se dispara, algo cambio en Toast.
+  let discountsSkippedVoidCount = 0;
+  let discountsSkippedVoidAmount = 0;
+
   // Ventas que no se pudieron ubicar en una hora porque el check y la
   // order venian sin ninguna fecha usable. Se reporta en la respuesta en
   // vez de esconderse: si esto crece, el query de reconciliacion lo marca.
@@ -233,6 +242,8 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
         const refunds = refundsForCheck(check, businessDate);
         discountsTotal += discounts.amount;
         refundsTotal += refunds.amount;
+        discountsSkippedVoidCount += discounts.skippedVoid.count;
+        discountsSkippedVoidAmount += discounts.skippedVoid.amount;
         refundsSkippedOtherDateCount += refunds.skippedOtherDate.count;
         refundsSkippedOtherDateAmount += refunds.skippedOtherDate.amount;
 
@@ -257,6 +268,8 @@ async function computeSalesTransactionsAndHours(businessDate, restaurantGuid, to
     refundsTotal: Math.round(refundsTotal * 100) / 100,
     refundsSkippedOtherDateCount,
     refundsSkippedOtherDateAmount: Math.round(refundsSkippedOtherDateAmount * 100) / 100,
+    discountsSkippedVoidCount,
+    discountsSkippedVoidAmount: Math.round(discountsSkippedVoidAmount * 100) / 100,
     fieldAnomalies,
     fieldAnomalyCount,
     hourlySales: hourlySales.map((v) => Math.round(v * 100) / 100),
@@ -410,6 +423,8 @@ export async function POST(request) {
       refundsTotal,
       refundsSkippedOtherDateCount,
       refundsSkippedOtherDateAmount,
+      discountsSkippedVoidCount,
+      discountsSkippedVoidAmount,
       fieldAnomalies,
       fieldAnomalyCount,
       hourlySales,
@@ -613,6 +628,8 @@ export async function POST(request) {
       refundsTotal,
       refundsSkippedOtherDateCount,
       refundsSkippedOtherDateAmount,
+      discountsSkippedVoidCount,
+      discountsSkippedVoidAmount,
       // Solo informativo, para el log del workflow y para poder comparar
       // contra el Sales Summary de Toast sin ir a la base. La columna real
       // la calcula Postgres; esto es el mismo numero, no su fuente.
@@ -637,6 +654,8 @@ export async function POST(request) {
           refundsTotal,
           refundsSkippedOtherDateCount,
           refundsSkippedOtherDateAmount,
+          discountsSkippedVoidCount,
+          discountsSkippedVoidAmount,
           fieldAnomalyCount,
         },
         transactions: { ok: !transactionError, count: transactionCount, error: transactionError },

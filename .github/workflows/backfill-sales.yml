@@ -87,6 +87,7 @@ jobs:
           : > failed-pairs.txt
           : > anomaly-pairs.txt
           : > skipped-refunds.txt
+          : > void-discounts.txt
 
       - name: Validate inputs and plan chunks
         id: validate
@@ -230,7 +231,15 @@ jobs:
                 # ORDEN. Sesgo de una sola direccion: net siempre alto.
                 skipn=$(echo "$body" | jq -r '.refundsSkippedOtherDateCount // 0')
                 skipa=$(echo "$body" | jq -r '.refundsSkippedOtherDateAmount // 0')
-                echo "OK   $code $iso grossSales=\$$sales discounts=\$$disc refunds=\$$refu net=\$$net transactions=$txns hourlyRows=$hourly laborRows=$labor anomalies=$anom skippedRefunds=$skipn/\$$skipa" >> full-log.txt
+                # Descuentos que Toast YA QUITO (processingState VOID /
+                # PENDING_VOID) y que por eso no entran en discounts. Hasta el
+                # 2026-09-16 se estaban sumando, y eran EXACTAMENTE la
+                # diferencia contra el Sales Summary de Toast en los dos dias
+                # de control. Se loguea para que el tamano de esto se vea en
+                # cada corrida en vez de descubrirse otra vez dentro de un ano.
+                vdn=$(echo "$body" | jq -r '.discountsSkippedVoidCount // 0')
+                vda=$(echo "$body" | jq -r '.discountsSkippedVoidAmount // 0')
+                echo "OK   $code $iso grossSales=\$$sales discounts=\$$disc refunds=\$$refu net=\$$net transactions=$txns hourlyRows=$hourly laborRows=$labor anomalies=$anom skippedRefunds=$skipn/\$$skipa voidDiscounts=$vdn/\$$vda" >> full-log.txt
                 echo "$code:$iso" >> synced-pairs.txt
 
                 # Un campo con forma inesperada (un refund sin refundAmount,
@@ -245,6 +254,10 @@ jobs:
 
                 if [ "$skipn" != "0" ] && [ "$skipn" != "null" ]; then
                   echo "$code:$iso count=$skipn amount=$skipa" >> skipped-refunds.txt
+                fi
+
+                if [ "$vdn" != "0" ] && [ "$vdn" != "null" ]; then
+                  echo "$code:$iso count=$vdn amount=$vda" >> void-discounts.txt
                 fi
                 return 0
               fi
@@ -357,6 +370,15 @@ jobs:
           SKIPPED_COUNT=$(awk -F'count=' '{split($2,a," "); s += a[1]} END {print s+0}' skipped-refunds.txt)
           SKIPPED_AMOUNT=$(awk -F'amount=' '{s += $2} END {printf "%.2f", s+0}' skipped-refunds.txt)
 
+          # Descuentos VOID/PENDING_VOID excluidos. Mismo trato: se reportan
+          # SIEMPRE, incluso en cero. Esto NO es un sesgo pendiente como los
+          # reembolsos de arriba - es dinero correctamente excluido. Se mide
+          # porque hasta el 2026-09-16 se estaba SUMANDO, y era exactamente la
+          # diferencia contra el Sales Summary de Toast.
+          VOID_PAIRS=$(wc -l < void-discounts.txt)
+          VOID_COUNT=$(awk -F'count=' '{split($2,a," "); s += a[1]} END {print s+0}' void-discounts.txt)
+          VOID_AMOUNT=$(awk -F'amount=' '{s += $2} END {printf "%.2f", s+0}' void-discounts.txt)
+
           STORE_LABEL="${{ steps.validate.outputs.store }}"
           [ -z "$STORE_LABEL" ] && STORE_LABEL="todas"
 
@@ -414,6 +436,26 @@ jobs:
               cat skipped-refunds.txt
               echo '```'
             fi
+
+            echo ""
+            if [ "$VOID_PAIRS" -eq 0 ]; then
+              echo "**0 voided discounts excluded.** No discount Toast had already"
+              echo "removed appeared in any pair this run."
+            else
+              echo "**$VOID_COUNT voided discount(s) totalling \$$VOID_AMOUNT excluded across $VOID_PAIRS store/day pair(s)**"
+              echo "because Toast had already removed them (processingState VOID or PENDING_VOID)."
+              echo ""
+              echo "This is money correctly NOT subtracted, not a pending gap. It is reported"
+              echo "because these were being counted until 2026-09-16, and they were exactly"
+              echo "the difference against Toast's Sales Summary on both gate days (7.05 on"
+              echo "10001/2026-09-14, 7.32 on 10037/2026-08-28). If this number ever collapses"
+              echo "to zero across a whole run, suspect that processingState stopped being"
+              echo "populated rather than that voids stopped happening."
+              echo ""
+              echo '```'
+              cat void-discounts.txt
+              echo '```'
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           echo ""
@@ -432,6 +474,14 @@ jobs:
             cat skipped-refunds.txt
           fi
 
+          if [ "$VOID_PAIRS" -eq 0 ]; then
+            echo "=== 0 voided discounts excluded ==="
+          else
+            echo "=== $VOID_COUNT voided discount(s) totalling \$$VOID_AMOUNT excluded across $VOID_PAIRS pair(s) ==="
+            echo "    (processingState VOID/PENDING_VOID - correctly not subtracted; counted until 2026-09-16)"
+            cat void-discounts.txt
+          fi
+
           echo "ok_count=$OK_COUNT" >> "$GITHUB_OUTPUT"
           echo "fail_count=$FAIL_COUNT" >> "$GITHUB_OUTPUT"
           echo "chunks_with_failures=$CHUNKS_WITH_FAILURES" >> "$GITHUB_OUTPUT"
@@ -440,6 +490,9 @@ jobs:
           echo "skipped_refund_pairs=$SKIPPED_PAIRS" >> "$GITHUB_OUTPUT"
           echo "skipped_refund_count=$SKIPPED_COUNT" >> "$GITHUB_OUTPUT"
           echo "skipped_refund_amount=$SKIPPED_AMOUNT" >> "$GITHUB_OUTPUT"
+          echo "void_discount_pairs=$VOID_PAIRS" >> "$GITHUB_OUTPUT"
+          echo "void_discount_count=$VOID_COUNT" >> "$GITHUB_OUTPUT"
+          echo "void_discount_amount=$VOID_AMOUNT" >> "$GITHUB_OUTPUT"
 
       # v6: v4 is stuck on Node 20, which GitHub Actions stopped running by
       # default after the June 2026 Node 24 cutover - v4 runs were starting
@@ -458,6 +511,7 @@ jobs:
             failed-pairs.txt
             anomaly-pairs.txt
             skipped-refunds.txt
+            void-discounts.txt
           retention-days: 30
           if-no-files-found: error
 
