@@ -30,6 +30,12 @@ const MACHINE = new Set([
   "/api/toast/cron-trigger",
   "/api/hme/sync-store",
   "/api/sync/tattle",
+  // TEMPORAL - diagnostico del desfase de discounts (ver
+  // app/api/toast/discount-probe/route.js). Sin esta entrada la ruta es
+  // inalcanzable: la lista de arriba es explicita a proposito, no un
+  // prefijo, asi que una ruta nueva bajo /api/toast/ NO pasa sola.
+  // BORRAR ESTA LINEA junto con la ruta cuando se cierre el diagnostico.
+  "/api/toast/discount-probe",
 ]);
 
 // Solo lo que Auth.js necesita para su propio ciclo OAuth, no todo el prefijo
