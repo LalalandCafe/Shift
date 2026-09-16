@@ -27,8 +27,72 @@ Extracted from `Trailing_SSSG.xlsx`, the finance team's own SSSG report.
   That is real, not a parse error.
 - Only two sheets compute SSSG with correct methodology: P3 2025 and the
   live Sales Summary. P4 through P11 2025 use `=SUM(F4:F37)`, which sums
-  percentages and evaluates to #N/A. P12 2025 through P8 2026 are
-  hardcoded values. Validate per store, not per total.
+  percentages and evaluates to #N/A. Several later sheets are hardcoded
+  values. Validate per store, not per total. See **Workbook figure
+  provenance** below for which sheets, and what SHIFT does about it.
+- **The `soft_opening` column in `comp_basis.csv` does not count.**
+  Finance confirmed 2026-09-16: ignore it entirely. Comp entry is driven
+  by `grand_opening` / `entered_comp_basis` / `enter_comp_period` only.
+  It is left in the extract because the extract is a faithful dump, not
+  because anything should read it.
+
+## Workbook figure provenance
+
+Recorded for forensics, not for display. SHIFT publishes its own computed
+figure for every period, with no UI marker and no dual display - decided by
+Finance 2026-09-16. When somebody eventually asks why a SHIFT number differs
+from a figure Finance circulated, this is the answer, and it should be
+findable here rather than reconstructed from the workbook a year later.
+
+**Periods whose workbook SSSG total was a hardcoded value, not a formula**,
+per Finance, 2026-09-16:
+
+    P12 2025
+    P2 2026, P3 2026, P4 2026, P5 2026, P6 2026, P7 2026, P8 2026
+
+A hardcoded total is a number somebody typed. It is not reproducible from
+the sheet it sits on, so a SHIFT figure that disagrees with one of these is
+not evidence that SHIFT is wrong - there is nothing on the sheet to check it
+against. Per-store figures on those sheets are still real; it is the total
+that was typed.
+
+**One discrepancy, unresolved, flagged rather than smoothed over.** An
+earlier note in this file said "P12 2025 through P8 2026 are hardcoded" - an
+inclusive range, which also sweeps in **P1 2026**. Finance's list above skips
+P1 2026. Both claims are recorded because the source workbook
+(`Trailing_SSSG.xlsx`) is not tracked in git and nothing in this repo can
+settle it: the extracted CSVs carry values, not formulas, and
+`layout_report.json` records parse status, not whether a cell held a formula.
+Treat P1 2026 as unknown until someone opens the workbook and looks. The
+other eight are not in doubt.
+
+**What SHIFT does instead.** Nothing special. SSSG is computed uniformly for
+every period from `daily_sales`, with no per-period branch anywhere in
+`lib/sssg.js` - see the note there. No period is excluded, corrected, or
+annotated because its workbook counterpart was typed rather than calculated.
+
+**Stores excluded from every total**: 20001 (Dallas Lab) and 20002 (Test
+Cafe), confirmed by Finance 2026-09-16. Already true by construction - see
+Known traps above.
+
+**10033 Melrose has not opened yet** (confirmed by Finance 2026-09-16, and
+consistent with the data: absent from the `stores` table, all zeros in the
+workbook). No action required now, but **`opened_at` must be set when it
+opens**, and the failure modes are silent in both directions:
+
+- `opened_at` left NULL: `backfill-sales.yml` filters on
+  `opened_at != null and opened_at <= <date>`, so the store is skipped on
+  every date forever. It never fails, it just never gets data, and SSSG then
+  excludes it as "incomplete data" without anyone being told why.
+- `opened_at` set earlier than the real opening: the backfill writes real
+  $0 rows for days the store did not trade, which is exactly the phantom-row
+  pattern that cost 391 rows across 12 stores in run 33800079982. Once a
+  prior-year month mixes those $0 days with real trading days, the store
+  enters the comp set on a partial year and drags growth down.
+
+All 35 current stores have `opened_at` and `toast_guid` populated as of
+2026-09-16. Keep it that way; there is no alert if a new row lands without
+them.
 
 ## Reference totals, P9 2026 - PARTIAL PERIOD
 
