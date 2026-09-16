@@ -1,7 +1,23 @@
 # Period SSSG Report — specification
 
-Status: **spec only, nothing built.** Sits after the period port in the
-agreed ordering. Written 2026-09-16.
+Status: **spec only, nothing built.** Written 2026-09-16, decisions frozen
+2026-09-16.
+
+**This report is deferred until the number is right.** It does not enter scope
+until step 6 below passes. A better-looking view of a wrong number is worth
+nothing.
+
+### Frozen build order
+
+    1. Merge the discount fix, deploy, validate both gate days
+    2. Refund sweep built and validated against 10037/2026-08-28 -> 9.20
+    3. Re-sync everything the new code path has touched
+    4. FY2025 backfill, reconciled against period_store_figures.csv
+    5. FY2025 into FISCAL_PERIODS, key normalization to YYYY-PP
+    6. Period port, validated against P9 2026 -> 21 stores, -0.0251%
+
+Nothing else enters scope until step 6 passes. Step 1 blocks all four gates in
+§1, including `net_sales` being NULL on 3,348 of 3,420 rows.
 
 Interaction pattern is modelled on the Wingstop Brand Partner Report. Four
 formulas are taken from their data dictionary, named below. Everything else —
@@ -25,8 +41,8 @@ Nothing in this report is buildable today. Four things gate it, in order:
 | 3 | **FY2025 in `FISCAL_PERIODS`** | The prior period for any FY2026 period is an FY2025 period. `lib/fiscal.js` has no FY2025 keys at all. | Not started |
 | 4 | **2025 backfill** | `daily_sales` holds 1,085 pre-2026 rows, **all in August 2025**. September 2025: zero rows. | Not started |
 
-A fifth gate applies only to the 2-year stack: **FY2024 backfill**. Costed in
-§9.
+There is no fifth gate: the 2-year stack was **dropped from v1** on
+2026-09-16, so FY2024 is not backfilled. See §9.
 
 `daily_transactions` is in better shape than `daily_sales` — 3,420 rows, 1,117
 of them pre-2026 — but it inherits the same date coverage, so it is blocked by
@@ -57,19 +73,17 @@ Note this is algebraically just `sum(net_sales) / sum(transactions)` — the
 weekly normalisation cancels. It is written as AWS/AWT to match the
 dictionary, and because the two inputs are already on the card.
 
-**SSS 2Y** (2-year stack)
+**SSS 2Y / SST 2Y — OUT OF SCOPE for v1, decided 2026-09-16.** Recorded here
+only so the formulas do not have to be re-derived if Finance asks later. Do
+not build these, and do not build a 3Y stack at all (§9).
 
     SSS 2Y = SSS_change_% + (SSS_prior - SSS_2Y_prior) / SSS_2Y_prior
-
-i.e. this period's growth plus the prior period's own growth. Additive, not
-multiplicative — it is a stack, not a compound.
-
-**SST 2Y** uses the **same additive structure**:
-
     SST 2Y = SST_change_% + (SST_prior - SST_2Y_prior) / SST_2Y_prior
 
-The Wingstop document divides where the SSS formula adds. Treated as a typo in
-their document; do not reproduce it.
+This period's growth plus the prior period's own growth. Additive, not
+multiplicative — it is a stack, not a compound. The Wingstop document divides
+where the SSS formula adds; that is a typo in their document and **SST 2Y uses
+the SSS additive structure**, not theirs.
 
 ### 2.2 `operational_days` — the definition everything rests on
 
@@ -147,19 +161,34 @@ reports 21 comp stores for P9 2026. Measured against `stores.opened_at`:
 The difference is **10021 DFW Southlake**, opened 2025-06-06, comp entry
 2026-09-06 — mid-period. Period-end reproduces Finance's number exactly.
 
+**DECIDED 2026-09-16, and it must be defended in code.** Period-end is not an
+implementation detail; it is the difference between 20 and 21 comp stores and
+it reproduces Finance exactly. It is also precisely the thing someone
+"corrects" to period start in six months because start looks more principled.
+
+Required at step 6, not optional:
+
+- The comp-membership function carries a comment giving the reason and the
+  measured evidence (20 at start, 21 at end, Finance reports 21).
+- A test pins **P9 2026 to 21 comp stores**, naming **10021 DFW Southlake**
+  (opened 2025-06-06, comp entry 2026-09-06) as the boundary case, so the
+  failure message points straight at the store that moves.
+
 *Known consequence, flag in the tooltip:* a store entering comp mid-period
 contributes a full period of sales against a prior period in which it was
 open but still ramping. That inflates its growth. It is what Finance does, so
 we do it, but the tooltip should say the store entered comp during the period.
 
-**Source of the opening date — decision required (§10).** `comp_basis.csv`
-carries `grand_opening` and a pre-computed `entered_comp_basis`, but **it
-cannot be joined to our data**: it is keyed by `dba_store_name` with **0 of 30
+**Source of the opening date — DECIDED 2026-09-16: compute from
+`stores.opened_at`.** `comp_basis.csv` is reference material. It is never a
+runtime input and is never joined to at runtime. Reconcile it by hand once
+and record the outcome in `docs/finance/README.md`.
+
+Why it cannot be an input: it is keyed by `dba_store_name` with **0 of 30
 exact matches** against `stores.name` (their `Addison (Belt-line)` vs our
 `DFW Addison`), only 18 loose substring matches, 30 rows against 35 stores,
-and at least one row with an unescaped quote. Recommendation: compute from
-`stores.opened_at`, which reproduces Finance's 21, and treat `comp_basis.csv`
-as a cross-check to be reconciled once, by hand, not as a live input.
+and at least one row with an unescaped quote. Computing from
+`stores.opened_at` reproduces Finance's 21 without any of that.
 
 Per Finance 2026-09-16, the `soft_opening` column is ignored entirely.
 
@@ -308,9 +337,23 @@ impossible later.
 
 ---
 
-## 9. Cost of backfilling FY2024 — the 2Y stack decision
+## 9. FY2024 — OUT OF SCOPE. 2Y and 3Y stack dropped from v1
 
-**Decision is yours; this is the input, not a recommendation.**
+**DECIDED 2026-09-16: FY2024 is not backfilled, and the 2Y and 3Y stacks are
+dropped from the first version entirely.**
+
+Reason: a P9 2026 2Y stack rests on **11 comp stores against today's 21**. It
+describes half the chain, and most readers will take it for a statement about
+the whole one. Not worth 2.3 hours and a second year of data for a number that
+misleads by default. The data stays in Toast if Finance asks later; the costing
+below is kept so the decision does not have to be re-derived.
+
+The FY2025 costing in the table **remains live** — it is step 4 of the frozen
+build order.
+
+---
+
+### Costing, retained for reference
 
 FY2024 = 2024-01-01 .. 2024-12-29 (364 days, opens on a Monday, closes the day
 before FY2025 starts).
@@ -338,10 +381,24 @@ is why adding a whole extra year costs well under double.
 2s between days, chunks at 45 days, and the job times out at 360 minutes.
 At an assumed 6s per store-day call:
 
-- **FY2024**: ~5,143 / 4 × 6s + 364 × 2s ≈ **2.3 hours**, 9 chunks. Comfortable
-  inside one dispatch.
-- **FY2025**: ≈ **3.5 hours**. Fits, but at 10s per call it exceeds the 360-minute
-  timeout. **Split FY2025 into two dispatches** regardless of the 2024 decision.
+- **FY2024**: ~5,143 / 4 × 6s + 364 × 2s ≈ **2.3 hours**, 9 chunks. (Moot — out
+  of scope.)
+- **FY2025**: ≈ **3.5 hours**. Fits, but at 10s per call it exceeds the
+  360-minute timeout.
+
+**DECIDED 2026-09-16: FY2025 is split into two dispatches, unconditionally.**
+
+**And the split is sized on measurement, not on this estimate.** The 6s figure
+is the softest number in this document — there is no recorded per-pair timing
+anywhere in the repo. Before the full run, time **20 real store-day calls** and
+report the actual per-pair figure.
+
+The route already returns `elapsedSeconds` on every response. The cheapest way
+to get this is to log it in `backfill-sales.yml` the same way
+`discountsSkippedVoidAmount` is logged, then dispatch a single store over a
+20-day range — roughly 2 minutes of wall clock, and it also exercises the
+chunk planner. That two-line workflow change is a prerequisite of step 4, not
+a separate piece of work.
 
 The 6s figure is an assumption — there is no recorded per-pair timing in the
 repo. The merged chunking work makes a long run survivable either way: a
@@ -371,24 +428,25 @@ grounds whatever is decided about 2Y.
 
 ---
 
-## 10. Open decisions — needed before build, not during
+## 10. Decisions
 
-1. **2Y stack in or out of v1?** §9. Drives whether FY2024 is backfilled.
-2. **Comp entry source** — compute `EDATE(opened_at, 15)`, or reconcile
-   `comp_basis.csv` by hand first? §3. Recommendation: compute; it already
-   reproduces Finance's 21.
-3. **`state` column or code-side region map?** §4. Recommendation: column.
-4. **Does the monthly view stay?** Prior scoping recommended replacing it.
-   If it stays, both views must share `classifyStore` and neither may
-   re-implement "comparable".
-5. **`closed_at` column** — add now as inert, or when the first store closes?
-   §2.2.
-6. **Partial-period marker.** P9 2026 is live and incomplete. Cards 1–4 are
-   period-length-sensitive and will mislead on a partial period. Decide
-   whether the report refuses partial periods, marks them, or shows only the
-   length-neutral cards (AWS, AWT, Average Ticket) until the period closes.
+Closed 2026-09-16:
 
----
+| # | Decision | Outcome |
+|---|---|---|
+| 1 | 2Y stack in v1? | **Out.** 2Y and 3Y both dropped; FY2024 not backfilled. §9 |
+| 2 | Comp entry source | **Compute `EDATE(opened_at, 15)`.** `comp_basis.csv` is reference only, never joined at runtime. §3 |
+| 3 | Comp cutoff | **Period end.** Reproduces Finance's 21. Comment + test required at step 6. §3 |
+| 4 | FY2025 backfill shape | **Two dispatches**, sized on a measured per-pair timing, not the 6s estimate. §9 |
+
+Still open — see the covering note; these do not block steps 1–5:
+
+| # | Decision | Options |
+|---|---|---|
+| 5 | Partial-period marker | Refuse partial periods / mark them / show only length-neutral cards |
+| 6 | `state` column vs code-side region map | Column on `stores` (recommended) vs map in code |
+| 7 | Monthly view: keep or replace | Replace (recommended) vs maintain both |
+| 8 | `closed_at` column | Add now, inert, vs when the first store closes |
 
 ## 11. Traceability
 
