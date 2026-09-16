@@ -239,7 +239,15 @@ jobs:
                 # cada corrida en vez de descubrirse otra vez dentro de un ano.
                 vdn=$(echo "$body" | jq -r '.discountsSkippedVoidCount // 0')
                 vda=$(echo "$body" | jq -r '.discountsSkippedVoidAmount // 0')
-                echo "OK   $code $iso grossSales=\$$sales discounts=\$$disc refunds=\$$refu net=\$$net transactions=$txns hourlyRows=$hourly laborRows=$labor anomalies=$anom skippedRefunds=$skipn/\$$skipa voidDiscounts=$vdn/\$$vda" >> full-log.txt
+                # Cuanto tardo ESTE par. El route ya lo devuelve, aqui solo se
+                # loguea. Existe para dimensionar cuantos dispatches necesita
+                # un backfill de un año: los 6s por par que se venian asumiendo
+                # no estan medidos en ningun lado, y a 10s un FY completo se
+                # pasa del timeout de 360 min del job. Correr UNA tienda sobre
+                # ~20 dias y leer el resumen de abajo contesta eso en dos
+                # minutos, antes de comprometer la corrida larga.
+                secs=$(echo "$body" | jq -r '.elapsedSeconds // "?"')
+                echo "OK   $code $iso grossSales=\$$sales discounts=\$$disc refunds=\$$refu net=\$$net transactions=$txns hourlyRows=$hourly laborRows=$labor anomalies=$anom skippedRefunds=$skipn/\$$skipa voidDiscounts=$vdn/\$$vda elapsed=${secs}s" >> full-log.txt
                 echo "$code:$iso" >> synced-pairs.txt
 
                 # Un campo con forma inesperada (un refund sin refundAmount,
@@ -482,6 +490,40 @@ jobs:
             cat void-discounts.txt
           fi
 
+          # Tiempos por par. Se derivan del log, no de variables acumuladas:
+          # sync_one corre bajo xargs, en subshells, y cualquier contador que
+          # se sume ahi dentro se pierde al terminar el par - el mismo motivo
+          # por el que el bucle de chunks usa process substitution.
+          TIMED=$(grep -c ' elapsed=[0-9]' full-log.txt || true)
+          if [ "${TIMED:-0}" -gt 0 ]; then
+            SECS_LIST=$(grep -o ' elapsed=[0-9]*s' full-log.txt | grep -o '[0-9]*')
+            T_MEAN=$(echo "$SECS_LIST" | awk '{s+=$1;n++} END{if(n)printf "%.1f", s/n}')
+            T_MAX=$(echo "$SECS_LIST" | sort -n | tail -1)
+            T_P90=$(echo "$SECS_LIST" | sort -n | awk '{v[NR]=$1} END{i=int(NR*0.9); if(i<1)i=1; print v[i]}')
+            EST=$(awk -v n="$OK_COUNT" -v m="$T_MEAN" 'BEGIN{if(m>0)printf "%.1f", (n/4*m)/3600}')
+            # Proyeccion a FY2025 completo. Es LA cifra que se necesita para
+            # decidir en cuantos dispatches se parte el backfill, y una
+            # corrida de calibracion de 20 pares no la da sola: 20 pares
+            # siempre proyectan a ~0h. 7961 = store-days reales de FY2025
+            # (2024-12-30..2025-12-28) contados contra stores.opened_at.
+            FY_PAIRS=7961
+            EST_FY=$(awk -v n="$FY_PAIRS" -v m="$T_MEAN" 'BEGIN{if(m>0)printf "%.1f", (n/4*m)/3600}')
+            echo "=== per-pair timing: mean ${T_MEAN}s, p90 ${T_P90}s, max ${T_MAX}s over $TIMED pairs ==="
+            {
+              echo ""
+              echo "**Per-pair timing:** mean ${T_MEAN}s, p90 ${T_P90}s, max ${T_MAX}s over $TIMED pairs."
+              echo ""
+              echo "Time per store/day pair, NOT wall clock - the job runs 4 in parallel."
+              echo "At this mean, $OK_COUNT pairs is roughly ${EST}h of wall clock plus 2s"
+              echo "per day of sleep."
+              echo ""
+              echo "**Projected to a full FY2025** ($FY_PAIRS store-days): **~${EST_FY}h**."
+              echo "The job times out at 360 minutes (6h), so anything approaching 5h needs"
+              echo "splitting. FY2025 is already committed to two dispatches; this says"
+              echo "whether two is enough."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
           echo "ok_count=$OK_COUNT" >> "$GITHUB_OUTPUT"
           echo "fail_count=$FAIL_COUNT" >> "$GITHUB_OUTPUT"
           echo "chunks_with_failures=$CHUNKS_WITH_FAILURES" >> "$GITHUB_OUTPUT"
@@ -493,6 +535,9 @@ jobs:
           echo "void_discount_pairs=$VOID_PAIRS" >> "$GITHUB_OUTPUT"
           echo "void_discount_count=$VOID_COUNT" >> "$GITHUB_OUTPUT"
           echo "void_discount_amount=$VOID_AMOUNT" >> "$GITHUB_OUTPUT"
+          echo "pair_seconds_mean=${T_MEAN:-}" >> "$GITHUB_OUTPUT"
+          echo "pair_seconds_p90=${T_P90:-}" >> "$GITHUB_OUTPUT"
+          echo "pair_seconds_max=${T_MAX:-}" >> "$GITHUB_OUTPUT"
 
       # v6: v4 is stuck on Node 20, which GitHub Actions stopped running by
       # default after the June 2026 Node 24 cutover - v4 runs were starting
