@@ -19,6 +19,9 @@ nothing.
 Nothing else enters scope until step 6 passes. Step 1 blocks all four gates in
 §1, including `net_sales` being NULL on 3,348 of 3,420 rows.
 
+The calendar-month SSSG view is **replaced**, not kept alongside (§10.7), so
+its removal is part of step 6 rather than a later cleanup.
+
 Interaction pattern is modelled on the Wingstop Brand Partner Report. Four
 formulas are taken from their data dictionary, named below. Everything else —
 the comp rule, the ticket derivation, the total-row convention — comes from
@@ -109,9 +112,22 @@ academic:
 This makes AWS depend entirely on `opened_at` being correct, which ties
 directly to the 10033 Melrose note in `docs/finance/README.md`.
 
-**There is no `closed_at` column.** Nothing has closed yet. The formula is
-written with it so the shape is right when one does; until then the clause is
-inert. Adding it is a one-line migration, not a redesign.
+**`closed_at` — DECIDED 2026-09-16: add it now, inert.** Nothing has closed
+yet, and the formula above already reads it, so adding the column makes code
+and spec agree from day one instead of leaving a clause that references a
+column that does not exist.
+
+The objection to an always-NULL column is that it invites the assumption that
+something maintains it. That is a real trap, and it is fixed by documenting it
+rather than by deferring the column. **The migration must carry a comment
+stating plainly:**
+
+- nothing populates this column, and nothing ever will automatically;
+- it must be set **by hand** when a store closes;
+- `operational_days` already reads it, so leaving it NULL for a store that has
+  actually closed will overstate that store's AWS for every period after the
+  closure — silently, because a closed store's zero days will divide as if it
+  were trading.
 
 ### 2.3 Kept from our workbook — do not substitute the Wingstop equivalents
 
@@ -212,9 +228,10 @@ The mapping is unambiguous but has to be written down and stored:
 | AZ | AZ | 2 |
 | TN | NSH | 1 |
 
-Recommend a real `state` column on `stores` rather than a mapping in code —
-a hardcoded region→state map is the kind of thing that silently omits a new
-region. TN is a single store (NSH), so any bug here hides in a rounding error.
+**DECIDED 2026-09-16: add a real `state` column to `stores`**, backfilled from
+the seven existing regions. Not a region→state map in code — a hardcoded map
+is the kind of thing that silently omits a new region, and TN is a single
+store (NSH), so that bug would hide inside a rounding error.
 
 **Store** — one, many, or all. Multi-select.
 
@@ -252,8 +269,23 @@ exact formula — the tooltip is the documentation, and is mandatory.
 
 Cards 5 and 6 are period-length-neutral, which is what makes a 28-day period
 comparable to a 35-day one and a mid-period opening comparable to a full one.
-Cards 1–4 are not, and must never be shown for a partial period without the
-partial-period marker (§7).
+Cards 1–4 are not.
+
+**Partial periods — DECIDED 2026-09-16: show only the length-neutral cards.**
+While a period is still running, render **Average Weekly Sales, Average Weekly
+Transactions and Average Ticket ($) only**. Net Sales, SSS %, SST % and Ticket
+SSSG are withheld until the period closes, then revealed.
+
+Not a marker on a misleading number, and not a refusal to show the period at
+all. AWS and Average Ticket are *designed* to be period-length-neutral — they
+are correct on day 3 of a period, which is the entire reason those formulas
+were taken from the Wingstop dictionary. The other four are not, and a warning
+label does not survive a screenshot. Withholding is honest by construction;
+labelling depends on the reader.
+
+The withheld cards must show *why* they are withheld — "available when P9 2026
+closes on 2026-09-27" — not render blank or zero. A blank card reads as a data
+failure and generates a support question; a zero reads as a real number.
 
 ---
 
@@ -438,15 +470,12 @@ Closed 2026-09-16:
 | 2 | Comp entry source | **Compute `EDATE(opened_at, 15)`.** `comp_basis.csv` is reference only, never joined at runtime. §3 |
 | 3 | Comp cutoff | **Period end.** Reproduces Finance's 21. Comment + test required at step 6. §3 |
 | 4 | FY2025 backfill shape | **Two dispatches**, sized on a measured per-pair timing, not the 6s estimate. §9 |
+| 5 | Partial-period marker | **Show only the length-neutral cards** (AWS, AWT, Average Ticket) while a period is running; reveal the rest when it closes. §5 |
+| 6 | `state` column vs code map | **Real `state` column on `stores`**, backfilled from the seven regions. §4 |
+| 7 | Monthly view: keep or replace | **Replace with periods.** Not only tidiness — the calendar-month comparison is distorted (8 of 12 months carry a weekend-day mismatch against their prior year, worth ~1.28% of a month against a signal of −0.0251%). Keeping both would mean publishing a number known to be wrong beside one that is not. |
+| 8 | `closed_at` column | **Add now, inert**, with a migration comment stating that nothing populates it, that it is set by hand, and that `operational_days` already reads it. §2.2 |
 
-Still open — see the covering note; these do not block steps 1–5:
-
-| # | Decision | Options |
-|---|---|---|
-| 5 | Partial-period marker | Refuse partial periods / mark them / show only length-neutral cards |
-| 6 | `state` column vs code-side region map | Column on `stores` (recommended) vs map in code |
-| 7 | Monthly view: keep or replace | Replace (recommended) vs maintain both |
-| 8 | `closed_at` column | Add now, inert, vs when the first store closes |
+All decisions are closed. Nothing in this spec is awaiting an answer.
 
 ## 11. Traceability
 
