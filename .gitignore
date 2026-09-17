@@ -6,6 +6,7 @@ node_modules
 *.log
 .vercel
 *.bak
+*.orig
 *.bak
 scripts/tattle-change-password.js
 .env*
