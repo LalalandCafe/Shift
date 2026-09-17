@@ -10,8 +10,14 @@
 //
 // Thresholds come from metric_targets and are passed through untouched. This
 // route does not know what 105 seconds means and must never decide it.
+//
+// Scoping: every branch below either guards an explicit storeCode against the
+// session's grps, or filters the rows it returns by grp. The pilot is three
+// stores today, but the tab is open to area managers, so a CA session must
+// not be able to read a TX store by editing the query string.
 
 import { supabaseAdmin } from "@/lib/supabase";
+import { scopeRows, denyIfStoreOutOfScope } from "@/lib/scope";
 
 const DT_METRIC = "dt_window";
 
@@ -65,6 +71,13 @@ export async function GET(request) {
     const view = searchParams.get("view") || "summary";
     const since = daysAgoISO(days);
 
+    // One guard for every branch that names a store. The views that do not
+    // name one are filtered by grp further down instead.
+    if (storeCode) {
+      const denied = await denyIfStoreOutOfScope(request, storeCode);
+      if (denied) return denied;
+    }
+
     const targets = await loadTarget();
 
     if (view === "hourly") {
@@ -103,11 +116,13 @@ export async function GET(request) {
       if (storeCode) query = query.eq("store_code", Number(storeCode));
       const { data, error } = await query;
       if (error) throw new Error(error.message);
-      return Response.json({ ok: true, view, targets, rows: data });
+      // Without a storeCode this is every store, so it still needs filtering.
+      // scopeRows is a no-op for admin and expects a grp field on each row.
+      return Response.json({ ok: true, view, targets, rows: scopeRows(request, data || []) });
     }
 
     // default: summary, one row per store over the requested window
-    const data = await fetchAllRows((from, to) => {
+    const fetched = await fetchAllRows((from, to) => {
       let query = supabaseAdmin
         .from("drive_thru_daily")
         .select("*")
@@ -117,6 +132,10 @@ export async function GET(request) {
       if (storeCode) query = query.eq("store_code", Number(storeCode));
       return query.range(from, to);
     }, "drive_thru_daily");
+
+    // Filtered before aggregation, so the per-store cards and the raw daily
+    // array in the response describe the same set of stores.
+    const data = scopeRows(request, fetched);
 
     const byStore = new Map();
     for (const r of data) {

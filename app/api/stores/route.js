@@ -2,7 +2,18 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getAllStores, updateStoreTargets } from "@/lib/data";
 import { requireAdmin } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request) {
+  // Admin only, same as PATCH below. This is the read side of the Store
+  // targets tab, whose roles array is ["admin"] in app/page.js, and it
+  // returns every store's targets chain-wide. It was protected by side
+  // effect while middleware 403'd every non-admin; now that area managers
+  // are admitted, the gate has to be stated here.
+  //
+  // Note it takes `request` now - it did not before, because it had no
+  // reason to read anything off the request.
+  const denied = requireAdmin(request);
+  if (denied) return denied;
+
   try {
     const map = await getAllStores(supabaseAdmin);
     const list = Object.values(map).sort((a, b) => a.code - b.code);

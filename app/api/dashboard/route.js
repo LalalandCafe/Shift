@@ -1,4 +1,5 @@
 import { buildDailyReport } from "@/lib/report";
+import { scopeRows } from "@/lib/scope";
 
 // Umbral que separa critico de advertencia (0.15 = 15% abajo del target)
 const CRITICAL_PCT = 0.15;
@@ -37,10 +38,19 @@ export async function GET(request) {
       prior = null;
     }
 
+    // Scope both windows before anything is computed, not after. Exceptions,
+    // counts, the trend series and the blended SPLH are all derived from
+    // these arrays, so filtering here is what keeps every number on the
+    // dashboard consistent with the region the viewer actually owns. Doing it
+    // on the output instead would leave blendedCurrent describing the chain
+    // while the store list describes one region.
+    const currentRows = scopeRows(request, current.rows);
+    const priorRows = prior ? scopeRows(request, prior.rows) : [];
+
     // ── EXCEPCIONES ──
     const exceptions = [];
 
-    current.rows.forEach((r) => {
+    currentRows.forEach((r) => {
       const base = { code: r.code, name: r.name, region: r.region };
 
       // Problemas de data, ya los detecta anomalyFlags
@@ -92,9 +102,9 @@ export async function GET(request) {
     // ratio de la suma. Con estos cuatro campos el Dashboard calcula el blended
     // exacto de cualquier region sin volver a llamar al API.
     const priorByCode = {};
-    if (prior) prior.rows.forEach((r) => { priorByCode[r.code] = r; });
+    priorRows.forEach((r) => { priorByCode[r.code] = r; });
 
-    const trends = current.rows
+    const trends = currentRows
       .map((r) => {
         const p = priorByCode[r.code];
         if (!p || !p.wtd.splh || !r.wtd.splh) return null;
@@ -116,8 +126,8 @@ export async function GET(request) {
       .filter(Boolean)
       .sort((a, b) => a.delta - b.delta);
 
-    const curBlended = blendedWtd(current.rows);
-    const priBlended = prior ? blendedWtd(prior.rows) : null;
+    const curBlended = blendedWtd(currentRows);
+    const priBlended = prior ? blendedWtd(priorRows) : null;
 
     return Response.json({
       ok: true,
@@ -127,7 +137,7 @@ export async function GET(request) {
       period: current.period,
       isLive: current.isLive,
       lastSyncAt: current.lastSyncAt,
-      storeCount: current.rows.length,
+      storeCount: currentRows.length,
       counts,
       exceptions,
       trend: {

@@ -1,5 +1,15 @@
 import { buildForecast, mondayOf } from "@/lib/forecast";
 import { supabaseAdmin } from "@/lib/supabase";
+import { denyIfStoreOutOfScope } from "@/lib/scope";
+
+// Reachable by area managers, not admin-only: the planner is rendered inside
+// the Store detail tab (components/StoreTrend.js -> components/Forecast.js),
+// which regionals are meant to have. So this route is NOT in ADMIN_ONLY_API;
+// it is scoped per store instead, on every verb.
+//
+// All three handlers guard before touching the database. The writes matter
+// most: without the guard, a TX-TN manager could overwrite or delete the
+// planned hours of a CA-AZ store by changing one number in the request.
 
 export async function GET(request) {
   try {
@@ -8,6 +18,11 @@ export async function GET(request) {
     if (!store) {
       return Response.json({ ok: false, error: "Falta store" }, { status: 400 });
     }
+
+    // Read guard. 400 for a missing store above, 403 for one this session
+    // may not see - the two are different answers and must stay distinct.
+    const denied = await denyIfStoreOutOfScope(request, store);
+    if (denied) return denied;
 
     // Por default, la semana que viene (los horarios se hacen con anticipacion)
     let weekStart = searchParams.get("weekStart");
@@ -35,6 +50,13 @@ export async function POST(request) {
     if (!storeCode || !Array.isArray(days)) {
       return Response.json({ ok: false, error: "Falta storeCode o days" }, { status: 400 });
     }
+
+    // WRITE guard. storeCode comes from the JSON body here, not the query
+    // string, so this reads the body value - guarding the query param would
+    // have guarded nothing. Placed before the rows are built and well before
+    // the upsert, so a cross-region write never reaches planned_hours.
+    const denied = await denyIfStoreOutOfScope(request, storeCode);
+    if (denied) return denied;
 
     const rows = [];
     for (const d of days) {
@@ -79,6 +101,12 @@ export async function DELETE(request) {
     if (!date && !weekStart) {
       return Response.json({ ok: false, error: "Falta date o weekStart" }, { status: 400 });
     }
+
+    // WRITE guard. A delete is the most destructive verb here - it can drop a
+    // whole week of planned hours with one weekStart - so it is checked
+    // before the query is even built.
+    const denied = await denyIfStoreOutOfScope(request, store);
+    if (denied) return denied;
 
     let q = supabaseAdmin
       .from("planned_hours")

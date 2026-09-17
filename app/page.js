@@ -26,25 +26,29 @@ import { yesterdayISO } from "../lib/ui";
  *            que se PUEDE. Antes solo existia la primera mitad.
  *   desktop  se oculta en pantallas angostas
  *   date / region / search  que controles muestra la barra superior
+ *
+ * The role strings here must match what lib/permissions.js returns, which is
+ * "admin" and "regional". The old list said "region" and "store"; neither
+ * value is ever produced, so every non-admin rendered zero tabs.
  */
-const ALL = ["admin", "region", "store"];
+const ALL = ["admin", "regional"];
 
 const VIEWS = [
-  { key: "dashboard",   label: "Dashboard",     short: "Dashboard", icon: "dashboard", group: "Today",      roles: ["admin"], date: true },
+  { key: "dashboard",   label: "Dashboard",     short: "Dashboard", icon: "dashboard", group: "Today",      roles: ALL, date: true },
   { key: "week",        label: "Week view",     short: "Week",      icon: "table",     group: "Today",      roles: ALL, date: true, region: true, search: true },
   { key: "storetrend",  label: "Store detail",  short: "Store",     icon: "search",    group: "Stores",     roles: ALL, date: true },
   { key: "leaderboard", label: "Leaderboard",   short: "Board",     icon: "rank",      group: "Stores",     roles: ALL, date: true },
   { key: "sssg",        label: "SSSG",          short: "SSSG",      icon: "gauge",     group: "Stores",     roles: ["admin"] },
   { key: "service",     label: "Service times", short: "Service",   icon: "timer",     group: "Operations", roles: ["admin"], date: true },
   { key: "tplh",        label: "TPLH",          short: "TPLH",      icon: "activity",  group: "Operations", roles: ["admin"] },
-  { key: "drivethru",   label: "Drive-thru",    short: "Drive",     icon: "car",       group: "Operations", roles: ["admin"] },
+  { key: "drivethru",   label: "Drive-thru",    short: "Drive",     icon: "car",       group: "Operations", roles: ALL },
   { key: "email",       label: "HTML email",    short: "Email",     icon: "mail",      group: "Share",      roles: ["admin"], desktop: true, date: true, region: true },
   { key: "targets",     label: "Store targets", short: "Targets",   icon: "target",    group: "Share",      roles: ["admin"], desktop: true },
 ];
 
 const NAV_GROUPS = ["Today", "Stores", "Operations", "Share"];
 
-const ROLE_LABEL = { admin: "Admin", region: "Region lead", store: "Store" };
+const ROLE_LABEL = { admin: "Admin", regional: "Area manager" };
 
 export default function ShiftApp() {
   const [session, setSession] = useState(null);
@@ -69,6 +73,24 @@ export default function ShiftApp() {
   const cfg = VIEWS.find((v) => v.key === view) || VIEWS[1];
   const allowed = session ? cfg.roles.includes(session.role) : false;
 
+  // report.rows arrives already scoped to this session's grps, so there is
+  // no client-side filtering here and no way for a component to read past
+  // its own region by ignoring a prop.
+  //
+  // leaderboardRows is the single exception: /api/report attaches it only
+  // for scoped sessions and it carries the whole chain, because a ranking of
+  // one region is not a ranking. Admin never receives it, hence the fallback.
+  const leaderboardReport = report
+    ? report.leaderboardRows
+      ? { ...report, rows: report.leaderboardRows }
+      : report
+    : null;
+
+  // The region picker only offers what this session can actually see. An
+  // admin gets both; an area manager gets their own, and the picker
+  // disappears entirely when there is only one thing to pick.
+  const regionOptions = session?.allStores ? ["TX-TN", "CA-AZ"] : session?.grps || [];
+
   // La sesion vive en una cookie HttpOnly, asi que el cliente no puede
   // leerla: se la tiene que preguntar al servidor.
   useEffect(() => {
@@ -80,14 +102,20 @@ export default function ShiftApp() {
           // esta pantalla espera la forma vieja, con scope y storeCode.
           // Se traduce aqui y no en el endpoint, para que el dia que se
           // construya el nivel regional solo cambie este mapeo.
+          const grps = Array.isArray(d.grps) ? d.grps : [];
           setSession({
             userId: d.email,
             name: d.name,
             role: d.role,
-            scope: d.allStores ? "all" : null,
+            grps,
+            allStores: d.allStores === true,
+            scope: d.allStores ? "all" : grps.join(" · ") || null,
             storeCode: null,
           });
-          if (d.role === "admin") setView("dashboard");
+          // A single-group area manager has nothing to choose between, so
+          // start them on their own region instead of a misleading "All".
+          if (!d.allStores && grps.length === 1) setRegion(grps[0]);
+          setView("dashboard");
         }
       })
       .catch(() => {})
@@ -150,7 +178,7 @@ export default function ShiftApp() {
     setSession(null);
     setReport(null);
     setView("week");
-    setNotice(message || "Your session expired. Enter your code again.");
+    setNotice(message || "Your session expired. Sign in again.");
   }, []);
 
   // El week view y el leaderboard comparten un solo payload de reporte.
@@ -341,12 +369,15 @@ export default function ShiftApp() {
                 <input type="date" value={isoDate} onChange={(e) => setIsoDate(e.target.value)} />
               </label>
             )}
-            {cfg.region && (
+            {cfg.region && regionOptions.length > 1 && (
               <label className="field">
                 <select value={region} onChange={(e) => setRegion(e.target.value)}>
                   <option value="All">All regions</option>
-                  <option value="TX-TN">TX-TN</option>
-                  <option value="CA-AZ">CA-AZ</option>
+                  {regionOptions.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
                 </select>
                 <Icon name="down" size={14} />
               </label>
@@ -394,7 +425,7 @@ export default function ShiftApp() {
                   search={search}
                 />
               )}
-              {view === "leaderboard" && <Leaderboard report={report} />}
+              {view === "leaderboard" && <Leaderboard report={leaderboardReport} />}
               {view === "storetrend" && <StoreTrend isoDate={isoDate} />}
               {view === "dashboard" && (
                 <Dashboard isoDate={isoDate} report={report} onNavigate={setView} />
@@ -471,4 +502,4 @@ export default function ShiftApp() {
       </div>
     </div>
   );
-}
+} 

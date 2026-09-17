@@ -1,5 +1,6 @@
 import { buildStoreTrend } from "@/lib/report";
 import { supabaseAdmin } from "@/lib/supabase";
+import { scopeRows, denyIfStoreOutOfScope } from "@/lib/scope";
 
 export async function GET(request) {
   try {
@@ -22,8 +23,14 @@ export async function GET(request) {
         .eq("active", true)
         .order("code");
       if (error) throw new Error(error.message);
-      return Response.json({ ok: true, stores: data || [] });
+      // The picker only offers what this session may open. Scoping the list
+      // is not the access control though - the guard below is, because the
+      // store code can also be typed straight into the URL.
+      return Response.json({ ok: true, stores: scopeRows(request, data || []) });
     }
+
+    const denied = await denyIfStoreOutOfScope(request, store);
+    if (denied) return denied;
 
     const trend = await buildStoreTrend(store, endIso, weeks);
     return Response.json(trend);

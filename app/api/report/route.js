@@ -1,5 +1,6 @@
 import { buildDailyReport } from "@/lib/report";
 import { sessionFrom } from "@/lib/auth";
+import { scopeRows, isAdminRequest } from "@/lib/scope";
 
 /**
  * unanswered and responseRate describe how well a store is replying to its
@@ -42,7 +43,30 @@ export async function GET(request) {
       report = stripReviewResponseFields(report);
     }
 
-    return Response.json(report);
+    // Scoping happens here, not in the client. rows is what this session may
+    // see; everything downstream (Week view, Dashboard, Excel, the emailed
+    // report) reads rows and therefore inherits the scope for free.
+    const allRows = report.rows || [];
+    const scoped = scopeRows(request, allRows);
+    const admin = isAdminRequest(request);
+
+    // The one deliberate exception: the leaderboard ranks against the whole
+    // chain, because a ranking of a third of the stores is not a ranking.
+    // It ships as a separate key so nothing else can pick it up by accident,
+    // and only for sessions that are actually scoped — an admin already has
+    // the same data in rows, and sending it twice would double the payload.
+    //
+    // Same row shape as rows on purpose: components/Leaderboard.js reads it
+    // unchanged. If the chain-wide detail here ever needs trimming, trim it
+    // in this one spot after checking which fields that component uses.
+    const body = {
+      ...report,
+      rows: scoped,
+      storeCount: scoped.length,
+    };
+    if (!admin) body.leaderboardRows = allRows;
+
+    return Response.json(body);
   } catch (err) {
     return Response.json({ ok: false, error: err.message }, { status: 500 });
   }

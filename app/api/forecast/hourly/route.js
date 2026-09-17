@@ -1,4 +1,5 @@
 import { buildHourlyPlan } from "@/lib/hourly-shape";
+import { denyIfStoreOutOfScope } from "@/lib/scope";
 
 // Endpoint aparte y no un campo mas en /api/forecast a proposito: la curva
 // solo se pide cuando alguien abre un dia. El planeador carga igual de
@@ -16,6 +17,12 @@ export async function GET(request) {
         { status: 400 }
       );
     }
+
+    // Same scope guard as app/api/forecast/route.js. This endpoint is split
+    // out for load reasons only, which does not make it any less of a way to
+    // read another region's store.
+    const denied = await denyIfStoreOutOfScope(request, store);
+    if (denied) return denied;
 
     const data = await buildHourlyPlan(
       store,
