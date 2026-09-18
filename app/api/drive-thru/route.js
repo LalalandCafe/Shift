@@ -15,9 +15,29 @@
 // session's grps, or filters the rows it returns by grp. The pilot is three
 // stores today, but the tab is open to area managers, so a CA session must
 // not be able to read a TX store by editing the query string.
+//
+// hasDriveThru / grpsWithDriveThru: every response carries these so the
+// client can tell two different situations apart, which must never be
+// collapsed into one message:
+//
+//   hasDriveThru: false  -> no store this session can see has drive-thru
+//                           hardware AT ALL. Date-independent.
+//   hasDriveThru: true   -> the region has hardware, but the selected date
+//   + empty rows            window came back empty.
+//
+// grpsWithDriveThru narrows the same answer to one region, which is what a
+// manager holding both grps needs when they filter the tab down to one.
+//
+// This is NOT a 403 and NOT a region allow-list. A CA-AZ manager gets a
+// normal 200 with empty arrays and the flag set to false, and the tab stays
+// visible for them. Both fields are derived from the data (see
+// driveThruGrpsInScope below), so the day CA/AZ stores get hardware and
+// start landing rows in drive_thru_daily, this begins returning true on its
+// own with no code change here and no list to remember to edit.
 
 import { supabaseAdmin } from "@/lib/supabase";
 import { scopeRows, denyIfStoreOutOfScope } from "@/lib/scope";
+import { accessOf } from "@/lib/auth";
 
 const DT_METRIC = "dt_window";
 
@@ -48,6 +68,70 @@ async function fetchAllRows(buildQuery, label) {
   return all;
 }
 
+/**
+ * The grps in this session's scope that actually have drive-thru hardware.
+ *
+ * Read the question carefully, because what it does NOT ask is the whole
+ * point. There is no date filter anywhere below. "This region has no
+ * drive-thru hardware" and "this region has hardware but reported nothing in
+ * the last 30 days" are different answers that deserve different copy, and a
+ * windowed query cannot tell them apart.
+ *
+ * Returned as a list rather than a bare boolean because a manager who holds
+ * both grps can filter the tab down to one of them. A boolean would force the
+ * client to guess which of the two empty states applies to the filtered
+ * region, which is exactly the conflation this flag exists to prevent.
+ *
+ * Derived from the data, never from a region allow-list:
+ *   - the grps come from the stores table, so a new market appears on its own
+ *   - membership comes from whether the grp's stores appear in
+ *     drive_thru_daily at all
+ * The first time a CA or AZ store syncs a drive_thru_daily row, "CA-AZ" joins
+ * this list by itself and the tab starts working, with no code change here.
+ *
+ * Scoping note: resolved through stores.grp rather than through the
+ * drive_thru_* views. stores.grp is the column the whole permission model is
+ * built on (lib/permissions.js), so it is the one place grp is guaranteed to
+ * exist; the views are maintained separately and this probe should not break
+ * if one of them is ever rebuilt without carrying grp through.
+ */
+async function driveThruGrpsInScope(request) {
+  const access = accessOf(request);
+
+  let storeQuery = supabaseAdmin.from("stores").select("code, grp");
+  if (access.allStores !== true) {
+    // Fail closed, same as lib/permissions.js: a session with no grp sees no
+    // stores, so it has no drive-thru regions either.
+    if (!Array.isArray(access.grps) || access.grps.length === 0) return [];
+    storeQuery = storeQuery.in("grp", access.grps);
+  }
+  const { data: stores, error } = await storeQuery;
+  if (error) throw new Error("stores: " + error.message);
+
+  const codesByGrp = new Map();
+  for (const s of stores || []) {
+    if (!s.grp) continue;
+    if (!codesByGrp.has(s.grp)) codesByGrp.set(s.grp, []);
+    codesByGrp.get(s.grp).push(s.code);
+  }
+
+  // One limit(1) probe per grp - two queries today, and bounded by the number
+  // of markets rather than by the number of drive-thru rows. Asking once for
+  // every code at a time and counting distinct grps would risk PostgREST's
+  // 1000-row cap silently hiding a grp.
+  const found = [];
+  for (const [grp, codes] of codesByGrp) {
+    const { data, error: probeError } = await supabaseAdmin
+      .from("drive_thru_daily")
+      .select("store_code")
+      .in("store_code", codes)
+      .limit(1);
+    if (probeError) throw new Error("drive_thru_daily: " + probeError.message);
+    if (data && data.length) found.push(grp);
+  }
+  return found;
+}
+
 async function loadTarget() {
   // green_value is optional on this table: it lets a metric name its own
   // green line instead of accepting target * 0.85. Drive-thru window time
@@ -73,12 +157,22 @@ export async function GET(request) {
 
     // One guard for every branch that names a store. The views that do not
     // name one are filtered by grp further down instead.
+    //
+    // Unchanged by the hasDriveThru work on purpose: a store outside this
+    // session's region is still a 403, not an empty state. The empty state is
+    // for a region with no hardware, which is not an access failure.
     if (storeCode) {
       const denied = await denyIfStoreOutOfScope(request, storeCode);
       if (denied) return denied;
     }
 
     const targets = await loadTarget();
+
+    // Resolved once and attached to every branch below, so each of the three
+    // views answers the "is there hardware in my scope" question identically.
+    // A client that only ever calls one of them still gets the same contract.
+    const grpsWithDriveThru = await driveThruGrpsInScope(request);
+    const hasDriveThru = grpsWithDriveThru.length > 0;
 
     if (view === "hourly") {
       if (!storeCode) {
@@ -104,6 +198,8 @@ export async function GET(request) {
         view,
         storeCode: Number(storeCode),
         targets,
+        hasDriveThru,
+        grpsWithDriveThru,
         rows: data,
       });
     }
@@ -118,7 +214,15 @@ export async function GET(request) {
       if (error) throw new Error(error.message);
       // Without a storeCode this is every store, so it still needs filtering.
       // scopeRows is a no-op for admin and expects a grp field on each row.
-      return Response.json({ ok: true, view, targets, rows: scopeRows(request, data || []) });
+      const rows = scopeRows(request, data || []);
+      return Response.json({
+        ok: true,
+        view,
+        targets,
+        hasDriveThru,
+        grpsWithDriveThru,
+        rows,
+      });
     }
 
     // default: summary, one row per store over the requested window
@@ -195,7 +299,16 @@ export async function GET(request) {
       // store had a bad Tuesday, or nobody can find their store twice.
       .sort((a, b) => a.storeCode - b.storeCode);
 
-    return Response.json({ ok: true, view, days, targets, stores, daily: data });
+    return Response.json({
+      ok: true,
+      view,
+      days,
+      targets,
+      hasDriveThru,
+      grpsWithDriveThru,
+      stores,
+      daily: data,
+    });
   } catch (err) {
     return Response.json({ ok: false, error: err.message }, { status: 500 });
   }

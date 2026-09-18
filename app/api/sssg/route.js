@@ -2,10 +2,14 @@ import { requireAdmin } from "@/lib/auth";
 import { getComparableMonths, computeMonthComparison } from "@/lib/sssg";
 
 // Admin only. Gated here (not just by hiding the nav tab) the same way
-// app/api/stores/route.js gates its PATCH - middleware.js already blocks
-// any non-admin session before a request reaches this file (every role
-// besides admin is blocked chain-wide today per lib/permissions.js), but
-// this is the route-local enforcement layer on top of that, same pattern.
+// app/api/stores/route.js gates its PATCH.
+//
+// This used to say that every non-admin role was blocked chain-wide, which
+// made the check below look redundant. That is no longer true: area managers
+// hold role "regional" and reach the API normally, so the only things keeping
+// them out of SSSG are middleware.js's ADMIN_ONLY_API list and the call
+// below. Two layers on purpose - the list is one edit away from being wrong,
+// this is not.
 
 function round2(n) {
   return Math.round(n * 100) / 100;

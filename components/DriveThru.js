@@ -8,8 +8,23 @@
 //
 // Every color and every threshold on this screen comes from lib/scale.js and
 // metric_targets. There is no goal number and no hex in this file, which is
-// why moving the target from 45s to 1:45 was a database update rather than a
-// rewrite.
+// why tightening the target to 2:15, with green at 2:05 and red at 2:30, was
+// a database update rather than a rewrite.
+//
+// Empty states. There are two of them and they are NOT the same message:
+//
+//   1. No drive-thru hardware anywhere in this session's scope. A CA-AZ area
+//      manager sees this, because CA and AZ stores have no hardware yet. It
+//      is not an error and not a permission failure - /api/drive-thru returns
+//      a normal 200 - so the tab stays visible for everyone and simply
+//      explains itself. Widening the date window cannot change it, so this
+//      state deliberately renders no controls.
+//
+//   2. The region has hardware, but nothing was reported in the selected
+//      window. Here the window selector IS the answer, so it stays on screen.
+//
+// Which one applies is decided by hasDriveThru / grpsWithDriveThru from the
+// server, never by a region list in this file. See app/api/drive-thru/route.js.
 
 "use client";
 
@@ -56,7 +71,9 @@ function dowIndex(iso) {
   return (new Date(y, m - 1, d).getDay() + 6) % 7;
 }
 
-export default function DriveThru() {
+// groupFilter is the shared region picker in app/page.js ("All", "TX-TN",
+// "CA-AZ"). Defaulted so the component still renders standalone.
+export default function DriveThru({ groupFilter = "All" }) {
   const [days, setDays] = useState(30);
   const [summary, setSummary] = useState(null);
   const [selectedStore, setSelectedStore] = useState(null);
@@ -65,6 +82,15 @@ export default function DriveThru() {
   const [distribution, setDistribution] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // The server already scoped this to the session's grps. groupFilter narrows
+  // it further, to the one region the viewer picked. Both layers matter: the
+  // first is access control, this one is just a view.
+  const regionFiltered = !!groupFilter && groupFilter !== "All";
+  const scopedStores = summary?.stores || [];
+  const inRegion = regionFiltered
+    ? scopedStores.filter((s) => s.grp === groupFilter)
+    : scopedStores;
 
   useEffect(() => {
     setLoading(true);
@@ -93,6 +119,22 @@ export default function DriveThru() {
       .catch(() => {});
   }, [selectedStore, days]);
 
+  // Keep the selected store inside what the region filter actually shows.
+  // Without this, switching the picker to a region leaves selectedStore
+  // pointing at a store that is no longer on screen, and every panel below
+  // would keep rendering that store's numbers under the new region's heading.
+  // Depends on groupFilter and summary rather than on inRegion, which is a
+  // fresh array each render and would loop.
+  useEffect(() => {
+    if (!inRegion.length) {
+      if (selectedStore !== null) setSelectedStore(null);
+      return;
+    }
+    if (!inRegion.some((s) => s.storeCode === selectedStore)) {
+      setSelectedStore(inRegion[0].storeCode);
+    }
+  }, [groupFilter, summary]);
+
   // Esc always clears the day drill-down, wherever focus happens to be.
   useEffect(() => {
     function onKeyDown(e) {
@@ -104,14 +146,98 @@ export default function DriveThru() {
 
   if (loading) return <div className="empty">Loading drive-thru data...</div>;
   if (error) return <div className="empty">Error: {error}</div>;
-  if (!summary?.stores?.length)
-    return <div className="empty">No drive-thru stores configured yet.</div>;
 
   // The whole screen hangs off this one object. Nothing below invents a number.
-  const cfg = cfgFromTarget(summary.targets);
+  const cfg = cfgFromTarget(summary?.targets);
   if (!cfg) return <div className="empty">No drive-thru target is configured.</div>;
 
-  const store = summary.stores.find((s) => s.storeCode === selectedStore) || summary.stores[0];
+  // Lifted out of the main return so the "no data in this window" state below
+  // can keep it. Byte for byte what it always was, it just has two render
+  // sites now. Same pattern as the nav block in components/Forecast.js.
+  const controls = (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-end",
+        marginBottom: 16,
+        flexWrap: "wrap",
+        gap: 12,
+      }}
+    >
+      <div style={{ fontSize: 13, color: "var(--text2)" }}>
+        Window time is measured at the service window, the same number the store sees on its own
+        timer. Target {fmtSeconds(cfg.target)}, red over {fmtSeconds(cfg.redLine)}.
+      </div>
+      <select
+        value={days}
+        onChange={(e) => setDays(Number(e.target.value))}
+        style={{
+          padding: "7px 12px",
+          borderRadius: 8,
+          border: "1.5px solid var(--border2)",
+          fontFamily: "inherit",
+          fontSize: 13,
+        }}
+      >
+        <option value={7}>Last 7 days</option>
+        <option value={30}>Last 30 days</option>
+        <option value={90}>Last 90 days</option>
+      </select>
+    </div>
+  );
+
+  // Does the region ON SCREEN have hardware at all?
+  //
+  // grpsWithDriveThru answers that per region, which is the whole reason it is
+  // a list: a manager who holds both grps and filters down to CA-AZ has to
+  // land on the same message a CA-AZ-only manager sees, even though their own
+  // scope does contain hardware. A bare chain-wide boolean would answer "yes"
+  // for them and show an empty chart instead.
+  //
+  // Missing fields read as "has hardware", so an older cached response can
+  // only ever fail toward the tab working, never toward hiding it.
+  const grpsWithHardware = summary?.grpsWithDriveThru;
+  const regionHasHardware =
+    regionFiltered && Array.isArray(grpsWithHardware)
+      ? grpsWithHardware.includes(groupFilter)
+      : summary?.hasDriveThru !== false;
+
+  // State 1: no hardware in scope. Deliberately renders NO controls - widening
+  // the window cannot conjure hardware, and a live dropdown sitting next to
+  // "there are no locations" is a dead end the viewer will still try.
+  //
+  // "this region", not "your region": an admin who filters the picker to
+  // CA-AZ has no region of their own, and neither does a manager who holds
+  // both grps and narrowed down to one.
+  //
+  // This copy is the one hardcoded thing on this path. The decision above it
+  // is not: when CA/AZ stores get hardware, regionHasHardware flips on its own
+  // and this branch stops being reached. Only the sentence needs revisiting.
+  if (!regionHasHardware) {
+    return (
+      <div className="empty">
+        <div className="empty-title">No drive-thru locations in this region</div>
+        <div>Drive-thru reporting is available for Texas and Tennessee stores.</div>
+      </div>
+    );
+  }
+
+  // State 2: hardware exists, this window came back empty. Keep the controls -
+  // here the window selector is exactly the fix, so it is the opposite of dead.
+  if (!inRegion.length) {
+    return (
+      <>
+        {controls}
+        <div className="empty">
+          <div className="empty-title">No drive-thru data in this window</div>
+          <div>Nothing was reported in the last {days} days. Try a longer window.</div>
+        </div>
+      </>
+    );
+  }
+
+  const store = inRegion.find((s) => s.storeCode === selectedStore) || inRegion[0];
 
   // Daily rows for the selected store
   const dailyRows = (summary.daily || [])
@@ -230,49 +356,19 @@ export default function DriveThru() {
 
   return (
     <div className="shift-dense">
-      {/* Window selector */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-end",
-          marginBottom: 16,
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <div style={{ fontSize: 13, color: "var(--text2)" }}>
-          Window time is measured at the service window, the same number the store sees on its own
-          timer. Target {fmtSeconds(cfg.target)}, red over {fmtSeconds(cfg.redLine)}.
-        </div>
-        <select
-          value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          style={{
-            padding: "7px 12px",
-            borderRadius: 8,
-            border: "1.5px solid var(--border2)",
-            fontFamily: "inherit",
-            fontSize: 13,
-          }}
-        >
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
-      </div>
+      {controls}
 
       {/* Store cards, click to switch. Fixed order by store number. */}
       <div
         className="dt-store-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${Math.min(summary.stores.length, 4)}, 1fr)`,
+          gridTemplateColumns: `repeat(${Math.min(inRegion.length, 4)}, 1fr)`,
           gap: 12,
           marginBottom: 20,
         }}
       >
-        {summary.stores.map((s) => {
+        {inRegion.map((s) => {
           const active = s.storeCode === store.storeCode;
           const b = bandFor(s.avgWindowTime, cfg);
           return (

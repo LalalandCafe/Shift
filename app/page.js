@@ -41,7 +41,7 @@ const VIEWS = [
   { key: "sssg",        label: "SSSG",          short: "SSSG",      icon: "gauge",     group: "Stores",     roles: ["admin"] },
   { key: "service",     label: "Service times", short: "Service",   icon: "timer",     group: "Operations", roles: ["admin"], date: true },
   { key: "tplh",        label: "TPLH",          short: "TPLH",      icon: "activity",  group: "Operations", roles: ["admin"] },
-  { key: "drivethru",   label: "Drive-thru",    short: "Drive",     icon: "car",       group: "Operations", roles: ALL },
+  { key: "drivethru",   label: "Drive-thru",    short: "Drive",     icon: "car",       group: "Operations", roles: ALL, region: true },
   { key: "email",       label: "HTML email",    short: "Email",     icon: "mail",      group: "Share",      roles: ["admin"], desktop: true, date: true, region: true },
   { key: "targets",     label: "Store targets", short: "Targets",   icon: "target",    group: "Share",      roles: ["admin"], desktop: true },
 ];
@@ -432,7 +432,7 @@ export default function ShiftApp() {
               )}
               {view === "service" && <ServiceBoard isoDate={isoDate} />}
               {view === "tplh" && <TPLH />}
-              {view === "drivethru" && <DriveThru />}
+              {view === "drivethru" && <DriveThru groupFilter={region} />}
               {view === "sssg" && <SSSG />}
               {view === "email" && <EmailPreview isoDate={isoDate} groupFilter={region} />}
               {view === "targets" && <Targets onAuthExpired={expired} />}

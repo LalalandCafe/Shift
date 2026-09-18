@@ -43,12 +43,6 @@ const MACHINE = new Set([
   "/api/toast/cron-trigger",
   "/api/hme/sync-store",
   "/api/sync/tattle",
-  // TEMPORAL - diagnostico del desfase de discounts (ver
-  // app/api/toast/discount-probe/route.js). Sin esta entrada la ruta es
-  // inalcanzable: la lista de arriba es explicita a proposito, no un
-  // prefijo, asi que una ruta nueva bajo /api/toast/ NO pasa sola.
-  // BORRAR ESTA LINEA junto con la ruta cuando se cierre el diagnostico.
-  "/api/toast/discount-probe",
 ]);
 
 // API routes that back an admin-only tab. Until today every non-admin got
@@ -61,6 +55,14 @@ const MACHINE = new Set([
 //
 // VERIFY against `ls app/api` before merging. Anything that backs a tab
 // whose roles array is ["admin"] in app/page.js belongs on this list.
+//
+// ONE DELIBERATE ABSENCE: /api/stores, which backs the Store targets tab, is
+// NOT here and is not an oversight. It enforces admin inside the handler with
+// requireAdmin() on both GET and PATCH (app/api/stores/route.js), which is
+// strictly stronger than this list because it survives a middleware change.
+// The routes that ARE listed here now do the same thing in their own handlers
+// as well, so this list is the outer layer, not the only one. Do not "fix"
+// the gap by adding /api/stores; check the handler first.
 const ADMIN_ONLY_API = [
   "/api/sssg",
   "/api/email",
@@ -170,13 +172,29 @@ export default auth(function middleware(request) {
   // unico detalle de este archivo que no es opcional.
   const headers = new Headers(request.headers);
   headers.delete("x-shift-user");
+  headers.delete("x-shift-oid");
   headers.delete("x-shift-name");
   headers.delete("x-shift-role");
   headers.delete("x-shift-scope");
   headers.delete("x-shift-store");
   headers.delete("x-shift-grp");
 
+  // x-shift-oid is the stable identifier (Entra objectId), x-shift-user is
+  // the display string. The tenant mixes @lalalandcafe.com and
+  // @lalalandkindcafe.com UPNs and Entra does not always populate `email`, so
+  // x-shift-user is not a key and must never be used as one.
+  //
+  // Neither header is an access input. Scope is decided above this block from
+  // role and grps alone; these two only travel so a handler can say WHO did
+  // something. Both are in the delete list above for the same reason as the
+  // rest: without it a client could send its own and sessionFrom() would
+  // believe it.
+  //
+  // Set only when present. A session issued before oid was added carries none
+  // until the user signs in again (12h maxAge), and an absent header reads
+  // back as null rather than as the string "undefined".
   headers.set("x-shift-user", user.email ?? "unknown");
+  if (user.oid) headers.set("x-shift-oid", user.oid);
   headers.set("x-shift-role", user.role);
   headers.set("x-shift-scope", isAdmin ? "all" : "grp");
   if (!isAdmin) headers.set("x-shift-grp", grps.join(","));
