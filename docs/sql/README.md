@@ -17,7 +17,7 @@ from progress docs. The "How verified" column says how to re-check each row
 independently — do that rather than trusting this file, which goes stale the
 moment someone runs something without updating it.
 
-## Status as of 2026-09-15
+## Status as of 2026-09-18
 
 | File | Branch | What it does | Depends on | Applied? | How verified |
 |---|---|---|---|---|---|
@@ -29,6 +29,7 @@ moment someone runs something without updating it.
 | `006-fix-tplh-weekend-boundary.sql` | `feat/command-center` | Overwrites all 68 of 005's TPLH values, which were computed with calendar Sat/Sun as "weekend" instead of this app's real Fri/Sat/Sun (`lib/fiscal.js`'s `WEEKEND`) | `003`, `005` | **NO — still pending** | Zero rows with `updated_by = 'migration-006'`; store 10002's `tplh_weekday` is still `7` (005's value) rather than `6.75` (006's correction) |
 | `007-daily-sales-net-sales.sql` | `feat/sssg-filters` | Adds `daily_sales.discounts_amount`, `.refunds_amount` (nullable numeric) and `.net_sales` (STORED GENERATED, `gross - discounts - refunds`, no COALESCE so it stays NULL until both components are populated) | — | **Yes**, 2026-09-15 | All three columns select without error; `net_sales` non-null on 0 of 3,385 rows, consistent with columns added but nothing backfilled yet |
 | `008-store-opened-at-backfill.sql` | `feat/sssg-filters` | Sets `opened_at` for all 35 store rows | `002` | **Yes**, 2026-09-15 — but see note | All 35 rows have non-null `opened_at` |
+| `009-dt-window-target-tightening.sql` | `main` | Tightens the chain-wide `dt_window` target: `green_value` 120→125 (2:05), `target_value` 150→135 (2:15), `red_value` 165→150 (2:30); then `refresh_drive_thru_views()` | — | **Yes**, 2026-09-18 | The single `dt_window` row (`store_code IS NULL`) reads 125/135/150 with `updated_by = 'dt-target-tightening-2026-09'`; `dt_bands` reads `b_comfort 125, b_target 135, b_red 150, b_low 67.50, b_far 225.00` |
 
 ## Notes
 
@@ -57,8 +58,25 @@ holds `2026-03-13`. Not resolved with finance. Immaterial until mid-2027, when
 10032 approaches the 455-day weekly-SSSG comparability line and one day could
 change which week it becomes comparable.
 
-**Two `metric_targets` rows predate this project** (`updated_by = 'migration'`):
-`dt_window` and `expo`. Origin not traceable in this repo.
+**Two `metric_targets` rows predated this project** (`updated_by = 'migration'`):
+`dt_window` and `expo`. Origin not traceable in this repo. As of 2026-09-18
+only `expo` still carries that stamp — `dt_window` was rewritten by `009` and
+now reads `updated_by = 'dt-target-tightening-2026-09'`.
+
+**`009` is a data change with no accompanying schema change**, which makes it
+the first entry here that cannot be verified by "does this column exist". Verify
+it by reading the values, as the "How verified" column describes. It is also the
+first entry that *must* be followed by `refresh_drive_thru_views()`: the
+drive-thru band counts, percentages and histogram buckets are precomputed in
+Postgres against `dt_bands`, so a `metric_targets` write alone leaves the tab's
+SQL-derived numbers on the old thresholds while its JS-derived colors move to
+the new ones.
+
+**`drive_thru_targets` (`green_seconds = 105`, `yellow_seconds = 135`) is a dead
+table.** It is referenced nowhere in the application code, and `dt_bands` was
+confirmed on 2026-09-18 to derive from `metric_targets` instead. Do not update
+it expecting anything to change. Left in place rather than dropped, because its
+origin is as untraceable as the two `migration` rows above.
 
 ## When adding a file here
 
